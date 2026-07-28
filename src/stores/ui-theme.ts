@@ -55,7 +55,7 @@ function applyUiTheme(theme: UiTheme): void {
 }
 
 export const useUiThemeStore = create<UiThemeState>((set) => ({
-  uiTheme: 'classic',
+  uiTheme: 'paper',
 
   initUiTheme: async () => {
     try {
@@ -64,12 +64,12 @@ export const useUiThemeStore = create<UiThemeState>((set) => ({
       const theme: UiTheme =
         saved && ['classic', 'navy', 'obsidian', 'paper'].includes(saved)
           ? saved
-          : 'classic'
+          : 'paper'
       set({ uiTheme: theme })
       applyUiTheme(theme)
     } catch (err) {
-      console.error('[UiTheme] 读取主题失败，使用经典主题:', err)
-      applyUiTheme('classic')
+      console.error('[UiTheme] 读取主题失败，使用默认主题(paper):', err)
+      applyUiTheme('paper')
     }
   },
 
