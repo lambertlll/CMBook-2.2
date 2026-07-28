@@ -241,10 +241,23 @@ export async function replaceMeetingTodos(
   }
 
   // 新增项单条 SQL 批量写入（json_each），避免逐条 IPC
+  // 注意：json_each 虚拟表只有 key/value/type/atom/id/parent/fullkey/path 列，
+  // 不能直接 SELECT JSON 字段名，必须用 json_extract(value, '$.field') 提取
   if (toInsert.length > 0) {
     await db.execute(
       `INSERT INTO visit_todos (id, customerId, visitId, meetingId, content, owner, dueDate, done, confirmed, createdAt, updatedAt)
-       SELECT id, customerId, visitId, meetingId, content, owner, dueDate, done, confirmed, createdAt, updatedAt
+       SELECT
+         json_extract(value, '$.id'),
+         json_extract(value, '$.customerId'),
+         json_extract(value, '$.visitId'),
+         json_extract(value, '$.meetingId'),
+         json_extract(value, '$.content'),
+         json_extract(value, '$.owner'),
+         json_extract(value, '$.dueDate'),
+         json_extract(value, '$.done'),
+         json_extract(value, '$.confirmed'),
+         json_extract(value, '$.createdAt'),
+         json_extract(value, '$.updatedAt')
        FROM json_each($1)`,
       [JSON.stringify(toInsert)]
     )
