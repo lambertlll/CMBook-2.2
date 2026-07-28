@@ -1,0 +1,10 @@
+{
+  "marscode.codeCompletionPro": {
+    "enableCodeCompletionPro": false
+  },
+  "marscode.enableInlineCommand": false,
+  "i18n-ally.localesPaths": [
+    "messages",
+    "src/i18n"
+  ]
+}

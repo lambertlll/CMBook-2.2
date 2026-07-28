@@ -1,0 +1,266 @@
+{
+  "dataSources": {
+    "enterprise": {
+      "businessInfo": [
+        {
+          "name": "国家企业信用信息公示系统",
+          "url": "https://www.gsxt.gov.cn",
+          "description": "工商信息、股东信息、经营状态",
+          "priority": 1
+        },
+        {
+          "name": "天眼查",
+          "url": "https://www.tianyancha.com",
+          "description": "企业综合信息（通过搜索引擎获取）",
+          "priority": 2
+        },
+        {
+          "name": "企查查",
+          "url": "https://www.qcc.com",
+          "description": "企业综合信息（通过搜索引擎获取）",
+          "priority": 2
+        }
+      ],
+      "financialData": [
+        {
+          "name": "巨潮资讯网",
+          "url": "http://www.cninfo.com.cn",
+          "description": "上市公司公告、财报",
+          "priority": 1
+        },
+        {
+          "name": "上交所",
+          "url": "http://www.sse.com.cn",
+          "description": "上交所上市公司信息",
+          "priority": 1
+        },
+        {
+          "name": "深交所",
+          "url": "http://www.szse.cn",
+          "description": "深交所上市公司信息",
+          "priority": 1
+        },
+        {
+          "name": "港交所",
+          "url": "https://www.hkex.com.hk",
+          "description": "港股上市公司信息",
+          "priority": 1
+        }
+      ],
+      "riskInfo": [
+        {
+          "name": "中国裁判文书网",
+          "url": "https://wenshu.court.gov.cn",
+          "description": "诉讼信息",
+          "priority": 1
+        },
+        {
+          "name": "信用中国",
+          "url": "https://www.creditchina.gov.cn",
+          "description": "失信被执行人信息",
+          "priority": 1
+        },
+        {
+          "name": "国家企业信用信息公示系统",
+          "url": "https://www.gsxt.gov.cn",
+          "description": "行政处罚、经营异常",
+          "priority": 1
+        }
+      ],
+      "news": [
+        {
+          "name": "财新网",
+          "url": "https://www.caixin.com",
+          "description": "财经新闻",
+          "priority": 1
+        },
+        {
+          "name": "财经杂志",
+          "url": "https://www.caijing.com.cn",
+          "description": "财经深度报道",
+          "priority": 1
+        },
+        {
+          "name": "21世纪经济报道",
+          "url": "https://www.21jingji.com",
+          "description": "财经新闻",
+          "priority": 1
+        },
+        {
+          "name": "证券时报",
+          "url": "http://www.stcn.com",
+          "description": "证券财经新闻",
+          "priority": 1
+        },
+        {
+          "name": "中国证券报",
+          "url": "http://www.cs.com.cn",
+          "description": "证券财经新闻",
+          "priority": 1
+        },
+        {
+          "name": "36氪",
+          "url": "https://36kr.com",
+          "description": "科技创业新闻",
+          "priority": 2
+        },
+        {
+          "name": "虎嗅",
+          "url": "https://www.huxiu.com",
+          "description": "科技商业新闻",
+          "priority": 2
+        },
+        {
+          "name": "钛媒体",
+          "url": "https://www.tmtpost.com",
+          "description": "科技商业新闻",
+          "priority": 2
+        }
+      ]
+    },
+    "individual": {
+      "background": [
+        {
+          "name": "LinkedIn",
+          "url": "https://www.linkedin.com",
+          "description": "职业履历",
+          "priority": 1
+        },
+        {
+          "name": "百度百科",
+          "url": "https://baike.baidu.com",
+          "description": "人物基本信息",
+          "priority": 2
+        }
+      ],
+      "socialMedia": [
+        {
+          "name": "微博",
+          "url": "https://weibo.com",
+          "description": "个人动态",
+          "priority": 1
+        },
+        {
+          "name": "微信公众号",
+          "url": "https://mp.weixin.qq.com",
+          "description": "个人文章",
+          "priority": 1
+        },
+        {
+          "name": "知乎",
+          "url": "https://www.zhihu.com",
+          "description": "个人观点",
+          "priority": 2
+        }
+      ],
+      "news": [
+        {
+          "name": "财经媒体",
+          "description": "人物专访、报道",
+          "priority": 1
+        },
+        {
+          "name": "行业媒体",
+          "description": "行业活动、演讲",
+          "priority": 1
+        }
+      ],
+      "riskInfo": [
+        {
+          "name": "信用中国",
+          "url": "https://www.creditchina.gov.cn",
+          "description": "失信记录",
+          "priority": 1
+        },
+        {
+          "name": "中国裁判文书网",
+          "url": "https://wenshu.court.gov.cn",
+          "description": "涉诉情况",
+          "priority": 1
+        }
+      ]
+    }
+  },
+  "searchKeywords": {
+    "enterprise": {
+      "basic": [
+        "[公司名] 统一社会信用代码",
+        "[公司名] 工商信息",
+        "[公司名] 法定代表人"
+      ],
+      "financial": [
+        "[公司名] 财报 2026",
+        "[公司名] 年报",
+        "[公司名] 营收",
+        "[公司名] 业绩"
+      ],
+      "news": [
+        "[公司名] 最新消息",
+        "[公司名] 2026",
+        "[公司名] 新闻"
+      ],
+      "management": [
+        "[董事长名] 发言",
+        "[CEO名] 采访",
+        "[公司名] 股东大会"
+      ],
+      "cooperation": [
+        "[公司名] 合作",
+        "[公司名] 签约",
+        "[公司名] 战略"
+      ],
+      "risk": [
+        "[公司名] 诉讼",
+        "[公司名] 处罚",
+        "[公司名] 失信",
+        "[公司名] 争议",
+        "[公司名] 负面"
+      ]
+    },
+    "individual": {
+      "background": [
+        "[姓名] 简历",
+        "[姓名] 履历",
+        "[姓名] 教育背景"
+      ],
+      "speech": [
+        "[姓名] 演讲",
+        "[姓名] 发言",
+        "[姓名] 采访",
+        "[姓名] 专访"
+      ],
+      "socialMedia": [
+        "[姓名] 微博",
+        "[姓名] 公众号",
+        "[姓名] LinkedIn"
+      ],
+      "company": [
+        "[姓名] 公司",
+        "[姓名] 企业",
+        "[姓名] 投资"
+      ],
+      "risk": [
+        "[姓名] 失信",
+        "[姓名] 诉讼",
+        "[姓名] 负面"
+      ]
+    }
+  },
+  "timeRange": {
+    "default": "近3个月",
+    "majorEvents": "近6个月",
+    "background": "不限"
+  },
+  "reportSettings": {
+    "updateFrequency": {
+      "keyClients": "每月",
+      "regularClients": "按需",
+      "oneTime": "单次"
+    },
+    "detailLevel": {
+      "brief": "1页简版",
+      "standard": "3-5页标准版",
+      "detailed": "10页详版"
+    }
+  }
+}

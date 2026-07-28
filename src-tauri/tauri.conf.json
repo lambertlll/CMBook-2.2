@@ -1,0 +1,71 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "CMBook",
+  "version": "2.2.0",
+  "identifier": "com.codexu.NoteGen",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:3456",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../out"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "macOSPrivateApi": true,
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http: asset:; font-src 'self' data:; connect-src 'self' ipc: http: https: ws: wss:; media-src 'self' blob: data: asset:; object-src 'none'; base-uri 'self'",
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "**"
+        ]
+      }
+    },
+    "windows": [
+      {
+        "title": "CMBook",
+        "label": "main",
+        "width": 1360,
+        "height": 720,
+        "dragDropEnabled": false,
+        "titleBarStyle": "Overlay"
+      }
+    ]
+  },
+  "bundle": {
+    "active": true,
+    "createUpdaterArtifacts": false,
+    "targets": "all",
+    "resources": [
+      "icons",
+      "resources/ocr/*",
+      "../builtin-skills"
+    ],
+    "fileAssociations": [
+      {
+        "ext": [
+          "md",
+          "markdown"
+        ],
+        "name": "Markdown Document",
+        "description": "Markdown document",
+        "mimeType": "text/markdown",
+        "role": "Editor"
+      }
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "10.13",
+      "signingIdentity": null,
+      "entitlements": null,
+      "exceptionDomain": null
+    }
+  },
+  "plugins": {}
+}

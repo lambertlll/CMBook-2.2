@@ -1,0 +1,37 @@
+{
+  "identifier": "desktop-capability",
+  "platforms": [
+    "macOS",
+    "windows",
+    "linux"
+  ],
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "global-shortcut:default",
+    "global-shortcut:allow-register",
+    "global-shortcut:allow-register-all",
+    "global-shortcut:allow-is-registered",
+    "global-shortcut:allow-unregister",
+    "global-shortcut:allow-unregister-all",
+    "window-state:default",
+    "os:default",
+    "core:window:allow-set-always-on-top",
+    "core:window:allow-start-dragging",
+    "clipboard:allow-read-image-base64",
+    "clipboard:read-all",
+    "clipboard:allow-clear",
+    "clipboard:allow-write-text",
+    "clipboard:allow-start-monitor",
+    "process:default",
+    "global-shortcut:allow-is-registered",
+    "global-shortcut:allow-register",
+    "global-shortcut:allow-unregister",
+    "core:window:allow-unminimize",
+    "os:default",
+    "opener:default",
+    "opener:allow-open-url",
+    "opener:allow-open-path"
+  ]
+}

@@ -1,0 +1,110 @@
+name: 'build'
+
+on:
+  push:
+    branches:
+      - release
+  workflow_dispatch:
+
+jobs:
+  build:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'macos-latest'
+            args: '--target aarch64-apple-darwin'
+            name: 'macos-arm64'
+            bundlePath: 'src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/CMBook_*.dmg'
+          - platform: 'macos-latest'
+            args: '--target x86_64-apple-darwin'
+            name: 'macos-x64'
+            bundlePath: 'src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/CMBook_*.dmg'
+          - platform: 'windows-latest'
+            args: ''
+            name: 'windows'
+            bundlePath: 'src-tauri\target\release\bundle\nsis\CMBook_*-setup.exe'
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: true
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: 'pnpm'
+
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: 'src-tauri -> target'
+
+      - name: install frontend dependencies
+        run: pnpm install
+
+      - name: Build (macOS)
+        if: matrix.platform == 'macos-latest'
+        run: pnpm tauri build ${{ matrix.args }}
+
+      - name: Build (Windows)
+        if: matrix.platform == 'windows-latest'
+        run: pnpm tauri build ${{ matrix.args }}
+        env:
+          LIBCLANG_PATH: 'C:/Program Files/LLVM/bin'
+          CFLAGS: '/utf-8'
+          CXXFLAGS: '/utf-8'
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: |
+            ${{ matrix.bundlePath }}
+          if-no-files-found: warn
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version
+        id: version
+        run: |
+          VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: 'cmbook-v${{ steps.version.outputs.version }}'
+          name: 'CMBook v${{ steps.version.outputs.version }}'
+          body: 'CMBook v${{ steps.version.outputs.version }} — 下载对应平台的安装包即可。'
+          draft: false
+          prerelease: false
+          files: |
+            artifacts/macos-arm64/*
+            artifacts/macos-x64/*
+            artifacts/windows/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

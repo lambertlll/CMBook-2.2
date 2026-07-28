@@ -1,0 +1,1183 @@
+@import "tailwindcss";
+
+/* 导入动画库 */
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* 配置 dark mode 变体 - 必须在 @theme 外面 */
+@variant dark (&:where(.dark, .dark *));
+
+/* 使用 @theme inline 替代 tailwind.config.ts */
+@theme inline {
+  /* 颜色映射 */
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-third: hsl(var(--third));
+  --color-third-foreground: hsl(var(--third-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  /* 语义状态色：成功 / 警告 / 危险（状态文本、图标、徽章、描边） */
+  --color-success: hsl(var(--success));
+  --color-success-foreground: hsl(var(--success-foreground));
+  --color-warning: hsl(var(--warning));
+  --color-warning-foreground: hsl(var(--warning-foreground));
+  --color-danger: hsl(var(--danger));
+  --color-danger-foreground: hsl(var(--danger-foreground));
+  /* 品牌色：Logo 与关键入口（三套主题各不相同，经典下=primary） */
+  --color-brand: hsl(var(--brand));
+  --color-brand-foreground: hsl(var(--brand-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  /* 边框圆角 */
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  /* 自定义动画 */
+  @keyframes accordion-down {
+    from {
+      height: 0;
+    }
+    to {
+      height: var(--radix-accordion-content-height);
+    }
+  }
+
+  @keyframes accordion-up {
+    from {
+      height: var(--radix-accordion-content-height);
+    }
+    to {
+      height: 0;
+    }
+  }
+
+  @keyframes iconBounce {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    20% {
+      transform: translateY(-0.3em);
+    }
+    40% {
+      transform: translateY(0);
+    }
+    60% {
+      transform: translateY(-0.1em);
+    }
+    80% {
+      transform: translateY(0);
+    }
+  }
+
+  --animate-shine: shine var(--duration) infinite linear
+;
+  @keyframes shine {
+  0% {
+    background-position: 0% 0%;}
+  50% {
+    background-position: 100% 100%;}
+  to {
+    background-position: 0% 0%;}}}
+
+@keyframes recordSearchBreathe {
+  0% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.12);
+    border-color: rgba(245, 158, 11, 0.45);
+    background-color: rgba(254, 243, 199, 0.4);
+  }
+
+  50% {
+    box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.18);
+    border-color: rgba(245, 158, 11, 0.9);
+    background-color: rgba(254, 243, 199, 0.9);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.1);
+    border-color: rgba(245, 158, 11, 0.35);
+    background-color: rgba(254, 243, 199, 0.35);
+  }
+}
+
+.record-search-highlight {
+  animation: recordSearchBreathe 1.5s ease-in-out 2;
+}
+
+/* 基础样式 - 包含主题变量定义 */
+@layer base {
+  :root {
+    /* CMBook 招本 商务蓝主题（浅色） */
+    --background: 210 25% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 215 85% 42%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 214 32% 92%;
+    --secondary-foreground: 222 47% 18%;
+    --third: 214 30% 88%;
+    --third-foreground: 222 40% 22%;
+    --muted: 214 28% 94%;
+    --muted-foreground: 215 16% 42%;
+    --accent: 210 92% 93%;
+    --accent-foreground: 215 85% 32%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    /* 语义状态色（浅色）： destructive 偏向"破坏性操作按钮"，danger 为状态语义色 */
+    --success: 152 60% 36%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 42%;
+    --warning-foreground: 0 0% 100%;
+    --danger: 0 72% 51%;
+    --danger-foreground: 0 0% 100%;
+    --border: 214 25% 88%;
+    --input: 214 25% 88%;
+    --ring: 215 85% 42%;
+    --shadow: 0 0% 0%;
+    --chart-1: 215 85% 45%;
+    --chart-2: 199 89% 42%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 160 84% 34%;
+    --chart-5: 226 70% 58%;
+    --radius: 0.5rem;
+    --sidebar-background: 216 30% 97%;
+    --sidebar-foreground: 222 35% 25%;
+    --sidebar-primary: 215 85% 42%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 92% 93%;
+    --sidebar-accent-foreground: 215 85% 30%;
+    --sidebar-border: 214 25% 88%;
+    --sidebar-ring: 215 85% 45%;
+    --component-inactive-color: var(--muted-foreground);
+    --component-bg: var(--card);
+    --component-shadow: var(--border);
+    --component-active-bg: var(--secondary);
+    --component-line-inactive-color: var(--border);
+    --component-active-color-default: var(--accent-foreground);
+  }
+
+  .dark {
+    /* CMBook 招本 商务蓝主题（暗色） */
+    --background: 222 47% 7%;
+    --foreground: 210 40% 96%;
+    --card: 222 40% 10%;
+    --card-foreground: 210 40% 96%;
+    --popover: 222 40% 10%;
+    --popover-foreground: 210 40% 96%;
+    --primary: 213 90% 60%;
+    --primary-foreground: 222 47% 10%;
+    --secondary: 217 25% 18%;
+    --secondary-foreground: 210 40% 96%;
+    --third: 217 22% 23%;
+    --third-foreground: 213 30% 90%;
+    --muted: 217 22% 16%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 214 45% 22%;
+    --accent-foreground: 213 90% 82%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    /* 语义状态色（暗色）：亮度调高保证对比度 */
+    --success: 152 55% 55%;
+    --success-foreground: 152 60% 10%;
+    --warning: 38 92% 58%;
+    --warning-foreground: 38 92% 12%;
+    --danger: 0 85% 68%;
+    --danger-foreground: 0 72% 12%;
+    --border: 217 25% 20%;
+    --input: 217 25% 22%;
+    --ring: 213 90% 60%;
+    --shadow: 0 0% 0%;
+    --chart-1: 213 90% 60%;
+    --chart-2: 199 89% 55%;
+    --chart-3: 38 92% 55%;
+    --chart-4: 160 84% 45%;
+    --chart-5: 226 75% 68%;
+    --sidebar-background: 222 40% 9%;
+    --sidebar-foreground: 210 40% 95%;
+    --sidebar-primary: 213 90% 60%;
+    --sidebar-primary-foreground: 222 47% 10%;
+    --sidebar-accent: 214 45% 20%;
+    --sidebar-accent-foreground: 210 40% 95%;
+    --sidebar-border: 217 25% 20%;
+    --sidebar-ring: 213 90% 60%;
+    --component-inactive-color: var(--muted-foreground);
+    --component-bg: var(--card);
+    --component-shadow: var(--border);
+    --component-active-bg: var(--secondary);
+    --component-line-inactive-color: var(--muted-foreground);
+    --component-active-color-default: var(--accent-foreground);
+    --notegen-app-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", "WenQuanYi Micro Hei", Arial, sans-serif;
+  }
+
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: var(--notegen-app-font-family);
+  }
+}
+
+/* 自定义组件样式 - 使用 Tailwind 类以支持主题切换 */
+html, body {
+  height: 100vh;
+  overflow: hidden;
+}
+
+.file-manange-item {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0;
+  font-size: 0.875rem;
+  cursor: pointer;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.file-manange-item:not(.active):not(.file-selected):not(.file-on-drop):hover {
+  background-color: hsl(var(--third) / 0.55);
+}
+
+.dark .file-manange-item:not(.active):not(.file-selected):not(.file-on-drop):hover {
+  background-color: hsl(var(--muted) / 0.65);
+}
+
+.file-manange-item.active {
+  background-color: hsl(var(--third));
+  color: hsl(var(--third-foreground));
+  font-weight: 700;
+}
+
+.dark .file-manange-item.active {
+  background-color: hsl(var(--secondary));
+  color: hsl(var(--secondary-foreground));
+}
+
+.file-manange-item.active .bg-primary-foreground {
+  background-color: hsl(var(--third));
+}
+
+.dark .file-manange-item.active .bg-primary-foreground {
+  background-color: hsl(var(--secondary-foreground));
+}
+
+.file-manange-item.file-selected {
+  background-color: hsl(var(--primary) / 0.12);
+  color: hsl(var(--foreground));
+  box-shadow: inset 2px 0 0 hsl(var(--primary));
+}
+
+.dark .file-manange-item.file-selected {
+  background-color: hsl(var(--primary) / 0.18);
+  color: hsl(var(--foreground));
+  box-shadow: inset 2px 0 0 hsl(var(--primary));
+}
+
+.file-manange-item.file-on-drop {
+  background-color: hsl(var(--primary) / 0.12);
+  outline: 1px dashed hsl(var(--primary) / 0.7);
+  outline-offset: -2px;
+}
+
+:not(table)::-webkit-scrollbar {
+  width: 0.5rem;
+  height: 0.5rem;
+}
+
+:not(table)::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+:not(table)::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background-color: hsl(var(--border));
+  border-width: 1px;
+  border-style: solid;
+  border-color: transparent;
+  background-clip: padding-box;
+}
+
+.setting-anchor {
+  font-size: 0.875rem;
+  width: 100%;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.setting-anchor:hover {
+  background-color: hsl(var(--accent));
+}
+
+.setting-anchor svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.search-highlight i {
+  background-color: hsl(var(--secondary-foreground));
+  color: hsl(var(--secondary));
+}
+
+.setting-input {
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
+  height: 1.25rem;
+  min-height: 1.25rem;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-radius: 0.125rem;
+  border-style: none;
+  outline-style: none;
+  box-shadow: none;
+}
+
+.setting-select {
+  height: 1.5rem;
+  min-height: 1.5rem;
+}
+
+ol {
+  list-style-type: decimal;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Tab scrollbar - absolute positioned, doesn't take height */
+.tab-scrollbar {
+  position: relative;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.tab-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Custom scrollbar using pseudo element */
+.tab-scrollbar-wrapper {
+  position: relative;
+}
+
+.tab-scrollbar-track {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+
+.tab-scrollbar-wrapper:hover .tab-scrollbar-track {
+  opacity: 1;
+}
+
+.tab-scrollbar-thumb {
+  position: absolute;
+  height: 100%;
+  background: hsl(var(--muted-foreground) / 0.4);
+  border-radius: 2px;
+  min-width: 20px;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--notegen-app-font-family);
+  }
+}
+
+/* Tiptap 搜索替换高亮样式 */
+.search-result {
+  background-color: #ffeb3b !important;
+  color: #000 !important;
+  padding: 0 2px !important;
+  border-radius: 2px !important;
+  text-decoration: none !important;
+}
+
+.search-result.search-result-current,
+.search-result.is-current {
+  background-color: #ff9800 !important;
+  color: #fff !important;
+}
+
+/* 暗色模式适配 */
+.dark .search-result {
+  background-color: #f59e0b !important;
+  color: #000 !important;
+}
+
+.dark .search-result.search-result-current,
+.dark .search-result.is-current {
+  background-color: #ea580c !important;
+  color: #fff !important;
+}
+
+/* Photo preview should leave breathing room around large images. */
+.PhotoView-Portal.notegen-photo-preview .PhotoView-Slider__BannerWrap {
+  display: none;
+}
+
+.PhotoView-Portal.notegen-photo-preview .PhotoView-Slider__Overlay {
+  pointer-events: none;
+  position: relative;
+  z-index: 30;
+}
+
+.PhotoView-Portal.notegen-photo-preview .notegen-photo-preview-control {
+  pointer-events: auto;
+}
+
+.PhotoView-Portal.notegen-photo-preview .notegen-photo-preview-photo {
+  scale: 0.9;
+  transform-origin: center;
+}
+
+@media (max-width: 640px) {
+  .PhotoView-Portal.notegen-photo-preview .notegen-photo-preview-photo {
+    scale: 0.88;
+  }
+}
+
+/* ============ 三套主题令牌（UI 重设计 2.1） ============
+   经典主题 = 无 data-theme（现有商务蓝明暗，完整保留）；
+   navy/obsidian/paper 挂在 [data-theme] 下，与经典互斥共存。
+   品牌红令牌 --brand：Logo、开始会议等关键入口（经典下映射为 primary） */
+@layer base {
+  :root {
+    --brand: 215 85% 42%;
+    --brand-foreground: 0 0% 100%;
+  }
+  .dark {
+    --brand: 213 90% 60%;
+    --brand-foreground: 222 47% 10%;
+  }
+
+  /* ---- V1 商务藏青（navy）：稳重商务，禁投影只用边框 ---- */
+  [data-theme='navy'] {
+    --background: 220 13% 97%;
+    --foreground: 225 13% 14%;
+    --card: 0 0% 100%;
+    --card-foreground: 225 13% 14%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 225 13% 14%;
+    --primary: 218 58% 27%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 216 30% 95%;
+    --secondary-foreground: 218 58% 22%;
+    --third: 216 26% 92%;
+    --third-foreground: 218 45% 24%;
+    --muted: 220 14% 95%;
+    --muted-foreground: 220 9% 46%;
+    --accent: 216 47% 95%;
+    --accent-foreground: 218 58% 27%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 152 64% 33%;
+    --success-foreground: 0 0% 100%;
+    --warning: 28 93% 37%;
+    --warning-foreground: 0 0% 100%;
+    --danger: 0 72% 51%;
+    --danger-foreground: 0 0% 100%;
+    --border: 220 14% 91%;
+    --input: 220 14% 91%;
+    --ring: 218 58% 27%;
+    --brand: 350 85% 42%;
+    --brand-foreground: 0 0% 100%;
+    --chart-1: 218 58% 35%;
+    --chart-2: 199 60% 40%;
+    --chart-3: 38 92% 45%;
+    --chart-4: 152 64% 33%;
+    --chart-5: 226 55% 55%;
+    --radius: 0.5rem;
+    --sidebar-background: 220 14% 98%;
+    --sidebar-foreground: 225 13% 14%;
+    --sidebar-primary: 218 58% 27%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 216 47% 95%;
+    --sidebar-accent-foreground: 218 58% 27%;
+    --sidebar-border: 220 14% 91%;
+    --sidebar-ring: 218 58% 27%;
+  }
+
+  /* ---- V2 曜石暗黑（obsidian）：科技深色，蓝青强调 ---- */
+  [data-theme='obsidian'] {
+    --background: 222 33% 6%;
+    --foreground: 220 20% 92%;
+    --card: 222 18% 9%;
+    --card-foreground: 220 20% 92%;
+    --popover: 224 24% 9%;
+    --popover-foreground: 220 20% 92%;
+    --primary: 222 100% 65%;
+    --primary-foreground: 222 47% 8%;
+    --secondary: 222 24% 13%;
+    --secondary-foreground: 220 100% 78%;
+    --third: 222 20% 16%;
+    --third-foreground: 220 60% 84%;
+    --muted: 222 22% 11%;
+    --muted-foreground: 220 12% 60%;
+    --accent: 222 45% 16%;
+    --accent-foreground: 220 100% 78%;
+    --destructive: 355 100% 65%;
+    --destructive-foreground: 355 60% 10%;
+    --success: 142 71% 56%;
+    --success-foreground: 142 60% 10%;
+    --warning: 36 90% 63%;
+    --warning-foreground: 36 80% 10%;
+    --danger: 355 100% 65%;
+    --danger-foreground: 355 60% 10%;
+    --border: 225 12% 14%;
+    --input: 225 12% 17%;
+    --ring: 222 100% 65%;
+    --brand: 355 100% 65%;
+    --brand-foreground: 355 60% 10%;
+    --chart-1: 222 100% 65%;
+    --chart-2: 188 86% 53%;
+    --chart-3: 36 90% 63%;
+    --chart-4: 142 71% 56%;
+    --chart-5: 226 75% 68%;
+    --radius: 0.875rem;
+    --sidebar-background: 223 29% 7%;
+    --sidebar-foreground: 220 20% 92%;
+    --sidebar-primary: 222 100% 65%;
+    --sidebar-primary-foreground: 222 47% 8%;
+    --sidebar-accent: 222 45% 16%;
+    --sidebar-accent-foreground: 220 100% 78%;
+    --sidebar-border: 225 12% 14%;
+    --sidebar-ring: 222 100% 65%;
+  }
+
+  /* ---- V3 东方纸韵（paper）：新中式编辑风，宋体标题+以线分区 ---- */
+  [data-theme='paper'] {
+    --background: 45 38% 96%;
+    --foreground: 40 15% 12%;
+    --card: 45 40% 97%;
+    --card-foreground: 40 15% 12%;
+    --popover: 45 40% 97%;
+    --popover-foreground: 40 15% 12%;
+    --primary: 40 15% 12%;
+    --primary-foreground: 45 38% 96%;
+    --secondary: 45 27% 92%;
+    --secondary-foreground: 40 15% 18%;
+    --third: 44 24% 89%;
+    --third-foreground: 40 15% 22%;
+    --muted: 45 27% 92%;
+    --muted-foreground: 38 11% 39%;
+    --accent: 6 30% 95%;
+    --accent-foreground: 6 63% 44%;
+    --destructive: 6 63% 44%;
+    --destructive-foreground: 45 38% 96%;
+    --success: 138 33% 36%;
+    --success-foreground: 45 38% 96%;
+    --warning: 37 70% 35%;
+    --warning-foreground: 45 38% 96%;
+    --danger: 6 63% 44%;
+    --danger-foreground: 45 38% 96%;
+    --border: 41 26% 83%;
+    --input: 41 26% 83%;
+    --ring: 6 63% 44%;
+    --brand: 6 63% 44%;
+    --brand-foreground: 45 38% 96%;
+    --chart-1: 6 63% 44%;
+    --chart-2: 40 15% 30%;
+    --chart-3: 37 70% 35%;
+    --chart-4: 138 33% 36%;
+    --chart-5: 38 16% 58%;
+    --radius: 0.25rem;
+    --sidebar-background: 45 27% 92%;
+    --sidebar-foreground: 40 15% 12%;
+    --sidebar-primary: 6 63% 44%;
+    --sidebar-primary-foreground: 45 38% 96%;
+    --sidebar-accent: 6 30% 95%;
+    --sidebar-accent-foreground: 6 63% 44%;
+    --sidebar-border: 41 26% 83%;
+    --sidebar-ring: 6 63% 44%;
+    --font-serif: 'Noto Serif SC', 'Songti SC', 'STSong', 'SimSun', serif;
+    /* 发丝线粗档（#CFC7B0）与墨色弱文（#A39A86），仅 paper 组件形态覆盖使用 */
+    --line-strong: 44 24% 75%;
+    --ink-3: 41 14% 58%;
+  }
+
+  /* V3 标题宋体（正文保持系统无衬线） */
+  [data-theme='paper'] h1,
+  [data-theme='paper'] h2,
+  [data-theme='paper'] h3,
+  [data-theme='paper'] .theme-serif {
+    font-family: var(--font-serif);
+  }
+}
+
+
+/* ============ V3 东方纸韵（paper）组件形态覆盖 ============
+   以下规则全部挂在 [data-theme='paper'] 选择器下，对经典/navy/obsidian 零影响。
+   有意置于 cascade layer 之外：Tailwind 4 的 utilities 位于 @layer utilities 内，
+   未分层样式优先级更高，可在此覆盖组件上的工具类（圆角/边框/字号等）。
+   组件侧仅新增 paper-* 语义 hook class，DOM 结构与业务行为不变。 */
+
+/* ---- 印章 Logo（title-bar / app-rail 品牌块：朱砂方印 + 宋体白「招」） ---- */
+[data-theme='paper'] .paper-seal {
+  border-radius: 3px;
+  font-family: var(--font-serif);
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px hsl(var(--brand-foreground) / 0.25);
+}
+
+[data-theme='paper'] .paper-seal-lg {
+  border-radius: 4px;
+  box-shadow:
+    inset 0 0 0 1.5px hsl(var(--brand-foreground) / 0.35),
+    0 2px 8px hsl(var(--brand) / 0.3);
+}
+
+[data-theme='paper'] .paper-brand-name {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+}
+
+/* ---- 左侧图标导轨：纸色二级底 + 激活态朱砂 ---- */
+[data-theme='paper'] .paper-rail {
+  background: hsl(var(--sidebar-background));
+}
+
+[data-theme='paper'] .paper-rail-btn:hover {
+  background: hsl(var(--third));
+}
+
+[data-theme='paper'] .paper-rail-btn.text-primary {
+  color: hsl(var(--brand));
+}
+
+[data-theme='paper'] .paper-rail-indicator {
+  border-radius: 0;
+  background: hsl(var(--brand));
+}
+
+/* ---- 页面标题：宋体 24px/700 宽字距 ---- */
+[data-theme='paper'] .paper-page-title {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+/* ---- 笔记首页欢迎条：去卡片化，底部粗细双线 ---- */
+[data-theme='paper'] .paper-welcome {
+  position: relative;
+  align-items: flex-end;
+  margin-bottom: 28px;
+  padding: 8px 2px 26px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+[data-theme='paper'] .paper-welcome::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  bottom: 0;
+  height: 1px;
+  background: hsl(var(--foreground));
+}
+
+[data-theme='paper'] .paper-welcome::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  bottom: 3px;
+  height: 1px;
+  background: hsl(var(--line-strong));
+}
+
+[data-theme='paper'] .paper-welcome-greeting {
+  font-family: var(--font-serif);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.3;
+}
+
+/* 欢迎语末尾朱砂句号 */
+[data-theme='paper'] .paper-welcome-greeting::after {
+  content: '。';
+  color: hsl(var(--brand));
+}
+
+[data-theme='paper'] .paper-welcome-date {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+}
+
+/* ---- 快速操作：01–04 编号目录列表（CSS counter 实现，DOM 不变） ---- */
+[data-theme='paper'] .paper-quick-list {
+  display: block;
+  margin-bottom: 28px;
+  border-top: 1px solid hsl(var(--border));
+  counter-reset: paper-quick;
+}
+
+[data-theme='paper'] .paper-quick-row {
+  width: 100%;
+  gap: 18px;
+  padding: 16px 2px;
+  border: none;
+  border-bottom: 1px solid hsl(var(--border));
+  border-radius: 0;
+  background: transparent;
+}
+
+[data-theme='paper'] .paper-quick-row:hover {
+  border-color: hsl(var(--border));
+  background: hsl(var(--muted));
+}
+
+/* 行首编号 01–04：宋体斜体浅色 */
+[data-theme='paper'] .paper-quick-row::before {
+  counter-increment: paper-quick;
+  content: counter(paper-quick, decimal-leading-zero);
+  flex: none;
+  width: 26px;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 13px;
+  color: hsl(var(--ink-3));
+}
+
+/* 行尾 → 指示 */
+[data-theme='paper'] .paper-quick-row::after {
+  content: '→';
+  margin-left: auto;
+  font-family: var(--font-serif);
+  color: hsl(var(--ink-3));
+  transition: transform 0.2s, color 0.2s;
+}
+
+[data-theme='paper'] .paper-quick-row:hover::after {
+  transform: translateX(4px);
+  color: hsl(var(--brand));
+}
+
+/* 图标盒：发丝线方框；首项「开始会议」朱砂强调（沿用 DOM 上的 text-brand 标记） */
+[data-theme='paper'] .paper-quick-row > span:first-child {
+  width: 34px;
+  height: 34px;
+  border: 1px solid hsl(var(--line-strong));
+  border-radius: 3px;
+  background: transparent;
+}
+
+[data-theme='paper'] .paper-quick-row > span:first-child:not(.text-brand) {
+  color: hsl(var(--muted-foreground));
+}
+
+[data-theme='paper'] .paper-quick-row > span:first-child.text-brand {
+  border-color: hsl(var(--brand) / 0.28);
+  background: hsl(var(--brand) / 0.06);
+}
+
+[data-theme='paper'] .paper-quick-title {
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 1px;
+}
+
+[data-theme='paper'] .paper-quick-desc {
+  color: hsl(var(--ink-3));
+}
+
+[data-theme='paper'] .paper-quick-row kbd {
+  margin-left: 0;
+  padding: 1px 6px;
+  border: 1px solid hsl(var(--line-strong));
+  border-radius: 2px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 11px;
+  color: hsl(var(--ink-3));
+}
+
+/* ---- 区块化卡片（最近编辑 / 工作台卡片）：以线分区，去边框卡片 ---- */
+[data-theme='paper'] .paper-sec {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  border-top: 1px solid hsl(var(--line-strong));
+}
+
+[data-theme='paper'] .paper-sec > header {
+  padding: 13px 2px;
+}
+
+[data-theme='paper'] .paper-sec > button,
+[data-theme='paper'] .paper-sec > div {
+  padding-left: 2px;
+  padding-right: 2px;
+}
+
+[data-theme='paper'] .paper-sec h3 {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+[data-theme='paper'] .paper-sec > header > svg,
+[data-theme='paper'] .paper-sec > header > span:first-child {
+  color: hsl(var(--brand));
+}
+
+/* ---- 工作台统计带：大号明体数字 + 上粗下细分隔线 ---- */
+[data-theme='paper'] .paper-stat-band {
+  gap: 0;
+  margin-bottom: 28px;
+  border-top: 2px solid hsl(var(--foreground));
+  border-bottom: 1px solid hsl(var(--line-strong));
+}
+
+[data-theme='paper'] .paper-stat-cell {
+  padding: 20px 22px;
+  border: none;
+  border-right: 1px solid hsl(var(--border));
+  border-radius: 0;
+  background: transparent;
+}
+
+[data-theme='paper'] .paper-stat-cell:first-child {
+  padding-left: 2px;
+}
+
+[data-theme='paper'] .paper-stat-cell:last-child {
+  border-right: none;
+}
+
+[data-theme='paper'] .paper-stat-cell:hover {
+  background: hsl(var(--muted));
+}
+
+[data-theme='paper'] .paper-stat-label {
+  font-size: 11px;
+  letter-spacing: 3px;
+}
+
+[data-theme='paper'] .paper-stat-num {
+  margin-top: 10px;
+  font-family: var(--font-serif);
+  font-size: 38px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* 待归类会议数字用朱砂警示（原型 .s-num.red） */
+[data-theme='paper'] .paper-stat-num.text-warning {
+  color: hsl(var(--brand));
+}
+
+[data-theme='paper'] .paper-stat-unit {
+  display: inline;
+  margin-left: 4px;
+  font-family: var(--font-serif);
+  font-size: 13px;
+  font-weight: 400;
+  color: hsl(var(--ink-3));
+}
+
+/* ---- 工作台 2x2 网格：列间留白 + 顶线分区 ---- */
+[data-theme='paper'] .paper-ws-grid {
+  gap: 0 34px;
+}
+
+[data-theme='paper'] .paper-ws-grid > .paper-sec {
+  margin-bottom: 26px;
+  overflow: visible;
+}
+
+/* ---- 右侧竖排标语「记录招行智慧」（仅 paper 显示，默认 hidden） ---- */
+[data-theme='paper'] .paper-vertical-slogan {
+  display: flex;
+  align-items: center;
+  position: absolute;
+  top: 26px;
+  right: 8px;
+  padding: 12px 2px 12px 8px;
+  border-left: 2px solid hsl(var(--brand) / 0.5);
+  writing-mode: vertical-rl;
+  font-family: var(--font-serif);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  color: hsl(var(--brand) / 0.85);
+  user-select: none;
+  pointer-events: none;
+}
+
+
+/* ============ V2 曜石暗黑（obsidian）光效组件覆盖 ============
+   以下规则全部挂在 [data-theme='obsidian'] 选择器下，对经典/navy/paper 零影响。
+   与 paper 段同理置于 cascade layer 之外，可覆盖组件上的工具类。
+   光效数值对齐原型 `_reference/ui-redesign/原型-V2曜石暗黑.html`。
+   HSL 通道令牌无法表达 alpha，obsidian 专属的原色/透明色集中在 --obs-* 令牌。 */
+[data-theme='obsidian'] {
+  --obs-acc: #4C7DFF;
+  --obs-acc-deep: #2E56D6;
+  --obs-acc-2: #22D3EE;
+  --obs-acc-soft: rgba(76, 125, 255, .13);
+  --obs-acc-border: rgba(76, 125, 255, .32);
+  --obs-panel: rgba(255, 255, 255, .028);
+  --obs-link: #8FB0FF;
+  --obs-btn-glow: rgba(61, 107, 255, .4);
+}
+
+/* ---- 入场动画：页面块依次浮入（translateY 8px + fade，对齐原型 rise） ---- */
+@keyframes obsidian-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---- 脉冲光环：状态点向外扩散的光圈（录音中/进行中/同步就绪） ---- */
+@keyframes obsidian-pulse-green {
+  0% { box-shadow: 0 0 0 0 rgba(74, 222, 128, .5); }
+  70% { box-shadow: 0 0 0 6px rgba(74, 222, 128, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
+}
+
+@keyframes obsidian-pulse-amber {
+  0% { box-shadow: 0 0 0 0 rgba(245, 176, 76, .5); }
+  70% { box-shadow: 0 0 0 6px rgba(245, 176, 76, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(245, 176, 76, 0); }
+}
+
+/* ---- 品牌 Logo（title-bar / app-rail）：红色渐变 + 发光（原型 .tb-logo/.rail-logo） ---- */
+[data-theme='obsidian'] .paper-seal {
+  background: linear-gradient(135deg, #FF4D5E, #B30D24);
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(255, 77, 94, .4);
+}
+
+[data-theme='obsidian'] .paper-seal-lg {
+  box-shadow: 0 4px 16px rgba(255, 77, 94, .35);
+}
+
+/* ---- 主按钮：蓝渐变 + 发光 ----
+   shadcn Button variant=default 的精准签名 = 基础类 whitespace-nowrap + bg-primary
+   + text-primary-foreground（badge/tabs/tag 等其他 bg-primary 组合均无 whitespace-nowrap，
+   已全库 grep 验证零误伤）；未分层样式同时压住 hover:bg-primary/90。 */
+[data-theme='obsidian'] .whitespace-nowrap.bg-primary.text-primary-foreground {
+  background: linear-gradient(135deg, #4C7DFF, #2E56D6);
+  border: none;
+  color: #fff;
+  font-weight: 500;
+  box-shadow: 0 4px 18px var(--obs-btn-glow), inset 0 1px 0 rgba(255, 255, 255, .2);
+}
+
+[data-theme='obsidian'] .whitespace-nowrap.bg-primary.text-primary-foreground:hover {
+  background: linear-gradient(135deg, #4C7DFF, #2E56D6);
+  filter: brightness(1.12);
+}
+
+/* ---- 卡片质感：半透底 + backdrop-blur（原型 .card --panel + blur(8px)） ---- */
+[data-theme='obsidian'] .paper-sec,
+[data-theme='obsidian'] .paper-stat-cell,
+[data-theme='obsidian'] .paper-quick-row,
+[data-theme='obsidian'] section.bg-card {
+  background-color: var(--obs-panel);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* ---- 欢迎条：半透底 + 蓝/红双向径向氛围光（原型 .welcome） ---- */
+[data-theme='obsidian'] .paper-welcome {
+  background:
+    radial-gradient(500px 200px at 8% -30%, rgba(76, 125, 255, .18), transparent 65%),
+    radial-gradient(400px 220px at 96% 130%, rgba(200, 16, 46, .10), transparent 60%),
+    var(--obs-panel);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* 欢迎区标题：白 → 浅蓝渐变文字（原型 .w-text h2） */
+[data-theme='obsidian'] .paper-welcome-greeting {
+  background: linear-gradient(120deg, #fff 30%, #9DB8FF);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* ---- 统计数字：蓝青渐变文字（原型 .s-num）；待归类警示数字用红色渐变（原型 .s-num.red） ---- */
+[data-theme='obsidian'] .paper-stat-num {
+  background: linear-gradient(135deg, #A8C2FF, #22D3EE);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+[data-theme='obsidian'] .paper-stat-num.text-warning {
+  background: linear-gradient(135deg, #FF8A95, #E11D33);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* ---- 导轨激活态：acc-soft 底 + 浅蓝文字（原型 .rail-btn.active） ---- */
+[data-theme='obsidian'] .paper-rail-btn.bg-accent {
+  background: var(--obs-acc-soft);
+  color: var(--obs-link);
+}
+
+/* 激活指示条：蓝青渐变 + 发光（原型 .rail-btn.active::before） */
+[data-theme='obsidian'] .paper-rail-indicator {
+  background: linear-gradient(180deg, var(--obs-acc), var(--obs-acc-2));
+  box-shadow: 0 0 10px rgba(76, 125, 255, .8);
+}
+
+/* ---- 选中/激活态：文件树 active/file-selected 用 acc-soft 底（原型 .tree-row.active） ---- */
+[data-theme='obsidian'] .file-manange-item.active {
+  background: var(--obs-acc-soft);
+  color: var(--obs-link);
+}
+
+[data-theme='obsidian'] .file-manange-item.file-selected {
+  background: var(--obs-acc-soft);
+  color: var(--obs-link);
+  box-shadow: inset 2px 0 0 var(--obs-acc);
+}
+
+/* Tab 激活态：浅蓝文字 + 微光描边（原型 .mt-tab.active 的深色转译） */
+[data-theme='obsidian'] [role='tab'][data-state='active'] {
+  color: var(--obs-link);
+  box-shadow: 0 0 0 1px rgba(76, 125, 255, .18), 0 2px 10px rgba(0, 0, 0, .3);
+}
+
+/* ---- 空状态图标圆：acc-soft 底 + 蓝色光晕（原型 .me-icon/.ce-icon） ---- */
+[data-theme='obsidian'] .rounded-full.bg-primary\/10 {
+  background: var(--obs-acc-soft);
+  border: 1px solid rgba(76, 125, 255, .25);
+  box-shadow: 0 0 24px rgba(76, 125, 255, .25);
+}
+
+/* ---- 开关开启态：蓝渐变 + 发光（原型 .switch.on） ---- */
+[data-theme='obsidian'] [role='switch'][data-state='checked'] {
+  background: linear-gradient(135deg, #4C7DFF, #2E56D6);
+  box-shadow: 0 0 12px rgba(76, 125, 255, .5);
+}
+
+/* ---- 脉冲状态点 ---- */
+/* 状态栏就绪/未配置圆点：扩散光环（原型 .statusbar .dot 的 ring 版） */
+[data-theme='obsidian'] footer .rounded-full.bg-success {
+  animation: obsidian-pulse-green 2.4s infinite;
+}
+
+[data-theme='obsidian'] footer .rounded-full.bg-warning {
+  animation: obsidian-pulse-amber 2.4s infinite;
+}
+
+/* 录音中/进行中 ping 点：叠加同色光晕（animate-ping 本体动画保留） */
+[data-theme='obsidian'] .animate-ping.bg-danger {
+  box-shadow: 0 0 10px rgba(255, 77, 94, .8);
+}
+
+[data-theme='obsidian'] .animate-ping.bg-warning {
+  box-shadow: 0 0 10px rgba(245, 176, 76, .8);
+}
+
+[data-theme='obsidian'] .animate-ping.bg-primary {
+  box-shadow: 0 0 10px rgba(76, 125, 255, .8);
+}
+
+/* ---- 逐条浮入：页面块与网格子项 stagger ----
+   纯 CSS nth-child 延迟，动画 both 填充仅初次渲染播放一次，不影响后续重渲染。 */
+[data-theme='obsidian'] .paper-welcome,
+[data-theme='obsidian'] .paper-quick-list > *,
+[data-theme='obsidian'] .paper-stat-band > *,
+[data-theme='obsidian'] .paper-sec {
+  animation: obsidian-rise .5s cubic-bezier(.2, .7, .3, 1) both;
+}
+
+[data-theme='obsidian'] .paper-quick-list > *:nth-child(2),
+[data-theme='obsidian'] .paper-stat-band > *:nth-child(2),
+[data-theme='obsidian'] .paper-ws-grid > .paper-sec:nth-child(2) {
+  animation-delay: .06s;
+}
+
+[data-theme='obsidian'] .paper-quick-list > *:nth-child(3),
+[data-theme='obsidian'] .paper-stat-band > *:nth-child(3),
+[data-theme='obsidian'] .paper-ws-grid > .paper-sec:nth-child(3) {
+  animation-delay: .12s;
+}
+
+[data-theme='obsidian'] .paper-quick-list > *:nth-child(4),
+[data-theme='obsidian'] .paper-stat-band > *:nth-child(4),
+[data-theme='obsidian'] .paper-ws-grid > .paper-sec:nth-child(4) {
+  animation-delay: .18s;
+}
+
+/* ---- 标题字重/字距：500–600 字重 + 宽字距，呈现轻盈感 ---- */
+[data-theme='obsidian'] .paper-page-title {
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+[data-theme='obsidian'] .paper-sec h3 {
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+[data-theme='obsidian'] .paper-stat-label {
+  letter-spacing: 1.5px;
+}
+
+[data-theme='obsidian'] .paper-welcome-greeting {
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+/* ---- 纸韵工作台右侧标语车道：内容区右侧留白，竖排标语独占不压内容 ---- */
+[data-theme='paper'] .paper-workbench-body {
+  padding-right: 56px !important;
+}

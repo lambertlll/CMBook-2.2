@@ -1,0 +1,53 @@
+name: 🐞 提交 Bug
+title: '[bug] '
+description: 详细的描述一个 Bug
+labels: ['type: bug']
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 首先请阅读
+        1. 请先搜索 [note-gen/issues](https://github.com/codexu/note-gen/issues) 中是否已存在此问题。
+        2. 尝试下载最新版本的 NoteGen 并测试是否还存在此问题。
+        3. 请确保这是 App 的问题，而不是 AI 或代理等问题。
+        4. 请按照提交要求详细的描述 Bug，提供全面的信息。
+        5. 请在社区内友善发言。
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 详细描述这个 Bug
+      description: 请详细的描述这个 Bug，包括重现步骤、预期行为和实际行为，如果可以建议附带截图或视频。
+      placeholder: Bug description
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: NoteGen 版本
+      placeholder: 请填写你当前使用的 NoteGen 版本。
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: 操作系统
+      multiple: true
+      options:
+        - Windows
+        - macOS
+        - Linux
+        - Android
+        - iOS
+    validations:
+      required: true
+
+  - type: textarea
+    id: log
+    attributes:
+      label: 报错日志
+      description: 可以通过右键呼出开发者工具，将报错信息粘贴在此处。
+      placeholder: Bug logs
