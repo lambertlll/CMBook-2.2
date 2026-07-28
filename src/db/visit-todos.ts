@@ -163,9 +163,53 @@ export async function deleteVisitTodo(id: string) {
  */
 export async function replaceMeetingTodos(
   meetingId: string,
-  rows: VisitTodoInputRow[]
+  rows: VisitTodoInputRow[],
+  options?: { fullReset?: boolean }
 ) {
   const db = await getDb()
+
+  // fullReset 模式：先删除该会议的所有待办，再全部作为新记录插入。
+  // 用于待办确认弹窗：用户明确选择了哪些待办，应以新选择为准，
+  // 不保留旧的 done/confirmed/删除状态。
+  if (options?.fullReset) {
+    await db.execute('DELETE FROM visit_todos WHERE meetingId = $1', [meetingId])
+    const now = Date.now()
+    const toInsert: Record<string, unknown>[] = rows.map((row) => ({
+      id: crypto.randomUUID(),
+      customerId: row.customerId,
+      visitId: row.visitId,
+      meetingId,
+      content: row.content,
+      owner: row.owner,
+      dueDate: row.dueDate,
+      done: 0,
+      confirmed: row.confirmed ? 1 : 0,
+      createdAt: now,
+      updatedAt: now,
+    }))
+    if (toInsert.length > 0) {
+      await db.execute(
+        `INSERT INTO visit_todos (id, customerId, visitId, meetingId, content, owner, dueDate, done, confirmed, createdAt, updatedAt)
+         SELECT
+           json_extract(value, '$.id'),
+           json_extract(value, '$.customerId'),
+           json_extract(value, '$.visitId'),
+           json_extract(value, '$.meetingId'),
+           json_extract(value, '$.content'),
+           json_extract(value, '$.owner'),
+           json_extract(value, '$.dueDate'),
+           json_extract(value, '$.done'),
+           json_extract(value, '$.confirmed'),
+           json_extract(value, '$.createdAt'),
+           json_extract(value, '$.updatedAt')
+         FROM json_each($1)`,
+        [JSON.stringify(toInsert)]
+      )
+    }
+    return
+  }
+
+  // 差异合并模式（默认）：用于纪要重新生成/自动同步时保留已勾选的完成状态
 
   // 该会议现有待办
   const existing = await db.select<VisitTodoRecord[]>(

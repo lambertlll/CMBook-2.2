@@ -95,7 +95,7 @@ export const useTodoConfirmStore = create<TodoConfirmState>((set, get) => ({
       dueDate: parseDueDate(todo.dueText),
       confirmed: state.selected[i],
     }))
-    await replaceMeetingTodos(state.meetingId, rows)
+    await replaceMeetingTodos(state.meetingId, rows, { fullReset: true })
     await useVisitTodosStore.getState().refreshTodos()
     const confirmedCount = state.selected.filter(Boolean).length
     useVisitTodosStore.getState().noteExtractedTodos(confirmedCount)
@@ -121,7 +121,7 @@ export const useTodoConfirmStore = create<TodoConfirmState>((set, get) => ({
       dueDate: parseDueDate(todo.dueText),
       confirmed: false,
     }))
-    await replaceMeetingTodos(state.meetingId, rows)
+    await replaceMeetingTodos(state.meetingId, rows, { fullReset: true })
     await useVisitTodosStore.getState().refreshTodos()
     useVisitTodosStore.getState().noteExtractedTodos(state.todos.length)
     set({ open: false })
