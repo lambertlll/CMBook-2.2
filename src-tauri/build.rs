@@ -112,15 +112,18 @@ fn build_macos_vision_ocr_provider() {
     if let Some(triple) = swift_target {
         swift_cmd.arg("-target").arg(triple);
     }
-    let status = swift_cmd
+    let output = swift_cmd
         .arg(&source)
         .arg("-o")
         .arg(&build_output)
-        .status()
+        .output()
         .expect("failed to run swiftc for macOS OCR provider");
 
-    if !status.success() {
-        panic!("failed to build macOS OCR provider");
+    if !output.status.success() {
+        println!("cargo:warning=swiftc failed to build macOS OCR provider. The app will work without built-in OCR.");
+        println!("cargo:warning=swiftc stdout: {}", String::from_utf8_lossy(&output.stdout));
+        println!("cargo:warning=swiftc stderr: {}", String::from_utf8_lossy(&output.stderr));
+        return;
     }
 
     let built_bytes = fs::read(&build_output).expect("failed to read built OCR provider");
