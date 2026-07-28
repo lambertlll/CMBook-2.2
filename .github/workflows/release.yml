@@ -31,15 +31,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
       - name: setup node
         uses: actions/setup-node@v4
         with:
           node-version: lts/*
           cache: 'pnpm'
+
+      - name: install frontend dependencies
+        run: pnpm install --no-frozen-lockfile
 
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -50,9 +49,6 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: 'src-tauri -> target'
-
-      - name: install frontend dependencies
-        run: pnpm install
 
       - name: Build (macOS)
         if: matrix.platform == 'macos-latest'
