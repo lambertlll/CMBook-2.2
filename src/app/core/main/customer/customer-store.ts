@@ -245,8 +245,13 @@ export const useCustomerStore = create<CustomerStoreState>((set, get) => ({
       visits: state.visits.filter((v) => v.id !== id),
     }))
     try {
-      // 仅删除 visits 记录：关联会议（meetings.customerId/visitId）与客户文件夹中的文件都保留
+      // 仅删除 visits 记录：客户文件夹中的文件都保留
       await deleteVisitRecord(id)
+      // 清空关联会议的 visitId（否则 ensureVisitForMeeting 会因 visitId 非空跳过重建）
+      const meeting = useMeetingStore.getState().meetings.find((m) => m.visitId === id)
+      if (meeting) {
+        useMeetingStore.getState().updateMeeting(meeting.id, { visitId: '' })
+      }
     } catch (err) {
       // 失败回滚快照，由调用方提示
       set({ visits: snapshot })

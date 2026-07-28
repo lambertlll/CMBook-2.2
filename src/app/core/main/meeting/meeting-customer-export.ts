@@ -355,7 +355,14 @@ export async function ensureVisitForMeeting(
   customerId: string
 ): Promise<void> {
   try {
-    if (!customerId || meeting.visitId) return
+    if (!customerId) return
+    // visitId 非空时需验证 visit 是否仍存在（可能已被用户从时间线删除）
+    if (meeting.visitId) {
+      const existing = await getVisit(meeting.visitId)
+      if (existing) return // visit 存在，无需重建
+      // visit 已被删除，清空 meeting.visitId 后继续创建新 visit
+      useMeetingStore.getState().updateMeeting(meeting.id, { visitId: '' })
+    }
     const title = meeting.title?.trim() || `${formatDate(meeting.createdAt)} 拜访`
     const visit = await createVisitRecord({
       customerId,

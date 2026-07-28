@@ -65,6 +65,7 @@ import { SummaryBubbleMenu } from './meeting-summary-bubble'
 import { transcribeAudio } from './meeting-transcribe'
 import { loadMeetingAudio } from './meeting-load-audio'
 import { syncMeetingSummaryToCustomer, retryExportFailures, ensureVisitForMeeting, type CustomerSyncFailureStep } from './meeting-customer-export'
+import { deleteVisitRecord } from '@/db/visits'
 import { useTodoConfirmStore } from '@/stores/todo-confirm'
 import { identifyMeetingCustomer } from '@/lib/identify-customer'
 import { useCustomerStore } from '../customer/customer-store'
@@ -637,15 +638,29 @@ export function ClassifyToCustomerDialog({
   const linkedName =
     customers.find((c) => c.id === meeting.customerId)?.name ?? ''
 
-  // 解除关联（误归类兜底）：仅清空关联，不删除已导出文件；解绑后回到"归类"入口可用状态
-  const handleUnbind = useCallback(() => {
-    updateMeeting(meeting.id, { customerId: '' })
+  // 解除关联（误归类兜底）：清空会议的客户/拜访关联，删除自动创建的拜访记录；
+  // 已导出到客户知识库的文件保留（用户可手动清理）。解绑后回到"归类"入口可用状态
+  const handleUnbind = useCallback(async () => {
+    // 删除拜访记录（由 ensureVisitForMeeting 自动创建的），并清空 meeting 的关联字段
+    if (meeting.visitId) {
+      try {
+        await deleteVisitRecord(meeting.visitId)
+      } catch (err) {
+        console.warn('[Unbind] 删除拜访记录失败:', err)
+      }
+      // 刷新客户拜访列表（若该客户时间线已加载）
+      const custId = meeting.customerId
+      if (custId && useCustomerStore.getState().visitsLoadedFor === custId) {
+        void useCustomerStore.getState().loadVisits(custId)
+      }
+    }
+    updateMeeting(meeting.id, { customerId: '', visitId: '' })
     toast({
       description: t('unbindSuccess', { name: linkedName || '—' }),
     })
     setUnbindConfirmOpen(false)
     onOpenChange(false)
-  }, [updateMeeting, meeting.id, linkedName, onOpenChange, t])
+  }, [updateMeeting, meeting.id, meeting.visitId, meeting.customerId, linkedName, onOpenChange, t])
 
   return (
     <>
