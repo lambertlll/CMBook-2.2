@@ -23,6 +23,7 @@ import {
 import { generateMeetingTitle } from './meeting-generate-title'
 import { generateMeetingSummary } from './meeting-generate-summary'
 import { syncMeetingSummaryToCustomer } from './meeting-customer-export'
+import { useTodoConfirmStore } from '@/stores/todo-confirm'
 import { getCustomer } from '@/db/customers'
 import { saveMeetingAudio } from './meeting-save-audio'
 import { Button } from '@/components/ui/button'
@@ -71,6 +72,14 @@ async function autoGenerateVisitSummary(meetingId: string): Promise<void> {
     if (finished) {
       void syncMeetingSummaryToCustomer({
         ...finished,
+        summary: fullSummary,
+      })
+      // 待办确认弹窗
+      useTodoConfirmStore.getState().showFromSummary({
+        meetingId: meetingId,
+        meetingTitle: finished.title,
+        customerId: finished.customerId || '',
+        visitId: finished.visitId || '',
         summary: fullSummary,
       })
     }

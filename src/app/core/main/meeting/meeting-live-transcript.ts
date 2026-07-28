@@ -104,6 +104,9 @@ let dsReconnecting = false
 let dsReconnectAttempts = 0
 let dsReconnectTimer: ReturnType<typeof setTimeout> | null = null
 const DS_MAX_RECONNECTS = 3
+// 串行发送队列：避免 fire-and-forget invoke 积压大量 Promise（每个 Promise 持有
+// Array.from(bytes) 的 number[] 闭包，29 分钟可膨胀至数百 MB 导致 WebView2 崩溃）
+let dsSendQueue: Promise<void> = Promise.resolve()
 
 // AudioWorklet 内联代码：把输入 PCM 帧转发到主线程（Blob URL 加载，避免新增构建配置）
 const WORKLET_CODE = `
@@ -165,6 +168,7 @@ export function startLiveTranscript(meetingId: string): void {
   dsInterimItemId = null
   dsAudioSeconds = 0
   dsFailed = false
+  dsSendQueue = Promise.resolve()
   // 新录音会话：重置断线重连状态（dsCorpusRejected 跨会话保留，网关兼容性一旦确认不再重试）
   dsReconnecting = false
   dsReconnectAttempts = 0
@@ -431,9 +435,21 @@ function updateSegment(
   }))
 }
 
-/** 记录实时通道错误（面板可见），同时输出到控制台 */
+/** 记录实时通道错误（面板可见），同时输出到控制台。
+ *  去抖：相同错误 500ms 内只 setState 一次，避免断连后大量 invoke 快速
+ *  失败导致高频 setState → React 重渲染 → 主线程阻塞 */
+let lastLiveError = ''
+let liveErrorTimer: ReturnType<typeof setTimeout> | null = null
 function setLiveError(message: string): void {
+  if (message === lastLiveError) return
+  lastLiveError = message
   useLiveTranscriptStore.setState({ error: message })
+  if (liveErrorTimer) clearTimeout(liveErrorTimer)
+  liveErrorTimer = setTimeout(() => {
+    liveErrorTimer = null
+    // 允许后续相同错误再次触发（重连后可能再次遇到同一错误）
+    lastLiveError = ''
+  }, 500)
 }
 
 // ---- DashScope realtime（qwen3-asr-flash-realtime）流式通道 ----
@@ -453,16 +469,22 @@ function appendDsPcm(data: Float32Array, fromRate: number): void {
   if (sessionId) {
     while (merged.length - offset >= DS_FRAME_BYTES) {
       const bytes = merged.slice(offset, offset + DS_FRAME_BYTES)
-      // 采集本身即实时速率，直接发送即可满足实时性要求（无需节流）
-      invoke('dashscope_asr_send_pcm', {
-        sessionId,
-        bytes: Array.from(bytes),
-      }).catch((err) => {
-        console.error('[LiveTranscript] DashScope realtime 发送失败:', err)
-        dsFailed = true
-        setLiveError(`音频发送失败: ${err}`)
-        // 录音仍在进行：尝试自动重连
-        if (capturing) scheduleDsReconnect()
+      const sid = sessionId
+      // 串行化发送：前一个 invoke resolve/reject 后才发下一个，
+      // 避免 Promise 积压与 Array.from(bytes) 的 number[] 闭包内存膨胀
+      dsSendQueue = dsSendQueue.then(async () => {
+        if (dsFailed) return
+        try {
+          await invoke('dashscope_asr_send_pcm', {
+            sessionId: sid,
+            bytes: Array.from(bytes),
+          })
+        } catch (err) {
+          console.error('[LiveTranscript] DashScope realtime 发送失败:', err)
+          dsFailed = true
+          setLiveError(`音频发送失败: ${err}`)
+          if (capturing) scheduleDsReconnect()
+        }
       })
       offset += DS_FRAME_BYTES
     }
@@ -495,8 +517,12 @@ async function connectDsSession(token: number): Promise<void> {
         ? `银行金融领域会议录音，参考术语：${hotwords.join('、')}`
         : undefined,
   })
-  // dsCorpusRejected 一旦置位（本网关确认不兼容），后续会话不再携带 corpus
-  const wantCorpus = hotwords.length > 0 && !dsCorpusRejected
+  // corpus（热词上下文）在 realtime 模式下默认不发送：
+  // 百炼/金融云网关对 input_audio_transcription.corpus.text 支持不完整，
+  // 长会话中会触发 InternalError.Algo.InvalidParameter: messages 缺 user 错误，
+  // 导致实时转写中断。热词功能在非 realtime 模式（qwen3-asr-flash 同步切块）
+  // 中通过 vocabulary_id 正常工作，不受影响。
+  const wantCorpus = false
 
   // 会话建立成功的统一处理：注册会话与事件监听
   const onConnected = async (sessionId: string): Promise<boolean> => {
@@ -548,6 +574,11 @@ async function connectDsSession(token: number): Promise<void> {
     }
     dsFailed = true
     setLiveError(`实时转写连接失败: ${err}`)
+    // 录音仍在进行：尝试自动重连（connectDsSession 被 scheduleDsReconnect 调用时，
+    // dsReconnectAttempts 已递增，此处再调 scheduleDsReconnect 会继续下一次重连尝试）
+    if (capturing) {
+      scheduleDsReconnect()
+    }
   }
 }
 

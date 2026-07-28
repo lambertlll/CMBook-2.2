@@ -65,6 +65,7 @@ import { SummaryBubbleMenu } from './meeting-summary-bubble'
 import { transcribeAudio } from './meeting-transcribe'
 import { loadMeetingAudio } from './meeting-load-audio'
 import { syncMeetingSummaryToCustomer, retryExportFailures, ensureVisitForMeeting, type CustomerSyncFailureStep } from './meeting-customer-export'
+import { useTodoConfirmStore } from '@/stores/todo-confirm'
 import { identifyMeetingCustomer } from '@/lib/identify-customer'
 import { useCustomerStore } from '../customer/customer-store'
 import type { CustomerType } from '@/db/customers'
@@ -600,6 +601,14 @@ export function ClassifyToCustomerDialog({
     if (result.ok) {
       onExported()
       toast({ description: t('classifySuccess', { name: customerName }) })
+      // 待办确认弹窗
+      useTodoConfirmStore.getState().showFromSummary({
+        meetingId: meeting.id,
+        meetingTitle: meeting.title,
+        customerId: latest?.customerId || '',
+        visitId: latest?.visitId || '',
+        summary: meeting.summary,
+      })
     } else {
       toast({
         description: t('classifyExportFailed', { name: customerName }),
@@ -1045,6 +1054,14 @@ export function MeetingResult({ meeting }: MeetingResultProps) {
         // 归档成功：刷新基线，清除"编辑后未同步"提示（附属步骤失败不影响归档事实）
         lastSyncedSummaryRef.current = meeting.summary
         setSummaryDirtySinceSync(false)
+        // 待办确认弹窗
+        useTodoConfirmStore.getState().showFromSummary({
+          meetingId: meeting.id,
+          meetingTitle: meeting.title,
+          customerId: meeting.customerId || '',
+          visitId: meeting.visitId || '',
+          summary: meeting.summary,
+        })
         if (result.failures.length === 0) {
           toast({ description: t('syncKnowledgeSuccess') })
         } else {
@@ -1294,6 +1311,14 @@ export function MeetingResult({ meeting }: MeetingResultProps) {
         } else {
           void autoClassifyMeeting(meeting.id, fullSummary)
         }
+        // 待办确认弹窗（弹窗内会获取最新的 customerId/visitId，autoClassify 完成后自动更新）
+        useTodoConfirmStore.getState().showFromSummary({
+          meetingId: meeting.id,
+          meetingTitle: meeting.title,
+          customerId: finished.customerId || '',
+          visitId: finished.visitId || '',
+          summary: fullSummary,
+        })
       }
     } catch (err) {
       console.error('生成纪要失败:', err)

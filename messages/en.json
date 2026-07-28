@@ -3470,7 +3470,14 @@
     "deleteTodo": "Delete to-do",
     "linkCustomer": "Link customer",
     "ownerLabel": "Owner",
-    "dueLabel": "Due"
+    "dueLabel": "Due",
+    "confirmDialogTitle": "Confirm To-dos",
+    "confirmDialogDesc": "Extracted {count} to-do items from \"{title}\". Please confirm which to add to your to-do list.",
+    "selectAll": "Select All",
+    "deselectAll": "Deselect All",
+    "selectedCount": "{selected}/{total} selected",
+    "skipAll": "Skip All",
+    "confirmSelected": "Confirm {count}"
   },
   "meeting": {
     "title": "Meeting Mode",

@@ -1,10 +1,8 @@
 <div align="center">
   <h1>CMBook（招本）</h1>
-  <p><strong>招本，记录招行智慧 —— 录音 + 笔记 → AI 智能纪要，一站式会议记录工具</strong></p>
+  <p><strong>招本，记录招行智慧 —— 录音 + 笔记 → AI 智能纪要，一站式客户会议管理工具</strong></p>
   <p>
-    基于开源项目 <a href="https://github.com/codexu/note-gen">codexu/note-gen</a> 优化完善
-  </p>
-  <p>
+    <img alt="Version" src="https://img.shields.io/badge/version-2.2.0-0f766e?style=flat-square">
     <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-ffc131?style=flat-square&logo=tauri&logoColor=111111">
     <img alt="Next.js 15" src="https://img.shields.io/badge/Next.js-15-000000?style=flat-square&logo=nextdotjs&logoColor=white">
     <img alt="React 19" src="https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react&logoColor=111111">
@@ -14,68 +12,106 @@
 
 ## 项目简介
 
-本项目基于优秀的开源笔记应用 [NoteGen](https://github.com/codexu/note-gen) 进行二次开发，在保留原有笔记功能的基础上，**新增了完整的会议模式**，专注于会议场景的录音、转写和智能纪要生成。
+CMBook（招本）是一款面向客户经理的智能会议管理工具，以「录音 → 转写 → AI 纪要 → 客户管理」为核心链路，将会议录音、语音转写、AI 结构化纪要、客户拜访管理、待办追踪和知识库问答融为一体。所有数据本地存储，凭据加密保护，隐私安全可控。
 
-### 与原版的主要区别
+## 核心功能
 
-| 功能 | 原版 NoteGen | 本版本 |
-|------|-------------|--------|
-| 会议模式 | ❌ 无 | ✅ 完整会议录音+纪要流程 |
-| 录音转写 | 仅语音便签 | 支持长时间会议录音（2h+）分段转写 |
-| AI 纪要生成 | ❌ 无 | ✅ 4种专业模板，支持选择模型 |
-| 多会议管理 | ❌ 无 | ✅ 左侧列表，后台并行处理 |
-| 编辑器工具栏 | 选中弹出 | 常驻格式工具栏（桌面端） |
-| 纪要模型选择 | ❌ 无 | ✅ 底部操作栏可选模型 |
+### 会议录音与转写
 
-## 核心功能：会议模式
-
-### 使用流程
-
-1. **开始会议** — 点击会议 Tab → 新建会议 → 自动录音
-2. **边录边记** — 录音过程中用编辑器记录重点笔记
-3. **结束转写** — 停止录音 → 自动 STT 转写（硅基流动 SenseVoice / 阿里云百炼 FunASR）
-4. **编辑确认** — 三栏视图查看和编辑笔记/转录内容
-5. **选择模型和模板** — 底部操作栏选择 AI 模型和纪要模板
-6. **生成纪要** — AI 流式生成结构化会议纪要
-7. **保存导出** — 保存为笔记文件 / 复制 / 重新生成
-
-### 会议纪要模板
-
-- **标准会议纪要** — 会议背景 + 会谈内容 + 后续待跟进事项（表格）
-- **行动项清单** — 按优先级分组的待办事项
-- **决策记录** — 每个决策独立记录背景、方案和结论
-- **简要纪要** — 300字以内快速总结
-
-### 技术特性
-
-- **分段转写** — 超过10分钟自动切分，最多3段并行，失败自动重试，支持2小时以上会议
+- **长时间录音** — 支持 2 小时以上会议录音，分段存储，崩溃后可恢复
+- **续录** — 已结束的会议可继续追加录音
+- **分段转写** — 超过 10 分钟自动切分，最多 3 段并行转写，失败自动重试
+- **实时转写** — 基于阿里云 qwen3-asr 的 WebSocket 真流式实时转写，~100ms 帧级延迟，边录边看
+- **说话人分离** — FunASR 自动标注不同说话人
+- **热词注入** — 支持自定义热词提升识别准确率
 - **音频格式兼容** — 原始格式（webm/opus 等）本地保存，转写时自动转码适配 STT API
+
+### AI 智能纪要
+
+- **5 种纪要模板** — 标准会议纪要、行动项清单、决策记录、简要纪要、客户拜访纪要（银行场景专用）
+- **自定义模板** — 在设置中管理自定义纪要模板
+- **流式生成** — AI 流式输出结构化纪要，实时可见
 - **模型灵活切换** — 每个会议可独立选择 AI 模型（DeepSeek V4、Qwen 等）
-- **数据本地存储** — SQLite 持久化，音频文件保存在本地 AppData
-- **会议搜索** — 按标题/内容过滤历史会议
 - **标题自动生成** — AI 从转录内容提取 ≤10 字标题
-- **错误可恢复** — 录音/转写/生成失败明确提示，支持重新转写、重新生成
+- **三栏视图** — 笔记 / 转录 / 纪要并排查看编辑
+
+### 客户拜访管理
+
+- **客户档案** — 企业/个人客户管理，支持搜索、筛选、置顶
+- **拜访时间线** — 按时间倒序展示拜访记录，关联的会议纪要自动展示
+- **拜访全生命周期** — 访前尽调 → 访中录音纪要 → 访后待办追踪，完整闭环
+- **访前材料** — 列出客户访前目录文件，一键 AI 生成访前尽调报告
+- **客户知识库** — 按访前/访中/访后/资料分组管理，支持拖拽上传（.md/.txt/.docx/.pdf），自动向量化索引
+- **AI 客户报告** — 一键生成财报分析、审贷会材料
+- **会议自动归类** — 未关联客户的会议 AI 自动识别并归类
+- **任务中心** — 顶部横条展示当前客户进行中的 AI 生成任务
+
+### 待办事项
+
+- **纪要待办自动提取** — 会议纪要生成后，AI 自动解析待办事项
+- **确认弹窗** — 待办提取后弹出确认窗口，用户可勾选确认或跳过
+- **智能分组** — 按逾期 / 今天 / 本周 / 以后 / 已完成五组展示
+- **客户关联** — 每条待办绑定客户与拜访记录
+- **角标提醒** — 客户 Tab 入口显示未完成待办数量
+- **新待办高亮** — 新提取的待办 10 秒内高亮动画提示
+
+### AI 对话与知识库
+
+- **多模型对话** — 支持切换 AI 模型，流式打字机输出
+- **RAG 知识库检索** — 对话中可开关知识库检索增强
+- **图片附件** — 最多 6 张图片，拖拽排序、粘贴上传
+- **文件关联** — 将笔记文件作为对话上下文
+- **引用对话** — 编辑器中选中文本可引用到 AI 对话
+- **联网搜索** — 支持 Tavily / Bocha 等搜索引擎
+- **MCP 工具集成** — Model Context Protocol 外部工具链对接
+- **Skills 技能系统** — 全局/项目级可执行技能包
+- **长期记忆** — AI 持久化记忆管理
+- **Agent 审批** — AI Agent 操作需经用户审批确认
+- **消息操作** — 复制 / 朗读 / 翻译 / 提取为笔记
+
+### Markdown 笔记编辑器
+
+- **TipTap 富文本** — Markdown 双向支持，所见即所得
+- **斜杠命令** — 输入 `/` 触发命令菜单
+- **代码高亮** — highlight.js 语法高亮
+- **数学公式** — KaTeX 行内/块级公式
+- **Mermaid 图表** — 流程图 / 时序图 / Gantt 图
+- **表格编辑** — 完整的行列增删
+- **AI 补全** — 内联 AI 续写
+- **AI 润色** — 选中文字一键润色/精简/扩写/翻译，Diff 预览
+- **多格式导出** — Markdown / HTML / JSON / PDF
+- **图床上传** — 支持 GitHub / PicGo / S3 / SMMS 四种图床
+
+### 多端同步
+
+- **6 种同步平台** — GitHub / Gitee / Gitlab / Gitea / S3 / WebDAV
+- **自动同步** — 定时自动推拉，打开时自动拉取
+- **数据同步** — 标签、记忆等应用数据自动上传/下载
+- **冲突解决** — 同步冲突检测与交互式解决
+- **同步状态** — 状态栏实时显示连通状态
+
+### 其他功能
+
+- **OCR 图片识别** — 多语言 OCR（中简/繁、英、日、韩），VLM 降级识别
+- **向量知识库** — 本地向量数据库，BM25 混合检索，Re-rank 重排，可配置切块/重叠/阈值
+- **快捷键自定义** — 编辑器与全局快捷键
+- **国际化** — 中/英双语，next-intl
 - **凭据加密** — API Key 加密存储，主密钥由系统钥匙串（keyring）管理
-
-## 原版功能（完整保留）
-
-- 📝 Markdown 笔记编辑器（TipTap，支持表格/图表/数学公式）
-- 🧩 快速记录：文字、语音、截图、图片、链接、文件、待办
-- 🧠 AI 对话与知识库问答
-- 🔄 多端同步（GitHub / Gitee / WebDAV / S3）
-- 🖼️ 图片 OCR 和 AI 识别
-- 🔍 向量知识库搜索
 
 ## 技术栈
 
-- **框架**：Tauri 2 + Next.js 15 + React 19
-- **编辑器**：TipTap
-- **状态管理**：Zustand
-- **UI 组件**：shadcn/ui + Tailwind CSS
-- **国际化**：next-intl
-- **数据存储**：SQLite（tauri-plugin-sql）
-- **STT**：硅基流动 SenseVoice（免费）/ 阿里云百炼 FunASR
-- **AI 纪要**：支持 DeepSeek V4 / Qwen / 其他 OpenAI 兼容模型
+| 类别 | 技术 |
+|------|------|
+| 桌面框架 | Tauri 2 (Rust) |
+| 前端框架 | Next.js 15 + React 19 |
+| 编辑器 | TipTap 3 |
+| 状态管理 | Zustand 5 |
+| UI 组件 | shadcn/ui + Tailwind CSS 4 |
+| 国际化 | next-intl |
+| 数据存储 | SQLite (tauri-plugin-sql) + IndexedDB |
+| STT 语音转写 | 硅基流动 SenseVoice / 阿里云百炼 FunASR / qwen3-asr |
+| AI 纪要 | DeepSeek V4 / Qwen / 其他 OpenAI 兼容模型 |
+| 向量检索 | 本地 Embedding + BM25 混合检索 + Re-rank |
 
 ## 快速开始
 
@@ -90,9 +126,8 @@
 ### 安装运行
 
 ```bash
-git clone https://github.com/lambertlll/CMBook.git
-cd CMBook
-git checkout dev
+git clone https://github.com/lambertlll/CMBook-2.2.git
+cd CMBook-2.2
 pnpm install
 pnpm run tauri dev
 ```
@@ -101,30 +136,54 @@ pnpm run tauri dev
 
 ```powershell
 $env:LIBCLANG_PATH="D:\Program Files\LLVM\bin"; $env:CFLAGS="/utf-8"; $env:CXXFLAGS="/utf-8"
-cd D:\AImeeting\note-gen
+cd D:\AImeeting\CMBook-2.2
 pnpm run tauri dev
 ```
 
+开发服务器默认运行在 `http://localhost:3456`。
+
 ## AI 模型配置
 
-在设置中添加模型配置：
+在设置 → AI 模型中添加模型配置：
 
 | 用途 | 推荐模型 | 提供商 |
 |------|---------|--------|
 | 会议纪要生成 | DeepSeek-V4-Flash / V4-Pro | 硅基流动 / DeepSeek 官方 |
-| 语音转写 (STT) | SenseVoiceSmall / FunASR | 硅基流动（免费）/ 阿里云百炼 |
+| 语音转写 (STT) | SenseVoiceSmall / FunASR / qwen3-asr | 硅基流动（免费）/ 阿里云百炼 |
 | 日常对话 | Qwen3-8B（内置免费） | CMBook 默认 |
 
-硅基流动 API 配置：
+硅基流动 API 配置示例：
 - Base URL：`https://api.siliconflow.cn/v1`
 - 模型名：`deepseek-ai/DeepSeek-V4-0324` 或 `deepseek-ai/DeepSeek-V4-Flash`
 
+## 项目结构
+
+```
+CMBook-2.2/
+├── src/
+│   ├── app/core/
+│   │   ├── main/
+│   │   │   ├── meeting/      # 会议录音、转写、纪要、实时转写
+│   │   │   ├── customer/     # 客户管理、拜访时间线、知识库
+│   │   │   ├── chat/         # AI 对话面板
+│   │   │   └── editor/       # Markdown 编辑器
+│   │   └── setting/          # 设置页面
+│   ├── components/            # 通用组件（待办面板等）
+│   ├── stores/               # Zustand 状态管理
+│   ├── db/                   # SQLite 数据访问层
+│   └── lib/                  # 工具库（OCR、RAG、同步等）
+├── src-tauri/                # Rust 后端（录音、ASR、文件操作）
+├── messages/                 # i18n 翻译文件（zh/en）
+└── .github/workflows/        # CI 构建（Windows/macOS）
+```
+
 ## 致谢
 
-- [codexu/note-gen](https://github.com/codexu/note-gen) — 优秀的开源笔记应用，本项目的基础
+- [codexu/note-gen](https://github.com/codexu/note-gen) — 本项目基于此开源笔记应用进行二次开发
 - [硅基流动](https://cloud.siliconflow.cn/) — 提供免费的 STT 和 AI 模型服务
 - [DeepSeek](https://deepseek.com/) — 高质量开源大语言模型
+- [阿里云百炼](https://bailian.console.aliyun.com/) — FunASR / qwen3-asr 语音识别服务
 
 ## 许可证
 
-本项目遵循原版 [MIT License](./LICENSE)。
+[MIT License](./LICENSE)

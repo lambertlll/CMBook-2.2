@@ -79,6 +79,7 @@ export async function createVisitRecord(input: {
   stage?: VisitStage
   visitType?: VisitType
   notes?: string
+  meetingId?: string
 }): Promise<VisitRecord> {
   const db = await getDb()
   const now = Date.now()
@@ -90,7 +91,7 @@ export async function createVisitRecord(input: {
     stage: input.stage || 'preparing',
     visitType: input.visitType || '',
     previsitDocPath: '',
-    meetingId: '',
+    meetingId: input.meetingId || '',
     noteDocPath: '',
     postDocs: '',
     notes: input.notes || '',

@@ -71,6 +71,9 @@ docs/.vitepress/cache
 # worktrees
 .worktrees
 
+# workbuddy agent workspace
+.workbuddy/
+
 # temp files
 _tmp_*
 

@@ -17,6 +17,7 @@ import { useCustomerStore } from './customer-store'
 import { useVisitGenerateStore, type VisitGenerateKind } from './visit-generate-manager'
 import { useMeetingStore, type Meeting } from '../meeting/meeting-store'
 import { syncMeetingSummaryToCustomer, ensureVisitForMeeting } from '../meeting/meeting-customer-export'
+import { useTodoConfirmStore } from '@/stores/todo-confirm'
 import { useVisitTodosStore } from '@/stores/visit-todos'
 import { useSidebarStore } from '@/stores/sidebar'
 import { getUpcomingVisits, type UpcomingVisitRecord } from '@/db/visits'
@@ -329,6 +330,14 @@ export function CustomerWorkbench() {
       .then((result) => {
         if (result.ok) {
           toast({ description: t('classifySuccess', { name: customerName }) })
+          // 待办确认弹窗
+          useTodoConfirmStore.getState().showFromSummary({
+            meetingId: meeting.id,
+            meetingTitle: meeting.title,
+            customerId,
+            visitId: meeting.visitId || '',
+            summary: meeting.summary,
+          })
         }
       })
       .catch((err) => console.error('[Workbench] 归类同步失败:', err))

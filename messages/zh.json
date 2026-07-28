@@ -3470,7 +3470,14 @@
     "deleteTodo": "删除待办",
     "linkCustomer": "关联客户",
     "ownerLabel": "负责人",
-    "dueLabel": "完成时限"
+    "dueLabel": "完成时限",
+    "confirmDialogTitle": "确认待办事项",
+    "confirmDialogDesc": "从《{title}》中提取了 {count} 条待办，请确认需要计入待办列表的事项",
+    "selectAll": "全选",
+    "deselectAll": "取消全选",
+    "selectedCount": "已选 {selected}/{total}",
+    "skipAll": "全部跳过",
+    "confirmSelected": "确认 {count} 项"
   },
   "meeting": {
     "title": "会议模式",

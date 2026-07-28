@@ -156,7 +156,7 @@ export async function syncMeetingSummaryToCustomer(
 
     // 拜访阶段联动：导出成功后 preparing → visited（其余阶段不回退）
     try {
-      await advanceVisitStage(meeting.visitId)
+      await advanceVisitStage(meeting.visitId, meeting.id)
     } catch (err) {
       console.warn('[MeetingExport] 更新拜访阶段失败:', err)
       failures.push({ step: 'advanceStage', error: toErrorMessage(err) })
@@ -326,13 +326,20 @@ async function vectorizeExportedFile(relativePath: string, content: string) {
  * 同步 customer-store 中已加载的拜访列表（若该拜访在当前客户的时间线中）。
  * 失败抛错由调用方收集进 failures。
  */
-async function advanceVisitStage(visitId: string) {
+async function advanceVisitStage(visitId: string, meetingId?: string) {
   if (!visitId) return
   const visit = await getVisit(visitId)
-  if (visit && visit.stage === 'preparing') {
-    await useCustomerStore.getState().updateVisit(visitId, {
-      stage: 'visited',
-    })
+  if (!visit) return
+  const updates: { stage?: string; meetingId?: string } = {}
+  if (visit.stage === 'preparing') {
+    updates.stage = 'visited'
+  }
+  // 存量数据修复：早期 ensureVisitForMeeting 未回写 meetingId，此处补齐
+  if (meetingId && !visit.meetingId) {
+    updates.meetingId = meetingId
+  }
+  if (Object.keys(updates).length > 0) {
+    await useCustomerStore.getState().updateVisit(visitId, updates)
   }
 }
 
@@ -355,6 +362,7 @@ export async function ensureVisitForMeeting(
       title,
       visitDate: meeting.createdAt,
       stage: 'visited',
+      meetingId: meeting.id,
     })
     useMeetingStore.getState().updateMeeting(meeting.id, { visitId: visit.id })
     // 该客户时间线若已加载（当前选中），刷新以即时显示新拜访

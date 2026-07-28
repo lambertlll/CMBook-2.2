@@ -31,6 +31,7 @@ export interface VisitTodoInputRow {
   content: string
   owner: string
   dueDate: number
+  confirmed?: boolean
 }
 
 /**
@@ -182,6 +183,7 @@ export async function replaceMeetingTodos(
   const now = Date.now()
   const toInsert: Record<string, unknown>[] = []
   const dueDateUpdates: Array<{ id: string; dueDate: number }> = []
+  const confirmedUpdates: Array<{ id: string; confirmed: number }> = []
 
   for (const row of rows) {
     const key = keyOf(row.content, row.owner)
@@ -198,13 +200,19 @@ export async function replaceMeetingTodos(
         owner: row.owner,
         dueDate: row.dueDate,
         done: 0,
-        confirmed: 0, // AI 提取恒为待确认；已存在项的 confirmed 状态因保留旧记录而天然延续
+        confirmed: row.confirmed ? 1 : 0,
         createdAt: now,
         updatedAt: now,
       })
-    } else if (old.dueDate !== row.dueDate) {
+    } else {
       // 保留完成态，仅同步时限变化
-      dueDateUpdates.push({ id: old.id, dueDate: row.dueDate })
+      if (old.dueDate !== row.dueDate) {
+        dueDateUpdates.push({ id: old.id, dueDate: row.dueDate })
+      }
+      // 用户确认弹窗显式传 confirmed 时，同步更新已有记录的确认状态
+      if (row.confirmed !== undefined && old.confirmed !== (row.confirmed ? 1 : 0)) {
+        confirmedUpdates.push({ id: old.id, confirmed: row.confirmed ? 1 : 0 })
+      }
     }
   }
 
@@ -221,6 +229,14 @@ export async function replaceMeetingTodos(
     await db.execute(
       'UPDATE visit_todos SET dueDate = $1, updatedAt = $2 WHERE id = $3',
       [u.dueDate, now, u.id]
+    )
+  }
+
+  // 确认状态变更更新（用户确认弹窗显式传 confirmed 时）
+  for (const u of confirmedUpdates) {
+    await db.execute(
+      'UPDATE visit_todos SET confirmed = $1, updatedAt = $2 WHERE id = $3',
+      [u.confirmed, now, u.id]
     )
   }
 

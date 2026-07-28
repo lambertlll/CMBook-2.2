@@ -378,7 +378,19 @@ pub async fn dashscope_asr_connect(
                         }
                         _ => {}
                     },
-                    Ok(Message::Close(_)) => break,
+                    Ok(Message::Close(_)) => {
+                        // 服务端主动关闭连接：emit error 通知前端，避免前端不知情持续发送
+                        let _ = app.emit(
+                            "dashscope-asr-error",
+                            DashscopeAsrErrorEvent {
+                                session_id: session_id.clone(),
+                                item_id: String::new(),
+                                code: "CLOSED".to_string(),
+                                message: "DashScope 连接已被服务端关闭".to_string(),
+                            },
+                        );
+                        break;
+                    }
                     Err(e) => {
                         let _ = app.emit(
                             "dashscope-asr-error",
@@ -439,13 +451,18 @@ pub async fn dashscope_asr_send_pcm(
     session_id: String,
     bytes: Vec<u8>,
 ) -> Result<(), String> {
-    let tx = {
+    let (tx, done) = {
         let sessions = manager.sessions.lock().await;
-        sessions.get(&session_id).map(|s| s.tx.clone())
+        match sessions.get(&session_id) {
+            Some(s) => (s.tx.clone(), s.done.clone()),
+            None => return Err("DashScope ASR session 不存在或已关闭".to_string()),
+        }
     };
-    let Some(tx) = tx else {
-        return Err("DashScope ASR session 不存在或已关闭".to_string());
-    };
+    // 连接已断（reader 收到 Close/error 退出后 done=true）：立即拒绝，
+    // 避免 PCM 数据进入无界 channel 积压导致内存增长
+    if *done.borrow() {
+        return Err("DashScope 连接已断开，发送失败".to_string());
+    }
     tx.send(Message::Text(build_audio_append(&bytes).to_string().into()))
         .map_err(|_| "DashScope 连接已断开，发送失败".to_string())
 }

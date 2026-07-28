@@ -8,6 +8,7 @@ import { MeetingPanel } from './meeting'
 import { CustomerPanel } from './customer/customer-panel'
 import { MeetingLiveTranscriptPanel } from './meeting/meeting-live-transcript-panel'
 import { TodoPanel } from '@/components/todo/todo-panel'
+import { TodoConfirmDialog } from './meeting/todo-confirm-dialog'
 import { AppStatusBar } from '@/components/app-footbar'
 import Chat from './chat'
 import dynamic from 'next/dynamic'
@@ -393,6 +394,7 @@ function Page() {
         </div>
       </div>
       <AppStatusBar />
+      <TodoConfirmDialog />
     </div>
   )
 }

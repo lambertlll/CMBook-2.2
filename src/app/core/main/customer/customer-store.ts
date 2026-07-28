@@ -52,6 +52,7 @@ async function backfillVisitsFromMeetings(customerId: string): Promise<void> {
         title,
         visitDate: m.createdAt,
         stage: 'visited',
+        meetingId: m.id,
       })
       useMeetingStore.getState().updateMeeting(m.id, { visitId: visit.id })
     }
