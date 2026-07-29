@@ -3,12 +3,13 @@
 import { FileSidebar } from "./file"
 import { MeetingList } from "./meeting/meeting-list"
 import { CustomerList } from "./customer/customer-list"
+import { ReportList } from "./report/report-list"
 import { FileActions } from "./file/file-actions"
 import { useSidebarStore } from "@/stores/sidebar"
 
 /**
  * 二级面板（2.1 全局框架）：
- * 位于图标导轨右侧，按 leftSidebarTab 切换文件树 / 会议列表 / 客户列表，
+ * 位于图标导轨右侧，按 leftSidebarTab 切换文件树 / 会议列表 / 客户列表 / 周报列表，
  * 各列表保留自身头部操作区；笔记 Tab 顶部保留 FileActions 功能区。
  * Tab 切换入口已移至左侧图标导轨（app-rail.tsx）。
  */
@@ -28,6 +29,8 @@ export function LeftSidebar() {
           <MeetingList />
         ) : leftSidebarTab === "customer" ? (
           <CustomerList />
+        ) : leftSidebarTab === "report" ? (
+          <ReportList />
         ) : (
           <FileSidebar />
         )}

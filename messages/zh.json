@@ -2560,7 +2560,8 @@
       "modelNotConfigured": "未配置"
     },
     "navigate": "导航",
-    "slogan": "记录招行智慧"
+    "slogan": "记录招行智慧",
+    "report": "周报"
   },
   "activity": {
     "title": "活跃度日历",
@@ -3779,5 +3780,41 @@
     "generateNoFileToast": "AI 助手已结束，但未找到生成的文件，请在对话中查看",
     "deleteFailed": "删除客户失败，请重试",
     "visitDeleteFailed": "删除拜访失败，请重试"
+  },
+  "report": {
+    "title": "周报",
+    "prevWeek": "上一周",
+    "currentWeek": "本周",
+    "thisWeek": "本周",
+    "nextWeek": "下一周",
+    "hasContent": "有内容",
+    "empty": "空白",
+    "selectWeek": "请选择周次",
+    "generating": "AI 生成中...",
+    "saving": "保存中...",
+    "saved": "已保存",
+    "edit": "编辑",
+    "preview": "预览",
+    "editPlaceholder": "在此编辑周报内容，或点击右侧 AI 生成按钮一键生成...",
+    "emptyHint": "周报内容为空，点击右侧 AI 生成按钮一键生成",
+    "assistTitle": "周报助手",
+    "statVisits": "本周拜访",
+    "statCustomers": "拜访客户",
+    "statCompleted": "已完成待办",
+    "statOverdue": "逾期待办",
+    "completionRate": "待办完成率",
+    "todoSummary": "已完成 {completed}/{total} 条",
+    "aiGenerate": "AI 一键生成",
+    "generateFailed": "生成失败，请检查 AI 配置",
+    "copy": "复制",
+    "copied": "已复制",
+    "copyTip": "复制周报到剪贴板",
+    "saveAsNote": "存为笔记",
+    "savedNote": "已保存",
+    "saveAsNoteTip": "将周报保存为 Markdown 笔记文件",
+    "saveNoteFailed": "保存笔记失败",
+    "weekVisits": "本周拜访",
+    "nextWeekTodos": "下周待办",
+    "moreCount": "还有 {count} 条..."
   }
 }

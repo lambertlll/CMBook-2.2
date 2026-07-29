@@ -25,6 +25,7 @@ export async function initAllDatabases() {
   const { initCustomersDb } = await import('./customers');
   const { initVisitsDb } = await import('./visits');
   const { initVisitTodosDb } = await import('./visit-todos');
+  const { initWeeklyReportsDb } = await import('./weekly-reports');
 
   // 执行初始化：先确保基础表存在，再做 conversations 对 chats 的迁移/补列。
   await initChatsDb();
@@ -42,4 +43,6 @@ export async function initAllDatabases() {
   await initVisitsDb();
   // 2.1 新增：待办表（含 cmbook2 schema v1→v2 迁移登记）
   await initVisitTodosDb();
+  // 2.6 新增：周报表
+  await initWeeklyReportsDb();
 }

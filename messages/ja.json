@@ -2445,7 +2445,8 @@
     "showCenterPanel": "显示编辑器",
     "hideCenterPanel": "隐藏编辑器",
     "navigate": "ナビゲーション",
-    "slogan": "知恵を記録する"
+    "slogan": "知恵を記録する",
+    "report": "週報"
   },
   "activity": {
     "title": "アクティビティカレンダー",
@@ -3643,5 +3644,41 @@
     "generateNoFileToast": "AI アシスタントは終了しましたが、生成されたファイルが見つかりません。チャットを確認してください",
     "deleteFailed": "顧客の削除に失敗しました。もう一度お試しください",
     "visitDeleteFailed": "訪問の削除に失敗しました。もう一度お試しください"
+  },
+  "report": {
+    "title": "週報",
+    "prevWeek": "前週",
+    "currentWeek": "今週",
+    "thisWeek": "今週",
+    "nextWeek": "翌週",
+    "hasContent": "内容あり",
+    "empty": "空",
+    "selectWeek": "週を選択してください",
+    "generating": "AI生成中...",
+    "saving": "保存中...",
+    "saved": "保存済み",
+    "edit": "編集",
+    "preview": "プレビュー",
+    "editPlaceholder": "ここで週報を編集するか、右のAI生成ボタンをクリック...",
+    "emptyHint": "週報が空です。右のAI生成ボタンをクリックして作成",
+    "assistTitle": "週報アシスタント",
+    "statVisits": "今週の訪問",
+    "statCustomers": "訪問顧客",
+    "statCompleted": "完了タスク",
+    "statOverdue": "期限超過",
+    "completionRate": "タスク完了率",
+    "todoSummary": "完了 {completed}/{total} 件",
+    "aiGenerate": "AI一括生成",
+    "generateFailed": "生成失敗。AI設定を確認してください",
+    "copy": "コピー",
+    "copied": "コピー済み",
+    "copyTip": "週報をクリップボードにコピー",
+    "saveAsNote": "ノートに保存",
+    "savedNote": "保存済み",
+    "saveAsNoteTip": "週報をMarkdownノートとして保存",
+    "saveNoteFailed": "ノートの保存に失敗",
+    "weekVisits": "今週の訪問",
+    "nextWeekTodos": "来週のタスク",
+    "moreCount": "他 {count} 件..."
   }
 }

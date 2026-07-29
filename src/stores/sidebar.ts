@@ -26,15 +26,15 @@ export interface SidebarState {
   initSidebarState: () => Promise<void>
 }
 
-// 左侧主标签：笔记 / 会议 / 客户（「记录」Tab 已移除）
-export type LeftSidebarTab = 'files' | 'meeting' | 'customer'
+// 左侧主标签：笔记 / 会议 / 客户 / 周报（「记录」Tab 已移除）
+export type LeftSidebarTab = 'files' | 'meeting' | 'customer' | 'report'
 
 // 右栏情境：workbench=客户工作台（默认展开），default=其余情境（默认收起）
 export type RightSidebarContext = 'workbench' | 'default'
 
 // 历史版本可能持久化了已移除的 'notes'，读取时兜底回 'files'
 function normalizeLeftSidebarTab(tab: string): LeftSidebarTab {
-  return tab === 'meeting' || tab === 'customer' ? tab : 'files'
+  return tab === 'meeting' || tab === 'customer' || tab === 'report' ? tab : 'files'
 }
 
 // 从 localStorage 获取初始状态

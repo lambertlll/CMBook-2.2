@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { Files, Mic, Users, BotMessageSquare, Settings } from 'lucide-react'
+import { Files, Mic, Users, ClipboardList, BotMessageSquare, Settings } from 'lucide-react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useSidebarStore, type LeftSidebarTab } from '@/stores/sidebar'
@@ -9,11 +9,12 @@ import { useVisitTodosStore } from '@/stores/visit-todos'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 
-// 左侧图标导轨（2.1 全局框架）：笔记 / 会议 / 客户 + 底部 AI 助手、设置
+// 左侧图标导轨（2.1 全局框架）：笔记 / 会议 / 客户 / 周报 + 底部 AI 助手、设置
 const RAIL_TABS: Array<{ id: LeftSidebarTab; icon: typeof Files }> = [
   { id: 'files', icon: Files },
   { id: 'meeting', icon: Mic },
   { id: 'customer', icon: Users },
+  { id: 'report', icon: ClipboardList },
 ]
 
 // 导轨按钮激活态样式：浅底 + 主色图标/文字 + 左侧 3px 指示条（对齐原型 .rail-btn.active）

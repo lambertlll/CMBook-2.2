@@ -2560,7 +2560,8 @@
       "modelNotConfigured": "Not configured"
     },
     "navigate": "Navigate",
-    "slogan": "Wisdom in every note"
+    "slogan": "Wisdom in every note",
+    "report": "Report"
   },
   "activity": {
     "title": "Activity Calendar",
@@ -3779,5 +3780,41 @@
     "generateNoFileToast": "The AI assistant finished, but the generated file was not found. Check the conversation for details",
     "deleteFailed": "Failed to delete customer, please try again",
     "visitDeleteFailed": "Failed to delete visit, please try again"
+  },
+  "report": {
+    "title": "Weekly Report",
+    "prevWeek": "Previous",
+    "currentWeek": "This Week",
+    "thisWeek": "This Week",
+    "nextWeek": "Next",
+    "hasContent": "Has content",
+    "empty": "Empty",
+    "selectWeek": "Select a week",
+    "generating": "AI generating...",
+    "saving": "Saving...",
+    "saved": "Saved",
+    "edit": "Edit",
+    "preview": "Preview",
+    "editPlaceholder": "Edit your weekly report here, or click AI Generate on the right...",
+    "emptyHint": "Report is empty. Click AI Generate to create one.",
+    "assistTitle": "Report Assistant",
+    "statVisits": "Visits",
+    "statCustomers": "Customers",
+    "statCompleted": "Completed",
+    "statOverdue": "Overdue",
+    "completionRate": "Completion Rate",
+    "todoSummary": "{completed}/{total} done",
+    "aiGenerate": "AI Generate",
+    "generateFailed": "Generation failed. Check AI settings.",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copyTip": "Copy report to clipboard",
+    "saveAsNote": "Save as Note",
+    "savedNote": "Saved",
+    "saveAsNoteTip": "Save report as a Markdown note",
+    "saveNoteFailed": "Failed to save note",
+    "weekVisits": "This Week Visits",
+    "nextWeekTodos": "Next Week Todos",
+    "moreCount": "{count} more..."
   }
 }

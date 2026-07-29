@@ -5,9 +5,10 @@ import { getDb } from './index'
 // v3（2.3 工作流）：visit_todos 新增 confirmed 确认制列，历史待办迁移为已确认
 // v4（2.4 拜访形态）：visits 新增 noteDocPath 归档型拜访的访中笔记文档列
 // v5（2.5 待办增强）：visit_todos 新增 deleted 软删除列，删除改为标记可恢复
-// （迁移均在 db/visit-todos.ts / db/visits.ts 的 init 中完成）
+// v6（2.6 周报）：新增 weekly_reports 表（周报正文 + AI 生成标记）
+// （迁移均在 db/visit-todos.ts / db/visits.ts / db/weekly-reports.ts 的 init 中完成）
 export const CMBOOK2_SCHEMA_KEY = 'cmbook2'
-export const CMBOOK2_SCHEMA_VERSION = 5
+export const CMBOOK2_SCHEMA_VERSION = 6
 
 export interface SchemaMetaRecord {
   key: string

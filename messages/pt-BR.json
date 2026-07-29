@@ -2463,7 +2463,8 @@
     "showCenterPanel": "Mostrar editor",
     "hideCenterPanel": "Ocultar editor",
     "navigate": "Navegar",
-    "slogan": "Sabedoria em cada nota"
+    "slogan": "Sabedoria em cada nota",
+    "report": "Relatório"
   },
   "activity": {
     "title": "Calendário de Atividade",
@@ -3596,5 +3597,41 @@
     "generateNoFileToast": "O assistente de IA terminou, mas o arquivo gerado não foi encontrado. Verifique a conversa",
     "deleteFailed": "Falha ao excluir cliente, tente novamente",
     "visitDeleteFailed": "Falha ao excluir visita, tente novamente"
+  },
+  "report": {
+    "title": "Relatório Semanal",
+    "prevWeek": "Anterior",
+    "currentWeek": "Esta Semana",
+    "thisWeek": "Esta Semana",
+    "nextWeek": "Próxima",
+    "hasContent": "Com conteúdo",
+    "empty": "Vazio",
+    "selectWeek": "Selecione uma semana",
+    "generating": "AI gerando...",
+    "saving": "Salvando...",
+    "saved": "Salvo",
+    "edit": "Editar",
+    "preview": "Visualizar",
+    "editPlaceholder": "Edite seu relatório semanal aqui, ou clique em AI Generate...",
+    "emptyHint": "Relatório vazio. Clique em AI Generate para criar.",
+    "assistTitle": "Assistente de Relatório",
+    "statVisits": "Visitas",
+    "statCustomers": "Clientes",
+    "statCompleted": "Concluidas",
+    "statOverdue": "Atrasadas",
+    "completionRate": "Taxa de Conclusão",
+    "todoSummary": "{completed}/{total} concluídas",
+    "aiGenerate": "Gerar com AI",
+    "generateFailed": "Falha na geração. Verifique as configurações de AI.",
+    "copy": "Copiar",
+    "copied": "Copiado",
+    "copyTip": "Copiar relatório para a área de transferência",
+    "saveAsNote": "Salvar como Nota",
+    "savedNote": "Salvo",
+    "saveAsNoteTip": "Salvar relatório como arquivo Markdown",
+    "saveNoteFailed": "Falha ao salvar nota",
+    "weekVisits": "Visitas da Semana",
+    "nextWeekTodos": "Tarefas da Próxima Semana",
+    "moreCount": "Mais {count}..."
   }
 }

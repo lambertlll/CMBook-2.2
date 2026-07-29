@@ -141,6 +141,7 @@ export function TodoPanel() {
 
   const [draft, setDraft] = useState('')
   const [draftCustomerId, setDraftCustomerId] = useState(NO_CUSTOMER_VALUE)
+  const [draftDueDate, setDraftDueDate] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [showCompleted, setShowCompleted] = useState(false)
   const [showDeleted, setShowDeleted] = useState(false)
@@ -266,8 +267,12 @@ export function TodoPanel() {
     addManualTodo({
       content,
       customerId: draftCustomerId === NO_CUSTOMER_VALUE ? undefined : draftCustomerId,
+      dueDate: dateInputToTimestamp(draftDueDate),
     })
-      .then(() => setDraft(''))
+      .then(() => {
+        setDraft('')
+        setDraftDueDate('')
+      })
       .catch((err) => {
         console.error('[TodoPanel] 添加待办失败:', err)
         toast({ description: String(err), variant: 'destructive' })
@@ -670,21 +675,41 @@ export function TodoPanel() {
         </div>
       </ScrollArea>
 
-      {/* 底部手动添加：内容 + 可选客户关联（允许纯个人待办） */}
+      {/* 底部手动添加：内容 + 可选客户关联 + 办结时间（允许纯个人待办） */}
       <div className="shrink-0 space-y-2 border-t p-2">
-        <Select value={draftCustomerId} onValueChange={setDraftCustomerId}>
-          <SelectTrigger className="h-8 text-xs" aria-label={t('linkCustomer')}>
-            <SelectValue placeholder={t('noCustomer')} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={NO_CUSTOMER_VALUE}>{t('noCustomer')}</SelectItem>
-            {customers.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          <Select value={draftCustomerId} onValueChange={setDraftCustomerId}>
+            <SelectTrigger className="h-8 flex-1 text-xs" aria-label={t('linkCustomer')}>
+              <SelectValue placeholder={t('noCustomer')} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NO_CUSTOMER_VALUE}>{t('noCustomer')}</SelectItem>
+              {customers.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Input
+            type="date"
+            value={draftDueDate}
+            onChange={(e) => setDraftDueDate(e.target.value)}
+            aria-label={t('dueLabel')}
+            className="h-8 w-[120px] shrink-0 text-xs"
+            title={t('dueLabel')}
+          />
+          {draftDueDate && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 shrink-0 px-2"
+              onClick={() => setDraftDueDate('')}
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <Input
             value={draft}

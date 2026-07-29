@@ -6,6 +6,8 @@ import { AppRail } from "./app-rail"
 import { EditorLayout } from './editor/editor-layout'
 import { MeetingPanel } from './meeting'
 import { CustomerPanel } from './customer/customer-panel'
+import { ReportPanel } from './report/report-panel'
+import { ReportAssistPanel } from './report/report-assist-panel'
 import { MeetingLiveTranscriptPanel } from './meeting/meeting-live-transcript-panel'
 import { TodoPanel } from '@/components/todo/todo-panel'
 import { TodoConfirmDialog } from './meeting/todo-confirm-dialog'
@@ -331,7 +333,7 @@ function ResizableWrapper() {
         collapsible={true}
         collapsedSize={0}
       >
-        {leftSidebarTab === 'meeting' ? <MeetingPanel /> : leftSidebarTab === 'customer' ? <CustomerPanel /> : <EditorLayout />}
+        {leftSidebarTab === 'meeting' ? <MeetingPanel /> : leftSidebarTab === 'customer' ? <CustomerPanel /> : leftSidebarTab === 'report' ? <ReportPanel /> : <EditorLayout />}
       </ResizablePanel>
     )
 
@@ -354,7 +356,7 @@ function ResizableWrapper() {
         collapsedSize={0}
       >
         <SlideInRight visible={rightSidebarVisible}>
-          {leftSidebarTab === 'meeting' ? <MeetingLiveTranscriptPanel /> : <RightPanel />}
+          {leftSidebarTab === 'meeting' ? <MeetingLiveTranscriptPanel /> : leftSidebarTab === 'report' ? <ReportAssistPanel /> : <RightPanel />}
         </SlideInRight>
       </ResizablePanel>
     )

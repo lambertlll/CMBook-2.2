@@ -2470,7 +2470,8 @@
     "showCenterPanel": "显示编辑器",
     "hideCenterPanel": "隐藏编辑器",
     "navigate": "導覽",
-    "slogan": "記錄招行智慧"
+    "slogan": "記錄招行智慧",
+    "report": "週報"
   },
   "activity": {
     "title": "活躍度日曆",
@@ -3633,5 +3634,41 @@
     "generateNoFileToast": "AI 助手已結束，但未找到產生的檔案，請在對話中查看",
     "deleteFailed": "刪除客戶失敗，請重試",
     "visitDeleteFailed": "刪除拜訪失敗，請重試"
+  },
+  "report": {
+    "title": "週報",
+    "prevWeek": "上一週",
+    "currentWeek": "本週",
+    "thisWeek": "本週",
+    "nextWeek": "下一週",
+    "hasContent": "有內容",
+    "empty": "空白",
+    "selectWeek": "請選擇週次",
+    "generating": "AI 生成中...",
+    "saving": "儲存中...",
+    "saved": "已儲存",
+    "edit": "編輯",
+    "preview": "預覽",
+    "editPlaceholder": "在此編輯週報內容，或點擊右側 AI 生成按鈕一鍵生成...",
+    "emptyHint": "週報內容為空，點擊右側 AI 生成按鈕一鍵生成",
+    "assistTitle": "週報助手",
+    "statVisits": "本週拜訪",
+    "statCustomers": "拜訪客戶",
+    "statCompleted": "已完成待辦",
+    "statOverdue": "逾期待辦",
+    "completionRate": "待辦完成率",
+    "todoSummary": "已完成 {completed}/{total} 條",
+    "aiGenerate": "AI 一鍵生成",
+    "generateFailed": "生成失敗，請檢查 AI 配置",
+    "copy": "複製",
+    "copied": "已複製",
+    "copyTip": "複製週報到剪貼簿",
+    "saveAsNote": "存為筆記",
+    "savedNote": "已儲存",
+    "saveAsNoteTip": "將週報儲存為 Markdown 筆記檔案",
+    "saveNoteFailed": "儲存筆記失敗",
+    "weekVisits": "本週拜訪",
+    "nextWeekTodos": "下週待辦",
+    "moreCount": "還有 {count} 條..."
   }
 }
