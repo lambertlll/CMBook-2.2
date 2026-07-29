@@ -2,7 +2,7 @@
   <h1>CMBook（招本）</h1>
   <p><strong>招本，记录招行智慧 —— 录音 + 笔记 → AI 智能纪要，一站式客户会议管理工具</strong></p>
   <p>
-    <img alt="Version" src="https://img.shields.io/badge/version-2.3.0-0f766e?style=flat-square">
+    <img alt="Version" src="https://img.shields.io/badge/version-2.4.0-0f766e?style=flat-square">
     <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-ffc131?style=flat-square&logo=tauri&logoColor=111111">
     <img alt="Next.js 15" src="https://img.shields.io/badge/Next.js-15-000000?style=flat-square&logo=nextdotjs&logoColor=white">
     <img alt="React 19" src="https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react&logoColor=111111">
@@ -34,6 +34,7 @@ CMBook（招本）是一款面向客户经理的智能会议管理工具，以�
 - **模型灵活切换** — 每个会议可独立选择 AI 模型（DeepSeek V4、Qwen 等）
 - **标题自动生成** — AI 从转录内容提取 ≤10 字标题
 - **三栏视图** — 笔记 / 转录 / 纪要并排查看编辑
+- **导出 Word** — 纪要一键导出为 Word 文档（.doc）
 
 ### 客户拜访管理
 
@@ -46,12 +47,23 @@ CMBook（招本）是一款面向客户经理的智能会议管理工具，以�
 - **会议自动归类** — 未关联客户的会议 AI 自动识别并归类
 - **任务中心** — 顶部横条展示当前客户进行中的 AI 生成任务
 
+### 周报
+
+- **AI 一键生成** — 自动汇总本周拜访记录、待办完成情况，AI 流式生成三段式周报（本周拜访 / 待办进展 / 下周规划）
+- **12 周导航** — 左栏展示最近 12 周周报列表，快速切换查看
+- **编辑/预览切换** — 中栏支持 Markdown 编辑与渲染预览双模式，编辑工具栏一键插入格式
+- **周统计面板** — 右栏展示本周拜访次数、待办完成率等关键数据
+- **自定义模板** — 设置中管理多个周报模板，生成时选择对应模板
+- **独立模型配置** — 周报生成可使用独立 AI 模型，与会议纪要模型解耦
+- **多格式导出** — 支持复制剪贴板、另存为笔记、导出 Word 文档
+
 ### 待办事项
 
 - **纪要待办自动提取** — 会议纪要生成后，AI 自动解析待办事项
 - **确认弹窗** — 待办提取后弹出确认窗口，用户可勾选确认或跳过
 - **智能分组** — 按逾期 / 今天 / 本周 / 以后 / 已完成五组展示
 - **客户关联** — 每条待办绑定客户与拜访记录
+- **办结时间** — 手动添加待办时可设置办结截止日期
 - **角标提醒** — 客户 Tab 入口显示未完成待办数量
 - **新待办高亮** — 新提取的待办 10 秒内高亮动画提示
 
@@ -79,7 +91,7 @@ CMBook（招本）是一款面向客户经理的智能会议管理工具，以�
 - **表格编辑** — 完整的行列增删
 - **AI 补全** — 内联 AI 续写
 - **AI 润色** — 选中文字一键润色/精简/扩写/翻译，Diff 预览
-- **多格式导出** — Markdown / HTML / JSON / PDF
+- **多格式导出** — Markdown / HTML / JSON / PDF / Word（.doc）
 - **图床上传** — 支持 GitHub / PicGo / S3 / SMMS 四种图床
 
 ### 多端同步
@@ -95,7 +107,7 @@ CMBook（招本）是一款面向客户经理的智能会议管理工具，以�
 - **OCR 图片识别** — 多语言 OCR（中简/繁、英、日、韩），VLM 降级识别
 - **向量知识库** — 本地向量数据库，BM25 混合检索，Re-rank 重排，可配置切块/重叠/阈值
 - **快捷键自定义** — 编辑器与全局快捷键
-- **国际化** — 中/英双语，next-intl
+- **国际化** — 中/英/繁/日/葡 5 种语言，next-intl
 - **凭据加密** — API Key 加密存储，主密钥由系统钥匙串（keyring）管理
 
 ## 技术栈
@@ -149,6 +161,7 @@ pnpm run tauri dev
 | 用途 | 推荐模型 | 提供商 |
 |------|---------|--------|
 | 会议纪要生成 | DeepSeek-V4-Flash / V4-Pro | 硅基流动 / DeepSeek 官方 |
+| 周报生成 | DeepSeek-V4-Flash / Qwen | 硅基流动 / 阿里云百炼 |
 | 语音转写 (STT) | SenseVoiceSmall / FunASR / qwen3-asr | 硅基流动（免费）/ 阿里云百炼 |
 | 日常对话 | Qwen3-8B（内置免费） | CMBook 默认 |
 
@@ -165,15 +178,16 @@ CMBook-2.2/
 │   │   ├── main/
 │   │   │   ├── meeting/      # 会议录音、转写、纪要、实时转写
 │   │   │   ├── customer/     # 客户管理、拜访时间线、知识库
+│   │   │   ├── report/       # 周报生成、编辑、导出
 │   │   │   ├── chat/         # AI 对话面板
 │   │   │   └── editor/       # Markdown 编辑器
-│   │   └── setting/          # 设置页面
+│   │   └── setting/          # 设置页面（含周报设置）
 │   ├── components/            # 通用组件（待办面板等）
 │   ├── stores/               # Zustand 状态管理
 │   ├── db/                   # SQLite 数据访问层
 │   └── lib/                  # 工具库（OCR、RAG、同步等）
 ├── src-tauri/                # Rust 后端（录音、ASR、文件操作）
-├── messages/                 # i18n 翻译文件（zh/en）
+├── messages/                 # i18n 翻译文件（zh/en/zh-TW/ja/pt-BR）
 └── .github/workflows/        # CI 构建（Windows/macOS）
 ```
 
