@@ -37,12 +37,24 @@ export function ReportPanel() {
   const [htmlContent, setHtmlContent] = useState('')
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // 同步 store 内容到本地编辑状态
+  // 同步 store 内容到本地编辑状态（切换周报时）
   useEffect(() => {
     const content = currentReport?.content || ''
     setLocalContent(content)
     setDirty(false)
   }, [currentReport?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // AI 生成完成后，同步最终内容到本地编辑状态
+  // markGenerated 更新了 currentReport.content 但 id 不变，上面的 effect 不会触发
+  const prevGeneratingRef = useRef(false)
+  useEffect(() => {
+    if (prevGeneratingRef.current && !generating) {
+      // generating 从 true→false，说明生成刚结束
+      setLocalContent(currentReport?.content || '')
+      setDirty(false)
+    }
+    prevGeneratingRef.current = generating
+  }, [generating]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // AI 生成中时自动切换到预览模式
   useEffect(() => {
