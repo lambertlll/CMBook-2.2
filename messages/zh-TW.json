@@ -3372,7 +3372,18 @@
     "deleteTodo": "刪除待辦",
     "linkCustomer": "關聯客戶",
     "ownerLabel": "負責人",
-    "dueLabel": "完成時限"
+    "dueLabel": "完成時限",
+    "editTodo": "編輯待辦",
+    "editContent": "待辦內容",
+    "ownerPlaceholder": "負責人（可選）",
+    "cancel": "取消",
+    "save": "儲存",
+    "deleted": "已刪除",
+    "restoreTodo": "恢復待辦",
+    "restore": "恢復",
+    "permanentDelete": "永久刪除",
+    "hideDeleted": "收起已刪除",
+    "showDeleted": "顯示已刪除（{count}）"
   },
   "meeting": {
     "templateGroupBuiltin": "內建模板",

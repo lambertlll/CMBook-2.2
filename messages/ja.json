@@ -3382,7 +3382,18 @@
     "deleteTodo": "ToDoを削除",
     "linkCustomer": "顧客を関連付け",
     "ownerLabel": "担当者",
-    "dueLabel": "期限"
+    "dueLabel": "期限",
+    "editTodo": "ToDoを編集",
+    "editContent": "内容",
+    "ownerPlaceholder": "担当者（任意）",
+    "cancel": "キャンセル",
+    "save": "保存",
+    "deleted": "削除済み",
+    "restoreTodo": "ToDoを復元",
+    "restore": "復元",
+    "permanentDelete": "完全に削除",
+    "hideDeleted": "削除済みを閉じる",
+    "showDeleted": "削除済みを表示（{count}）"
   },
   "meeting": {
     "templateGroupBuiltin": "組み込みテンプレート",

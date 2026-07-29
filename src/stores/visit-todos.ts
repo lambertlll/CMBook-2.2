@@ -3,17 +3,21 @@ import {
   confirmVisitTodo,
   createVisitTodo,
   deleteVisitTodo,
+  deleteVisitTodoPermanently,
   getVisitTodoList,
+  restoreVisitTodo,
   toggleVisitTodoDone,
+  updateVisitTodo,
   type VisitTodoRecord,
 } from '@/db/visit-todos'
 
 // 待办面板 store：纪要自动提取 + 手动个人待办的统一消费入口。
 // 组件订阅必须用 selector 精确取字段（useVisitTodosStore((s) => s.todos)），禁止全量订阅。
 // 确认制（2.3）：AI 提取的待办 confirmed=0 只进"待确认"区；confirmTodo 确认后进入正式分组；
-// "忽略"直接复用 removeTodo（删除）。
+// "忽略"直接复用 removeTodo（软删除）。
+// 软删除制（2.5）：removeTodo 标记 deleted=1 而非物理删除，可在"已删除"区恢复。
 interface VisitTodosState {
-  todos: VisitTodoRecord[] // 排序与 getVisitTodoList 一致：未完成优先 → 时限近者优先（0 无时限排最后）→ 新创建优先
+  todos: VisitTodoRecord[] // 含已删除项（deleted=1），由组件按状态过滤展示
   initialized: boolean
   newTodoCount: number // 未读新待办角标计数（面板打开时 markTodosSeen 清零）
 
@@ -28,14 +32,20 @@ interface VisitTodosState {
     owner?: string
     dueDate?: number
   }) => Promise<VisitTodoRecord> // 返回新记录；内容为空或失败时抛错由调用方提示
-  removeTodo: (id: string) => Promise<void> // 乐观删除 + 失败回滚，失败时抛错
+  removeTodo: (id: string) => Promise<void> // 软删除（乐观更新 + 失败回滚）
+  restoreTodo: (id: string) => Promise<void> // 恢复已删除的待办
+  permanentDeleteTodo: (id: string) => Promise<void> // 永久删除（不可恢复）
+  editTodo: (id: string, updates: { content?: string; owner?: string; dueDate?: number }) => Promise<void>
   markTodosSeen: () => void // 清零新待办角标（待办面板打开时调用）
   noteExtractedTodos: (count: number) => void // 累加新待办角标（纪要提取成功后由挂载点调用）
   dropTodosByCustomer: (customerId: string) => void // 本地剔除某客户的待办（删除客户级联后调用，避免残留）
 }
 
 // 与 getVisitTodoList 的 SQL 排序保持一致，本地增改后重排
+// 已删除（deleted=1）排最后，避免干扰正常列表
 function compareTodos(a: VisitTodoRecord, b: VisitTodoRecord): number {
+  // 已删除排最后
+  if (a.deleted !== b.deleted) return a.deleted - b.deleted
   if (a.done !== b.done) return a.done - b.done
   // dueDate 为 0（无时限）排最后
   const aDue = a.dueDate === 0 ? Number.MAX_SAFE_INTEGER : a.dueDate
@@ -52,7 +62,8 @@ export const useVisitTodosStore = create<VisitTodosState>((set, get) => ({
   loadTodos: async () => {
     if (get().initialized) return
     try {
-      const records = await getVisitTodoList()
+      // includeDeleted: true 加载全部（含已删除），由组件按 deleted 状态分组展示
+      const records = await getVisitTodoList({ includeDeleted: true })
       set({ todos: records, initialized: true })
     } catch (err) {
       console.error('[VisitTodosStore] 加载待办列表失败:', err)
@@ -62,7 +73,7 @@ export const useVisitTodosStore = create<VisitTodosState>((set, get) => ({
 
   refreshTodos: async () => {
     try {
-      const records = await getVisitTodoList()
+      const records = await getVisitTodoList({ includeDeleted: true })
       set({ todos: records, initialized: true })
     } catch (err) {
       console.error('[VisitTodosStore] 刷新待办列表失败:', err)
@@ -111,14 +122,75 @@ export const useVisitTodosStore = create<VisitTodosState>((set, get) => ({
   },
 
   removeTodo: async (id) => {
-    // 乐观删除（保留快照用于失败回滚）
+    // 软删除：乐观标记 deleted=1（保留在列表中，可恢复）
     const snapshot = get().todos
-    set((state) => ({ todos: state.todos.filter((t) => t.id !== id) }))
+    set((state) => ({
+      todos: state.todos
+        .map((t) => (t.id === id ? { ...t, deleted: 1, updatedAt: Date.now() } : t))
+        .sort(compareTodos),
+    }))
     try {
       await deleteVisitTodo(id)
     } catch (err) {
       set({ todos: snapshot })
       console.error('[VisitTodosStore] 删除待办失败:', err)
+      throw err
+    }
+  },
+
+  restoreTodo: async (id) => {
+    // 恢复已删除的待办
+    const snapshot = get().todos
+    set((state) => ({
+      todos: state.todos
+        .map((t) => (t.id === id ? { ...t, deleted: 0, updatedAt: Date.now() } : t))
+        .sort(compareTodos),
+    }))
+    try {
+      await restoreVisitTodo(id)
+    } catch (err) {
+      set({ todos: snapshot })
+      console.error('[VisitTodosStore] 恢复待办失败:', err)
+      throw err
+    }
+  },
+
+  permanentDeleteTodo: async (id) => {
+    // 永久删除：从列表中移除
+    const snapshot = get().todos
+    set((state) => ({ todos: state.todos.filter((t) => t.id !== id) }))
+    try {
+      await deleteVisitTodoPermanently(id)
+    } catch (err) {
+      set({ todos: snapshot })
+      console.error('[VisitTodosStore] 永久删除待办失败:', err)
+      throw err
+    }
+  },
+
+  editTodo: async (id, updates) => {
+    // 乐观更新 + 失败回滚
+    const snapshot = get().todos
+    set((state) => ({
+      todos: state.todos
+        .map((t) =>
+          t.id === id
+            ? {
+                ...t,
+                ...('content' in updates ? { content: updates.content! } : {}),
+                ...('owner' in updates ? { owner: updates.owner! } : {}),
+                ...('dueDate' in updates ? { dueDate: updates.dueDate! } : {}),
+                updatedAt: Date.now(),
+              }
+            : t
+        )
+        .sort(compareTodos),
+    }))
+    try {
+      await updateVisitTodo(id, updates)
+    } catch (err) {
+      set({ todos: snapshot })
+      console.error('[VisitTodosStore] 编辑待办失败:', err)
       throw err
     }
   },

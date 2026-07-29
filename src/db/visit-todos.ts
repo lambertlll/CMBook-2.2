@@ -20,6 +20,7 @@ export interface VisitTodoRecord {
   dueDate: number // 时限时间戳（0=无/待定）
   done: number // 0 未完成 | 1 已完成
   confirmed: number // 0 待确认（AI 提取）| 1 已确认
+  deleted: number // 0 正常 | 1 已删除（软删除，可恢复）
   createdAt: number
   updatedAt: number
 }
@@ -52,6 +53,7 @@ export async function initVisitTodosDb() {
       dueDate INTEGER DEFAULT 0,
       done INTEGER DEFAULT 0,
       confirmed INTEGER DEFAULT 0,
+      deleted INTEGER DEFAULT 0,
       createdAt INTEGER NOT NULL,
       updatedAt INTEGER NOT NULL
     )
@@ -73,6 +75,13 @@ export async function initVisitTodosDb() {
       'ALTER TABLE visit_todos ADD COLUMN confirmed INTEGER DEFAULT 0'
     )
     await db.execute('UPDATE visit_todos SET confirmed = 1')
+  }
+
+  // v5 迁移：visit_todos 新增 deleted 软删除列；历史数据默认 0（正常）
+  if (!columns.some((c) => c.name === 'deleted')) {
+    await db.execute(
+      'ALTER TABLE visit_todos ADD COLUMN deleted INTEGER DEFAULT 0'
+    )
   }
 
   // schema 版本迁移登记：新装库 initSchemaMetaDb 已直接写入当前版本，
@@ -109,12 +118,13 @@ export async function createVisitTodo(input: {
     dueDate: input.dueDate || 0,
     done: input.done ? 1 : 0,
     confirmed: input.confirmed === undefined ? 1 : input.confirmed ? 1 : 0,
+    deleted: 0,
     createdAt: now,
     updatedAt: now,
   }
   await db.execute(
-    `INSERT INTO visit_todos (id, customerId, visitId, meetingId, content, owner, dueDate, done, confirmed, createdAt, updatedAt)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+    `INSERT INTO visit_todos (id, customerId, visitId, meetingId, content, owner, dueDate, done, confirmed, deleted, createdAt, updatedAt)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
     [
       record.id,
       record.customerId,
@@ -125,6 +135,7 @@ export async function createVisitTodo(input: {
       record.dueDate,
       record.done,
       record.confirmed,
+      record.deleted,
       record.createdAt,
       record.updatedAt,
     ]
@@ -145,11 +156,63 @@ export async function getVisitTodo(id: string): Promise<VisitTodoRecord | null> 
 }
 
 /**
- * 删除待办
+ * 删除待办（软删除：标记 deleted=1，可恢复）
  */
 export async function deleteVisitTodo(id: string) {
   const db = await getDb()
+  await db.execute(
+    'UPDATE visit_todos SET deleted = 1, updatedAt = $1 WHERE id = $2',
+    [Date.now(), id]
+  )
+}
+
+/**
+ * 恢复已删除的待办（deleted=0 → 正常）
+ */
+export async function restoreVisitTodo(id: string) {
+  const db = await getDb()
+  await db.execute(
+    'UPDATE visit_todos SET deleted = 0, updatedAt = $1 WHERE id = $2',
+    [Date.now(), id]
+  )
+}
+
+/**
+ * 永久删除待办（物理删除，不可恢复）
+ */
+export async function deleteVisitTodoPermanently(id: string) {
+  const db = await getDb()
   await db.execute('DELETE FROM visit_todos WHERE id = $1', [id])
+}
+
+/**
+ * 更新待办内容/负责人/时限
+ */
+export async function updateVisitTodo(
+  id: string,
+  updates: { content?: string; owner?: string; dueDate?: number }
+) {
+  const db = await getDb()
+  const now = Date.now()
+  const setClauses: string[] = ['updatedAt = $1']
+  const values: unknown[] = [now]
+  if (updates.content !== undefined) {
+    values.push(updates.content)
+    setClauses.push(`content = $${values.length}`)
+  }
+  if (updates.owner !== undefined) {
+    values.push(updates.owner)
+    setClauses.push(`owner = $${values.length}`)
+  }
+  if (updates.dueDate !== undefined) {
+    values.push(updates.dueDate)
+    setClauses.push(`dueDate = $${values.length}`)
+  }
+  values.push(id)
+  await db.execute(
+    `UPDATE visit_todos SET ${setClauses.join(', ')} WHERE id = $${values.length}`,
+    values
+  )
 }
 
 /**
@@ -184,12 +247,13 @@ export async function replaceMeetingTodos(
       dueDate: row.dueDate,
       done: 0,
       confirmed: row.confirmed ? 1 : 0,
+      deleted: 0,
       createdAt: now,
       updatedAt: now,
     }))
     if (toInsert.length > 0) {
       await db.execute(
-        `INSERT INTO visit_todos (id, customerId, visitId, meetingId, content, owner, dueDate, done, confirmed, createdAt, updatedAt)
+        `INSERT INTO visit_todos (id, customerId, visitId, meetingId, content, owner, dueDate, done, confirmed, deleted, createdAt, updatedAt)
          SELECT
            json_extract(value, '$.id'),
            json_extract(value, '$.customerId'),
@@ -200,6 +264,7 @@ export async function replaceMeetingTodos(
            json_extract(value, '$.dueDate'),
            json_extract(value, '$.done'),
            json_extract(value, '$.confirmed'),
+           json_extract(value, '$.deleted'),
            json_extract(value, '$.createdAt'),
            json_extract(value, '$.updatedAt')
          FROM json_each($1)`,
@@ -211,7 +276,7 @@ export async function replaceMeetingTodos(
 
   // 差异合并模式（默认）：用于纪要重新生成/自动同步时保留已勾选的完成状态
 
-  // 该会议现有待办
+  // 该会议现有待办（含已软删除的，用于匹配）
   const existing = await db.select<VisitTodoRecord[]>(
     'SELECT * FROM visit_todos WHERE meetingId = $1',
     [meetingId]
@@ -228,6 +293,7 @@ export async function replaceMeetingTodos(
   const toInsert: Record<string, unknown>[] = []
   const dueDateUpdates: Array<{ id: string; dueDate: number }> = []
   const confirmedUpdates: Array<{ id: string; confirmed: number }> = []
+  const restoreUpdates: string[] = [] // 软删除待办重新出现时恢复
 
   for (const row of rows) {
     const key = keyOf(row.content, row.owner)
@@ -245,6 +311,7 @@ export async function replaceMeetingTodos(
         dueDate: row.dueDate,
         done: 0,
         confirmed: row.confirmed ? 1 : 0,
+        deleted: 0,
         createdAt: now,
         updatedAt: now,
       })
@@ -257,13 +324,15 @@ export async function replaceMeetingTodos(
       if (row.confirmed !== undefined && old.confirmed !== (row.confirmed ? 1 : 0)) {
         confirmedUpdates.push({ id: old.id, confirmed: row.confirmed ? 1 : 0 })
       }
+      // 软删除的待办重新出现在纪要中时自动恢复
+      if (old.deleted === 1) {
+        restoreUpdates.push(old.id)
+      }
     }
   }
 
-  // 已删除的待办（不在新行中的旧记录）
+  // 不在新行中的旧记录：物理删除（差异合并语义——纪要中已移除）
   const toDelete = existing.filter((e) => !newKeys.has(keyOf(e.content, e.owner)))
-
-  // 逐条删除差异项（数量小）
   for (const e of toDelete) {
     await db.execute('DELETE FROM visit_todos WHERE id = $1', [e.id])
   }
@@ -284,12 +353,20 @@ export async function replaceMeetingTodos(
     )
   }
 
+  // 软删除的待办重新出现在纪要中时自动恢复（deleted=0）
+  for (const id of restoreUpdates) {
+    await db.execute(
+      'UPDATE visit_todos SET deleted = 0, updatedAt = $1 WHERE id = $2',
+      [now, id]
+    )
+  }
+
   // 新增项单条 SQL 批量写入（json_each），避免逐条 IPC
   // 注意：json_each 虚拟表只有 key/value/type/atom/id/parent/fullkey/path 列，
   // 不能直接 SELECT JSON 字段名，必须用 json_extract(value, '$.field') 提取
   if (toInsert.length > 0) {
     await db.execute(
-      `INSERT INTO visit_todos (id, customerId, visitId, meetingId, content, owner, dueDate, done, confirmed, createdAt, updatedAt)
+      `INSERT INTO visit_todos (id, customerId, visitId, meetingId, content, owner, dueDate, done, confirmed, deleted, createdAt, updatedAt)
        SELECT
          json_extract(value, '$.id'),
          json_extract(value, '$.customerId'),
@@ -300,6 +377,7 @@ export async function replaceMeetingTodos(
          json_extract(value, '$.dueDate'),
          json_extract(value, '$.done'),
          json_extract(value, '$.confirmed'),
+         json_extract(value, '$.deleted'),
          json_extract(value, '$.createdAt'),
          json_extract(value, '$.updatedAt')
        FROM json_each($1)`,
@@ -321,13 +399,15 @@ export async function confirmVisitTodo(id: string): Promise<boolean> {
 }
 
 /**
- * 获取待办列表，支持 done/customerId 过滤。
+ * 获取待办列表，支持 done/customerId/confirmed 过滤。
+ * 默认排除已删除（deleted=0）的待办；传入 includeDeleted: true 可同时返回已删除项。
  * 默认排序：未完成优先（done ASC）→ 时限近者优先（dueDate ASC，0 无时限排最后）→ 新创建优先（createdAt DESC）
  */
 export async function getVisitTodoList(filter?: {
   done?: boolean
   customerId?: string
   confirmed?: boolean
+  includeDeleted?: boolean
 }): Promise<VisitTodoRecord[]> {
   const db = await getDb()
   const conditions: string[] = []
@@ -343,6 +423,9 @@ export async function getVisitTodoList(filter?: {
   if (filter?.confirmed !== undefined) {
     conditions.push(`confirmed = $${values.length + 1}`)
     values.push(filter.confirmed ? 1 : 0)
+  }
+  if (!filter?.includeDeleted) {
+    conditions.push(`deleted = 0`)
   }
   const where = conditions.length > 0 ? ` WHERE ${conditions.join(' AND ')}` : ''
   return await db.select<VisitTodoRecord[]>(

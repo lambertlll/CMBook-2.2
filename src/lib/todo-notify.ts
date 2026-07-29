@@ -114,9 +114,13 @@ export async function checkDueTodosOnce(): Promise<void> {
     const endOfToday = endOfTodayTs(now)
     const todayKey = localDateKey(now)
 
-    // 到期口径：未完成 + 有时限 + 时限 ≤ 今天 23:59（覆盖已逾期与今天到期）
+    // 到期口径：未删除 + 未完成 + 有时限 + 时限 ≤ 今天 23:59（覆盖已逾期与今天到期）
     const dueTodos = todos.filter(
-      (todo) => todo.done === 0 && todo.dueDate > 0 && todo.dueDate <= endOfToday
+      (todo) =>
+        todo.deleted === 0 &&
+        todo.done === 0 &&
+        todo.dueDate > 0 &&
+        todo.dueDate <= endOfToday
     )
 
     const store = await Store.load('store.json')

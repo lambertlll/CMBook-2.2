@@ -4,8 +4,14 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import {
   Select,
   SelectContent,
@@ -13,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Check, ChevronDown, ChevronRight, Loader2, X } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, Loader2, Pencil, RotateCcw, Trash2, X } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 import { useVisitTodosStore } from '@/stores/visit-todos'
@@ -35,18 +41,28 @@ interface GroupedTodos {
   thisWeek: VisitTodoRecord[]
   later: VisitTodoRecord[]
   completed: VisitTodoRecord[]
+  deleted: VisitTodoRecord[]
 }
 
-// 按 逾期/今天/本周/以后（无时限归入以后）/已完成 分组
+// 按 逾期/今天/本周/以后（无时限归入以后）/已完成/已删除 分组
 function groupTodos(todos: VisitTodoRecord[]): GroupedTodos {
   const now = new Date()
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
   const startOfTomorrow = startOfToday + 24 * 60 * 60 * 1000
   const endOfWeek = startOfToday + 7 * 24 * 60 * 60 * 1000
 
-  const grouped: GroupedTodos = { overdue: [], today: [], thisWeek: [], later: [], completed: [] }
+  const grouped: GroupedTodos = {
+    overdue: [],
+    today: [],
+    thisWeek: [],
+    later: [],
+    completed: [],
+    deleted: [],
+  }
   for (const todo of todos) {
-    if (todo.done === 1) {
+    if (todo.deleted === 1) {
+      grouped.deleted.push(todo)
+    } else if (todo.done === 1) {
       grouped.completed.push(todo)
     } else if (todo.dueDate > 0 && todo.dueDate < startOfToday) {
       grouped.overdue.push(todo)
@@ -55,7 +71,6 @@ function groupTodos(todos: VisitTodoRecord[]): GroupedTodos {
     } else if (todo.dueDate >= startOfTomorrow && todo.dueDate < endOfWeek) {
       grouped.thisWeek.push(todo)
     } else {
-      // dueDate === 0（无时限）或更远的未来
       grouped.later.push(todo)
     }
   }
@@ -69,6 +84,40 @@ function formatDueDate(dueDate: number): string | null {
   return `${d.getMonth() + 1}/${d.getDate()}`
 }
 
+// 时间戳 → date input 的 YYYY-MM-DD 格式
+function timestampToDateInput(ts: number): string {
+  if (!ts) return ''
+  const d = new Date(ts)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+// date input 的 YYYY-MM-DD → 当天结束时的时间戳
+function dateInputToTimestamp(dateStr: string): number {
+  if (!dateStr) return 0
+  const [y, m, d] = dateStr.split('-').map(Number)
+  if (!y || !m || !d) return 0
+  return new Date(y, m - 1, d, 23, 59, 59, 999).getTime()
+}
+
+// 状态标签
+function StatusBadge({ variant, label }: { variant: 'completed' | 'deleted'; label: string }) {
+  return (
+    <span
+      className={cn(
+        'inline-flex shrink-0 items-center rounded px-1.5 py-px text-[10px] font-medium',
+        variant === 'completed'
+          ? 'bg-emerald-500/12 text-emerald-600 dark:text-emerald-400'
+          : 'bg-muted text-muted-foreground'
+      )}
+    >
+      {label}
+    </span>
+  )
+}
+
 export function TodoPanel() {
   const t = useTranslations('todos')
   const todos = useVisitTodosStore((s) => s.todos)
@@ -78,6 +127,9 @@ export function TodoPanel() {
   const confirmTodo = useVisitTodosStore((s) => s.confirmTodo)
   const addManualTodo = useVisitTodosStore((s) => s.addManualTodo)
   const removeTodo = useVisitTodosStore((s) => s.removeTodo)
+  const restoreTodo = useVisitTodosStore((s) => s.restoreTodo)
+  const permanentDeleteTodo = useVisitTodosStore((s) => s.permanentDeleteTodo)
+  const editTodo = useVisitTodosStore((s) => s.editTodo)
   const markTodosSeen = useVisitTodosStore((s) => s.markTodosSeen)
 
   const customers = useCustomerStore((s) => s.customers)
@@ -91,6 +143,14 @@ export function TodoPanel() {
   const [draftCustomerId, setDraftCustomerId] = useState(NO_CUSTOMER_VALUE)
   const [submitting, setSubmitting] = useState(false)
   const [showCompleted, setShowCompleted] = useState(false)
+  const [showDeleted, setShowDeleted] = useState(false)
+
+  // 编辑弹窗状态
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editContent, setEditContent] = useState('')
+  const [editOwner, setEditOwner] = useState('')
+  const [editDueDate, setEditDueDate] = useState('')
+  const [editSaving, setEditSaving] = useState(false)
 
   useEffect(() => {
     void loadTodos()
@@ -111,12 +171,12 @@ export function TodoPanel() {
     return map
   }, [customers])
 
-  // 待确认分组：AI 提取未确认（confirmed=0）且未完成的待办，确认后才进入正式分组
+  // 待确认分组：AI 提取未确认（confirmed=0）且未完成且未删除的待办
   const pendingConfirmTodos = useMemo(
-    () => todos.filter((todo) => todo.confirmed === 0 && todo.done === 0),
+    () => todos.filter((todo) => todo.confirmed === 0 && todo.done === 0 && todo.deleted === 0),
     [todos]
   )
-  // 正式分组只统计已确认（confirmed=1）的待办
+  // 正式分组只统计已确认（confirmed=1）的待办（含已完成和已删除）
   const grouped = useMemo(
     () => groupTodos(todos.filter((todo) => todo.confirmed === 1)),
     [todos]
@@ -150,12 +210,53 @@ export function TodoPanel() {
     })
   }
 
+  const handleRestore = (id: string) => {
+    restoreTodo(id).catch((err) => {
+      console.error('[TodoPanel] 恢复待办失败:', err)
+      toast({ description: String(err), variant: 'destructive' })
+    })
+  }
+
+  const handlePermanentDelete = (id: string) => {
+    permanentDeleteTodo(id).catch((err) => {
+      console.error('[TodoPanel] 永久删除待办失败:', err)
+      toast({ description: String(err), variant: 'destructive' })
+    })
+  }
+
   // 待确认分组：确认（进入正式分组）
   const handleConfirm = (id: string) => {
     confirmTodo(id).catch((err) => {
       console.error('[TodoPanel] 确认待办失败:', err)
       toast({ description: String(err), variant: 'destructive' })
     })
+  }
+
+  // 打开编辑弹窗
+  const handleStartEdit = (todo: VisitTodoRecord) => {
+    setEditingId(todo.id)
+    setEditContent(todo.content)
+    setEditOwner(todo.owner)
+    setEditDueDate(timestampToDateInput(todo.dueDate))
+  }
+
+  // 保存编辑
+  const handleSaveEdit = () => {
+    if (!editingId || editSaving) return
+    const content = editContent.trim()
+    if (!content) return
+    setEditSaving(true)
+    editTodo(editingId, {
+      content,
+      owner: editOwner.trim(),
+      dueDate: dateInputToTimestamp(editDueDate),
+    })
+      .then(() => setEditingId(null))
+      .catch((err) => {
+        console.error('[TodoPanel] 编辑待办失败:', err)
+        toast({ description: String(err), variant: 'destructive' })
+      })
+      .finally(() => setEditSaving(false))
   }
 
   const handleAdd = () => {
@@ -174,15 +275,14 @@ export function TodoPanel() {
       .finally(() => setSubmitting(false))
   }
 
-  const renderItem = (todo: VisitTodoRecord, group: TodoGroupKey | 'completed') => {
-    const isNew = Date.now() - todo.createdAt < NEW_HIGHLIGHT_WINDOW_MS
+  // 渲染元信息段（客户名/负责人/时限/来源纪要），多个段用「·」串联
+  function renderMetaSegments(todo: VisitTodoRecord, group: TodoGroupKey | 'completed' | 'deleted'): ReactNode[] {
     const isDone = todo.done === 1
     const customerName = todo.customerId ? customerNameMap.get(todo.customerId) : undefined
     const dueText = formatDueDate(todo.dueDate)
-    // 次行元信息段：客户名（可点）· 负责人 · 时限 · 来源纪要（可点），有内容的段用「·」串联
-    const metaSegments: ReactNode[] = []
+    const segs: ReactNode[] = []
     if (customerName) {
-      metaSegments.push(
+      segs.push(
         <button
           key="customer"
           className="hover:text-primary hover:underline"
@@ -193,10 +293,10 @@ export function TodoPanel() {
       )
     }
     if (todo.owner) {
-      metaSegments.push(<span key="owner">{t('ownerLabel')} {todo.owner}</span>)
+      segs.push(<span key="owner">{t('ownerLabel')} {todo.owner}</span>)
     }
     if (dueText) {
-      metaSegments.push(
+      segs.push(
         <span
           key="due"
           className={cn(group === 'overdue' && !isDone && 'text-danger')}
@@ -206,7 +306,7 @@ export function TodoPanel() {
       )
     }
     if (todo.meetingId) {
-      metaSegments.push(
+      segs.push(
         <button
           key="meeting"
           className="hover:text-primary hover:underline"
@@ -216,6 +316,92 @@ export function TodoPanel() {
         </button>
       )
     }
+    return segs
+  }
+
+  // 渲染编辑弹窗内容
+  const renderEditPopover = (todo: VisitTodoRecord) => {
+    const isOpen = editingId === todo.id
+    return (
+      <Popover open={isOpen} onOpenChange={(open) => { if (!open) setEditingId(null) }}>
+        <PopoverTrigger asChild>
+          <button
+            onClick={() => handleStartEdit(todo)}
+            aria-label={t('editTodo')}
+            className="mt-0.5 shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-72" sideOffset={4}>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">{t('editContent')}</label>
+              <Textarea
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                className="min-h-[60px] text-sm"
+                autoFocus
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">{t('ownerLabel')}</label>
+              <Input
+                value={editOwner}
+                onChange={(e) => setEditOwner(e.target.value)}
+                placeholder={t('ownerPlaceholder')}
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">{t('dueLabel')}</label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="date"
+                  value={editDueDate}
+                  onChange={(e) => setEditDueDate(e.target.value)}
+                  className="h-8 flex-1 text-sm"
+                />
+                {editDueDate && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 shrink-0 px-2"
+                    onClick={() => setEditDueDate('')}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7"
+                onClick={() => setEditingId(null)}
+              >
+                {t('cancel')}
+              </Button>
+              <Button
+                size="sm"
+                className="h-7"
+                disabled={!editContent.trim() || editSaving}
+                onClick={handleSaveEdit}
+              >
+                {editSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : t('save')}
+              </Button>
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
+    )
+  }
+
+  const renderItem = (todo: VisitTodoRecord, group: TodoGroupKey | 'completed') => {
+    const isNew = Date.now() - todo.createdAt < NEW_HIGHLIGHT_WINDOW_MS
+    const isDone = todo.done === 1
+    const metaSegments = renderMetaSegments(todo, group)
     return (
       <div
         key={todo.id}
@@ -231,15 +417,18 @@ export function TodoPanel() {
           className="mt-0.5 shrink-0"
         />
         <div className="min-w-0 flex-1">
-          <p
-            className={cn(
-              'text-sm leading-snug break-words',
-              isDone && 'text-muted-foreground line-through',
-              group === 'overdue' && !isDone && 'text-danger'
-            )}
-          >
-            {todo.content}
-          </p>
+          <div className="flex items-start gap-1.5">
+            <p
+              className={cn(
+                'text-sm leading-snug break-words',
+                isDone && 'text-muted-foreground line-through',
+                group === 'overdue' && !isDone && 'text-danger'
+              )}
+            >
+              {todo.content}
+            </p>
+            {isDone && <StatusBadge variant="completed" label={t('completed')} />}
+          </div>
           {metaSegments.length > 0 && (
             <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11px] text-muted-foreground">
               {metaSegments.map((seg, i) => (
@@ -251,6 +440,7 @@ export function TodoPanel() {
             </div>
           )}
         </div>
+        {renderEditPopover(todo)}
         <button
           onClick={() => handleRemove(todo.id)}
           aria-label={t('deleteTodo')}
@@ -258,6 +448,53 @@ export function TodoPanel() {
         >
           <X className="h-3.5 w-3.5" />
         </button>
+      </div>
+    )
+  }
+
+  // 已删除条目：内容（删除线）+ 已删除标签 + 恢复/永久删除按钮
+  const renderDeletedItem = (todo: VisitTodoRecord) => {
+    const metaSegments = renderMetaSegments(todo, 'deleted')
+    return (
+      <div
+        key={todo.id}
+        className="group flex items-start gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-accent/60"
+      >
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start gap-1.5">
+            <p className="text-sm leading-snug break-words text-muted-foreground line-through">
+              {todo.content}
+            </p>
+            <StatusBadge variant="deleted" label={t('deleted')} />
+          </div>
+          {metaSegments.length > 0 && (
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11px] text-muted-foreground">
+              {metaSegments.map((seg, i) => (
+                <span key={i} className="flex items-center gap-1.5">
+                  {i > 0 && <span>·</span>}
+                  {seg}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="mt-0.5 flex shrink-0 items-center gap-1">
+          <button
+            onClick={() => handleRestore(todo.id)}
+            aria-label={t('restoreTodo')}
+            className="flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <RotateCcw className="h-3 w-3" />
+            {t('restore')}
+          </button>
+          <button
+            onClick={() => handlePermanentDelete(todo.id)}
+            aria-label={t('permanentDelete')}
+            className="flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:text-destructive"
+          >
+            <Trash2 className="h-3 w-3" />
+          </button>
+        </div>
       </div>
     )
   }
@@ -372,7 +609,7 @@ export function TodoPanel() {
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="p-2">
-          {!hasPending && grouped.completed.length === 0 && pendingConfirmTodos.length === 0 ? (
+          {!hasPending && grouped.completed.length === 0 && grouped.deleted.length === 0 && pendingConfirmTodos.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 px-4 py-12 text-center">
               <p className="text-base font-medium">{t('noTodos')}</p>
               <p className="text-xs text-muted-foreground">{t('noTodosDesc')}</p>
@@ -407,6 +644,25 @@ export function TodoPanel() {
                       : t('showCompleted', { count: grouped.completed.length })}
                   </button>
                   {showCompleted && grouped.completed.map((todo) => renderItem(todo, 'completed'))}
+                </div>
+              )}
+
+              {grouped.deleted.length > 0 && (
+                <div className="mt-2 border-t pt-2">
+                  <button
+                    onClick={() => setShowDeleted((v) => !v)}
+                    className="flex w-full items-center gap-1 px-2 pb-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+                  >
+                    {showDeleted ? (
+                      <ChevronDown className="h-3.5 w-3.5" />
+                    ) : (
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    )}
+                    {showDeleted
+                      ? t('hideDeleted')
+                      : t('showDeleted', { count: grouped.deleted.length })}
+                  </button>
+                  {showDeleted && grouped.deleted.map(renderDeletedItem)}
                 </div>
               )}
             </>

@@ -3335,7 +3335,18 @@
     "deleteTodo": "Excluir pendência",
     "linkCustomer": "Vincular cliente",
     "ownerLabel": "Responsável",
-    "dueLabel": "Prazo"
+    "dueLabel": "Prazo",
+    "editTodo": "Editar pendência",
+    "editContent": "Conteúdo",
+    "ownerPlaceholder": "Responsável (opcional)",
+    "cancel": "Cancelar",
+    "save": "Salvar",
+    "deleted": "Excluída",
+    "restoreTodo": "Restaurar pendência",
+    "restore": "Restaurar",
+    "permanentDelete": "Excluir permanentemente",
+    "hideDeleted": "Ocultar excluídas",
+    "showDeleted": "Mostrar excluídas ({count})"
   },
   "meeting": {
     "templateGroupBuiltin": "Modelos internos",

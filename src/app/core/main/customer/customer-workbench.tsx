@@ -226,7 +226,7 @@ export function CustomerWorkbench() {
     }
     const groups = new Map<string, PendingGroup>()
     for (const todo of todos) {
-      if (todo.confirmed !== 0 || todo.done === 1) continue
+      if (todo.confirmed !== 0 || todo.done === 1 || todo.deleted === 1) continue
       const key = todo.meetingId
         ? `meeting:${todo.meetingId}`
         : todo.customerId
@@ -282,7 +282,7 @@ export function CustomerWorkbench() {
     let week = 0
     let overdue = 0
     for (const todo of todos) {
-      if (todo.done === 1 || todo.dueDate === 0) continue
+      if (todo.done === 1 || todo.deleted === 1 || todo.dueDate === 0) continue
       if (todo.dueDate < endOfWeek) week += 1
       if (todo.dueDate < startOfToday) overdue += 1
     }
