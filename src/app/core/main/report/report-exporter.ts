@@ -2,9 +2,10 @@ import { writeTextFile } from '@tauri-apps/plugin-fs'
 import { getFilePathOptions } from '@/lib/workspace'
 import { formatWeekLabel } from '@/db/weekly-reports'
 import useArticleStore from '@/stores/article'
+import { exportMarkdownToWord } from '@/lib/export-word'
 
 /**
- * 周报导出工具：复制到剪贴板 / 另存为笔记文件。
+ * 周报导出工具：复制到剪贴板 / 另存为笔记文件 / 导出为 Word。
  */
 
 /**
@@ -45,4 +46,16 @@ export async function saveReportAsNote(
   }
 
   return relativePath
+}
+
+/**
+ * 将周报导出为 Word 文档
+ */
+export async function exportReportToWord(
+  content: string,
+  weekStart: number
+): Promise<void> {
+  const label = formatWeekLabel(weekStart)
+  const fileName = `周报-${label}`
+  await exportMarkdownToWord(content, fileName)
 }

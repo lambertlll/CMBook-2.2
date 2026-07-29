@@ -1710,7 +1710,34 @@
         "webSearch": "联网搜索 Key"
       }
     },
-    "backToMain": "返回主界面"
+    "backToMain": "返回主界面",
+    "report": {
+      "title": "周报",
+      "desc": "配置周报生成模型和自定义模板",
+      "model": {
+        "title": "周报生成模型",
+        "desc": "用于 AI 一键生成周报的模型"
+      },
+      "customTemplates": {
+        "title": "自定义模板",
+        "desc": "为周报 AI 生成创建自定义提示词模板",
+        "add": "添加模板",
+        "edit": "编辑",
+        "delete": "删除",
+        "nameLabel": "模板名称",
+        "namePlaceholder": "输入模板名称",
+        "promptLabel": "提示词",
+        "promptPlaceholder": "输入自定义提示词，描述你希望周报的生成风格和重点...",
+        "promptHint": "提示词将追加到默认系统提示之后，影响 AI 生成的内容风格和结构。",
+        "cancel": "取消",
+        "save": "保存",
+        "dialogTitleNew": "新建模板",
+        "dialogTitleEdit": "编辑模板",
+        "deleteConfirmTitle": "确认删除",
+        "deleteConfirmDesc": "确定要删除模板 \"{name}\" 吗？此操作不可撤销。",
+        "invalidToast": "模板名称和提示词不能为空"
+      }
+    }
   },
   "record": {
     "trash": {
@@ -3636,7 +3663,9 @@
     "summaryEditedSinceSync": "纪要已修改，同步以更新知识库与待办",
     "syncingKnowledge": "同步中...",
     "syncKnowledgeSuccess": "已同步到客户知识库",
-    "syncKnowledgeFailed": "同步失败，请重试"
+    "syncKnowledgeFailed": "同步失败，请重试",
+    "exportWord": "导出 Word",
+    "exportedWord": "已导出 Word"
   },
   "customer": {
     "postvisitTodoEmptyCoach": "拜访纪要生成后，待办事项会自动出现在这里",
@@ -3815,6 +3844,13 @@
     "saveNoteFailed": "保存笔记失败",
     "weekVisits": "本周拜访",
     "nextWeekTodos": "下周待办",
-    "moreCount": "还有 {count} 条..."
+    "moreCount": "还有 {count} 条...",
+    "exportWord": "导出 Word",
+    "exported": "已导出",
+    "exportWordFailed": "导出 Word 失败",
+    "exportWordTip": "导出为 Word 文档",
+    "customPrompt": "自定义提示词",
+    "template": "生成模板",
+    "noTemplate": "默认模板"
   }
 }

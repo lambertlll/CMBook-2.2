@@ -13,6 +13,7 @@ import jsPDF from 'jspdf'
 import { useCallback, useRef, useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import useArticleStore from '@/stores/article'
+import { exportMarkdownToWord } from '@/lib/export-word'
 
 interface ExportMenuProps {
   editor: Editor
@@ -206,6 +207,18 @@ ${content}
     setIsOpen(false)
   }, [downloadFile])
 
+  const exportWord = useCallback(async () => {
+    const content = getMarkdown()
+    const activeFilePath = useArticleStore.getState().activeFilePath
+    const fileName = activeFilePath?.replace(/\.md$/, '') || 'document'
+    try {
+      await exportMarkdownToWord(content, fileName)
+    } catch (error) {
+      console.error('Word export failed:', error)
+    }
+    setIsOpen(false)
+  }, [getMarkdown])
+
   // Close menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -267,6 +280,13 @@ ${content}
           >
             <FileType size={14} />
             <span>PDF (.pdf)</span>
+          </button>
+          <button
+            onClick={exportWord}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-[hsl(var(--muted))] transition-colors"
+          >
+            <FileText size={14} />
+            <span>Word (.doc)</span>
           </button>
         </div>
       )}

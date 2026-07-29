@@ -1710,7 +1710,34 @@
         "webSearch": "Web search API key"
       }
     },
-    "backToMain": "Back to Main"
+    "backToMain": "Back to Main",
+    "report": {
+      "title": "Weekly Report",
+      "desc": "Configure report generation model and custom templates",
+      "model": {
+        "title": "Report Model",
+        "desc": "Model used for AI weekly report generation"
+      },
+      "customTemplates": {
+        "title": "Custom Templates",
+        "desc": "Create custom prompt templates for AI report generation",
+        "add": "Add Template",
+        "edit": "Edit",
+        "delete": "Delete",
+        "nameLabel": "Template Name",
+        "namePlaceholder": "Enter template name",
+        "promptLabel": "Prompt",
+        "promptPlaceholder": "Enter custom prompt describing the style and focus of the report...",
+        "promptHint": "The prompt will be appended to the default system prompt, affecting the AI-generated content style and structure.",
+        "cancel": "Cancel",
+        "save": "Save",
+        "dialogTitleNew": "New Template",
+        "dialogTitleEdit": "Edit Template",
+        "deleteConfirmTitle": "Confirm Delete",
+        "deleteConfirmDesc": "Are you sure you want to delete template \"{name}\"? This cannot be undone.",
+        "invalidToast": "Template name and prompt cannot be empty"
+      }
+    }
   },
   "record": {
     "trash": {
@@ -3636,7 +3663,9 @@
     "summaryEditedSinceSync": "Summary edited — sync to update the knowledge base and todos",
     "syncingKnowledge": "Syncing...",
     "syncKnowledgeSuccess": "Synced to customer knowledge base",
-    "syncKnowledgeFailed": "Sync failed, please try again"
+    "syncKnowledgeFailed": "Sync failed, please try again",
+    "exportWord": "Export Word",
+    "exportedWord": "Exported Word"
   },
   "customer": {
     "postvisitTodoEmptyCoach": "Once the visit summary is generated, todos will appear here automatically",
@@ -3815,6 +3844,13 @@
     "saveNoteFailed": "Failed to save note",
     "weekVisits": "This Week Visits",
     "nextWeekTodos": "Next Week Todos",
-    "moreCount": "{count} more..."
+    "moreCount": "{count} more...",
+    "exportWord": "Export Word",
+    "exported": "Exported",
+    "exportWordFailed": "Failed to export Word",
+    "exportWordTip": "Export as Word document",
+    "customPrompt": "Custom Prompt",
+    "template": "Template",
+    "noTemplate": "Default Template"
   }
 }

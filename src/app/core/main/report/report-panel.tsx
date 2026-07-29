@@ -7,6 +7,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { Loader2, Save, Check, PenLine, Eye } from 'lucide-react'
 import { useReportStore, formatWeekRange, formatWeekLabel } from './report-store'
+import { MarkdownToolbar } from './markdown-toolbar'
 // 复用主编辑器的排版样式（.tiptap-editor .ProseMirror），与笔记/会议纪要保持一致
 import '../editor/markdown/style.css'
 
@@ -38,6 +39,7 @@ export function ReportPanel() {
   const [saved, setSaved] = useState(false)
   const [htmlContent, setHtmlContent] = useState('')
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // 同步 store 内容到本地编辑状态（切换周报时）
   useEffect(() => {
@@ -160,12 +162,16 @@ export function ReportPanel() {
       {/* 内容区 */}
       <div className="min-h-0 flex-1">
         {mode === 'edit' && !generating ? (
-          <Textarea
-            value={localContent}
-            onChange={(e) => handleContentChange(e.target.value)}
-            placeholder={t('editPlaceholder')}
-            className="h-full w-full resize-none rounded-none border-0 text-base leading-relaxed focus-visible:ring-0"
-          />
+          <div className="flex h-full flex-col">
+            <MarkdownToolbar textareaRef={textareaRef} value={localContent} onChange={handleContentChange} />
+            <Textarea
+              ref={textareaRef}
+              value={localContent}
+              onChange={(e) => handleContentChange(e.target.value)}
+              placeholder={t('editPlaceholder')}
+              className="h-full w-full flex-1 resize-none rounded-none border-0 text-base leading-relaxed focus-visible:ring-0"
+            />
+          </div>
         ) : (
           <ScrollArea className="h-full">
             <div className="tiptap-editor">

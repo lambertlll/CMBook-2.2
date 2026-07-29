@@ -4,14 +4,16 @@ import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   Sparkles, Copy, FileDown, Loader2, Users, CalendarCheck,
-  ListTodo, CheckCircle2, AlertTriangle, TrendingUp,
+  ListTodo, CheckCircle2, AlertTriangle, TrendingUp, FileType,
 } from 'lucide-react'
 import { useReportStore, formatWeekLabel } from './report-store'
 import { generateWeeklyReport } from './report-generator'
-import { copyReportToClipboard, saveReportAsNote } from './report-exporter'
+import { copyReportToClipboard, saveReportAsNote, exportReportToWord } from './report-exporter'
+import useSettingStore from '@/stores/setting'
 import { cn } from '@/lib/utils'
 
 /**
@@ -29,6 +31,11 @@ export function ReportAssistPanel() {
 
   const [copied, setCopied] = useState(false)
   const [savedNote, setSavedNote] = useState(false)
+  const [exportedWord, setExportedWord] = useState(false)
+
+  // 自定义模板
+  const customReportTemplates = useSettingStore((s) => s.customReportTemplates)
+  const [selectedTemplateId, setSelectedTemplateId] = useState('')
 
   // AI 一键生成
   const handleGenerate = async () => {
@@ -36,17 +43,17 @@ export function ReportAssistPanel() {
     setGenerating(true)
     setStreamingContent('')
     try {
+      // 获取选中的自定义模板 prompt
+      const customTpl = customReportTemplates.find(t => t.id === selectedTemplateId)
       const full = await generateWeeklyReport(weekData, currentWeekStart, (chunk) => {
-        // 流式追加
         const current = useReportStore.getState().streamingContent
         setStreamingContent(current + chunk)
-      })
+      }, customTpl?.prompt)
       await markGenerated(full)
     } catch (err) {
       console.error('[ReportAssistPanel] AI 生成失败:', err)
       setGenerating(false)
       setStreamingContent('')
-      // 简单错误提示（可后续替换为 toast）
       alert(err instanceof Error ? err.message : t('generateFailed'))
     }
   }
@@ -75,6 +82,20 @@ export function ReportAssistPanel() {
     } catch (err) {
       console.error('[ReportAssistPanel] 另存为笔记失败:', err)
       alert(t('saveNoteFailed'))
+    }
+  }
+
+  // 导出为 Word
+  const handleExportWord = async () => {
+    const content = currentReport?.content || ''
+    if (!content) return
+    try {
+      await exportReportToWord(content, currentWeekStart)
+      setExportedWord(true)
+      setTimeout(() => setExportedWord(false), 1500)
+    } catch (err) {
+      console.error('[ReportAssistPanel] 导出Word失败:', err)
+      alert(t('exportWordFailed'))
     }
   }
 
@@ -157,6 +178,24 @@ export function ReportAssistPanel() {
               </div>
             )}
 
+            {/* 自定义模板选择 */}
+            {customReportTemplates.length > 0 && (
+              <div className="space-y-1">
+                <label className="text-[11px] text-muted-foreground">{t('template')}</label>
+                <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder={t('defaultTemplate')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">{t('defaultTemplate')}</SelectItem>
+                    {customReportTemplates.map((tpl) => (
+                      <SelectItem key={tpl.id} value={tpl.id}>{tpl.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             {/* AI 生成按钮 */}
             <Button
               className="w-full"
@@ -222,6 +261,29 @@ export function ReportAssistPanel() {
                 </TooltipContent>
               </Tooltip>
             </div>
+
+            {/* 导出 Word */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => void handleExportWord()}
+                  disabled={!currentReport.content || generating}
+                >
+                  {exportedWord ? (
+                    <CheckCircle2 className="mr-1.5 size-3.5 text-green-600" />
+                  ) : (
+                    <FileType className="mr-1.5 size-3.5" />
+                  )}
+                  {exportedWord ? t('exported') : t('exportWord')}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p>{t('exportWordTip')}</p>
+              </TooltipContent>
+            </Tooltip>
 
             {/* 数据预览：本周拜访列表 */}
             {weekData && weekData.visits.length > 0 && (

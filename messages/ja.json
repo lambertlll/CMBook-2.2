@@ -1711,7 +1711,34 @@
         "webSearch": "ウェブ検索 API キー"
       }
     },
-    "backToMain": "メインに戻る"
+    "backToMain": "メインに戻る",
+    "report": {
+      "title": "週報",
+      "desc": "週報生成モデルとカスタムテンプレートを設定",
+      "model": {
+        "title": "週報生成モデル",
+        "desc": "AI週報生成に使用するモデル"
+      },
+      "customTemplates": {
+        "title": "カスタムテンプレート",
+        "desc": "AI週報生成用のカスタムプロンプトテンプレートを作成",
+        "add": "テンプレート追加",
+        "edit": "編集",
+        "delete": "削除",
+        "nameLabel": "テンプレート名",
+        "namePlaceholder": "テンプレート名を入力",
+        "promptLabel": "プロンプト",
+        "promptPlaceholder": "週報の生成スタイルと重点を説明するカスタムプロンプトを入力...",
+        "promptHint": "プロンプトはデフォルトのシステムプロンプトに追加され、AI生成コンテンツのスタイルと構造に影響します。",
+        "cancel": "キャンセル",
+        "save": "保存",
+        "dialogTitleNew": "新規テンプレート",
+        "dialogTitleEdit": "テンプレート編集",
+        "deleteConfirmTitle": "削除確認",
+        "deleteConfirmDesc": "テンプレート「{name}」を削除しますか？この操作は取り消せません。",
+        "invalidToast": "テンプレート名とプロンプトは必須です"
+      }
+    }
   },
   "record": {
     "trash": {
@@ -3500,7 +3527,9 @@
     "summaryEditedSinceSync": "議事録が編集されました。同期してナレッジベースとToDoを更新してください",
     "syncingKnowledge": "同期中...",
     "syncKnowledgeSuccess": "顧客ナレッジベースに同期しました",
-    "syncKnowledgeFailed": "同期に失敗しました。もう一度お試しください"
+    "syncKnowledgeFailed": "同期に失敗しました。もう一度お試しください",
+    "exportWord": "Wordエクスポート",
+    "exportedWord": "Wordエクスポート済み"
   },
   "customer": {
     "postvisitTodoEmptyCoach": "訪問議事録が生成されると、タスクがここに自動で表示されます",
@@ -3679,6 +3708,13 @@
     "saveNoteFailed": "ノートの保存に失敗",
     "weekVisits": "今週の訪問",
     "nextWeekTodos": "来週のタスク",
-    "moreCount": "他 {count} 件..."
+    "moreCount": "他 {count} 件...",
+    "exportWord": "Wordエクスポート",
+    "exported": "エクスポート済み",
+    "exportWordFailed": "Wordエクスポートに失敗",
+    "exportWordTip": "Word文書としてエクスポート",
+    "customPrompt": "カスタムプロンプト",
+    "template": "テンプレート",
+    "noTemplate": "デフォルトテンプレート"
   }
 }

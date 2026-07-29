@@ -19,6 +19,7 @@ import {
   Brain,
   Presentation,
   Globe,
+  ClipboardList,
 } from "lucide-react"
 
 // 设置导航条目
@@ -44,6 +45,7 @@ const settingNavGroups: SettingNavGroup[] = [
       { icon: <MessageSquare className="size-4 md:size-6" />, anchor: 'chat' },
       { icon: <Volume2 className="size-4 md:size-6" />, anchor: 'audio' },
       { icon: <Presentation className="size-4 md:size-6" />, anchor: 'meeting' },
+      { icon: <ClipboardList className="size-4 md:size-6" />, anchor: 'report' },
     ],
   },
   {
@@ -114,6 +116,7 @@ export const settingSearchAliases: Record<string, string[]> = {
   imageMethod: ['图像识别', '文字识别', '图片识别', 'ocr', 'vlm', '视觉模型'],
   audio: ['语音', '音频', '录音', '朗读', '转写', 'audio', 'voice', 'speech', 'tts', 'stt', 'asr', 'sensevoice', 'funasr'],
   meeting: ['会议', '纪要', '会议录音', 'meeting', 'summary', 'minutes'],
+  report: ['周报', '汇报', 'weekly report', 'report'],
   dev: ['开发者', '代理', '调试', '数据清理', '配置文件', 'dev', 'developer', 'proxy', 'debug'],
 }
 

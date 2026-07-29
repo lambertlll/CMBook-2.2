@@ -1,5 +1,6 @@
 import { createOpenAIClient } from '@/lib/ai/utils'
 import { resolveModelConfig } from '@/app/core/main/meeting/meeting-model-config'
+import useSettingStore from '@/stores/setting'
 import type { WeekData } from '@/db/weekly-reports'
 import { formatWeekLabel, formatWeekRange } from '@/db/weekly-reports'
 
@@ -97,23 +98,28 @@ function buildPromptContext(
  * @param weekData 周聚合数据
  * @param weekStart 周一 0 点时间戳
  * @param onStream 流式回调（每个 chunk 调用一次）
+ * @param customPrompt 自定义模板 prompt（可选，来自设置中的自定义周报模板）
  * @returns 完整的 Markdown 周报正文
  */
 export async function generateWeeklyReport(
   weekData: WeekData,
   weekStart: number,
-  onStream?: (chunk: string) => void
+  onStream?: (chunk: string) => void,
+  customPrompt?: string
 ): Promise<string> {
-  const aiConfig = resolveModelConfig()
+  // 优先使用 reportModel，留空时回退到 primaryModel
+  const settingStore = useSettingStore.getState()
+  const reportModel = settingStore.reportModel
+  const aiConfig = resolveModelConfig(reportModel || undefined)
   if (!aiConfig) {
-    throw new Error('AI 模型未配置，请在设置中配置 AI 模型后重试')
+    throw new Error('AI 模型未配置，请在设置中配置周报生成模型或主模型后重试')
   }
 
   const promptContext = buildPromptContext(weekData, weekStart)
   const weekLabel = formatWeekLabel(weekStart)
   const weekRange = formatWeekRange(weekStart)
 
-  const systemPrompt = `你是一位银行客户经理的工作助手，擅长根据周拜访和待办数据撰写结构化、专业、简洁的周报。
+  const systemPrompt = customPrompt || `你是一位银行客户经理的工作助手，擅长根据周拜访和待办数据撰写结构化、专业、简洁的周报。
 请根据提供的本周数据，生成一份 Markdown 格式的周报，包含以下三个部分：
 
 ## 一、本周客户拜访情况

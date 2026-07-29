@@ -164,6 +164,17 @@ interface SettingState {
   inspirationModel: string
   setInspirationModel: (inspirationModel: string) => Promise<void>
 
+  // 周报生成模型（留空时回退到 primaryModel）
+  reportModel: string
+  setReportModel: (reportModel: string) => Promise<void>
+
+  // 周报：自定义模板（与内置模板一起在周报生成时选择）
+  customReportTemplates: CustomMeetingTemplate[]
+  setCustomReportTemplates: (templates: CustomMeetingTemplate[]) => Promise<void>
+  addCustomReportTemplate: (template: Omit<CustomMeetingTemplate, 'id'>) => Promise<CustomMeetingTemplate>
+  updateCustomReportTemplate: (id: string, patch: Partial<Omit<CustomMeetingTemplate, 'id'>>) => Promise<void>
+  removeCustomReportTemplate: (id: string) => Promise<void>
+
   systemPrompt: string
   setSystemPrompt: (systemPrompt: string) => Promise<void>
 
@@ -438,7 +449,8 @@ const useSettingStore = create<SettingState>((set, get) => ({
       const modelSettingKeys = [
         'primaryModel', 'placeholderModel', 'completionModel', 'markDescModel',
         'commitModel', 'embeddingModel', 'rerankingModel', 'imageMethodModel',
-        'audioModel', 'sttModel', 'condenseModel', 'inspirationModel'
+        'audioModel', 'sttModel', 'condenseModel', 'inspirationModel',
+        'reportModel'
       ]
       for (const key of modelSettingKeys) {
         const value = await store.get<string>(key)
@@ -547,7 +559,8 @@ const useSettingStore = create<SettingState>((set, get) => ({
       { storeKey: 'markDescModel', modelType: 'chat' },
       { storeKey: 'commitModel', modelType: 'chat' },
       { storeKey: 'condenseModel', modelType: 'chat' },
-      { storeKey: 'inspirationModel', modelType: 'chat' }
+      { storeKey: 'inspirationModel', modelType: 'chat' },
+      { storeKey: 'reportModel', modelType: 'chat' }
     ]
 
     for (const { storeKey, modelType } of modelTypes) {
@@ -906,6 +919,38 @@ const useSettingStore = create<SettingState>((set, get) => ({
     const store = await Store.load('store.json');
     await store.set('inspirationModel', inspirationModel)
     set({ inspirationModel })
+  },
+
+  reportModel: '',
+  setReportModel: async (reportModel) => {
+    const store = await Store.load('store.json');
+    await store.set('reportModel', reportModel)
+    set({ reportModel })
+  },
+
+  customReportTemplates: [],
+  setCustomReportTemplates: async (templates) => {
+    const store = await Store.load('store.json')
+    await store.set('customReportTemplates', templates)
+    set({ customReportTemplates: templates })
+  },
+  addCustomReportTemplate: async (template) => {
+    const created: CustomMeetingTemplate = {
+      ...template,
+      id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    }
+    await get().setCustomReportTemplates([...get().customReportTemplates, created])
+    return created
+  },
+  updateCustomReportTemplate: async (id, patch) => {
+    await get().setCustomReportTemplates(
+      get().customReportTemplates.map((t) => (t.id === id ? { ...t, ...patch } : t))
+    )
+  },
+  removeCustomReportTemplate: async (id) => {
+    await get().setCustomReportTemplates(
+      get().customReportTemplates.filter((t) => t.id !== id)
+    )
   },
 
   systemPrompt: DEFAULT_SYSTEM_PROMPT,

@@ -1704,7 +1704,34 @@
         "webSearch": "Chave de busca na web"
       }
     },
-    "backToMain": "Voltar ao Início"
+    "backToMain": "Voltar ao Início",
+    "report": {
+      "title": "Relatorio",
+      "desc": "Configurar modelo de geracao e modelos personalizados",
+      "model": {
+        "title": "Modelo de Relatorio",
+        "desc": "Modelo usado para geracao de relatorio por AI"
+      },
+      "customTemplates": {
+        "title": "Modelos Personalizados",
+        "desc": "Criar modelos de prompt personalizados para geracao de relatorio por AI",
+        "add": "Adicionar Modelo",
+        "edit": "Editar",
+        "delete": "Excluir",
+        "nameLabel": "Nome do Modelo",
+        "namePlaceholder": "Digite o nome do modelo",
+        "promptLabel": "Prompt",
+        "promptPlaceholder": "Digite o prompt personalizado descrevendo o estilo e foco do relatorio...",
+        "promptHint": "O prompt sera adicionado ao prompt do sistema padrao, afetando o estilo e estrutura do conteudo gerado por AI.",
+        "cancel": "Cancelar",
+        "save": "Salvar",
+        "dialogTitleNew": "Novo Modelo",
+        "dialogTitleEdit": "Editar Modelo",
+        "deleteConfirmTitle": "Confirmar Exclusao",
+        "deleteConfirmDesc": "Tem certeza de que deseja excluir o modelo \"{name}\"? Isso nao pode ser desfeito.",
+        "invalidToast": "Nome do modelo e prompt sao obrigatorios"
+      }
+    }
   },
   "record": {
     "trash": {
@@ -3453,7 +3480,9 @@
     "summaryEditedSinceSync": "Resumo editado — sincronize para atualizar a base de conhecimento e as tarefas",
     "syncingKnowledge": "Sincronizando...",
     "syncKnowledgeSuccess": "Sincronizado com a base de conhecimento do cliente",
-    "syncKnowledgeFailed": "Falha na sincronização, tente novamente"
+    "syncKnowledgeFailed": "Falha na sincronização, tente novamente",
+    "exportWord": "Exportar Word",
+    "exportedWord": "Word Exportado"
   },
   "customer": {
     "postvisitTodoEmptyCoach": "Quando a ata da visita for gerada, as pendências aparecerão aqui automaticamente",
@@ -3632,6 +3661,13 @@
     "saveNoteFailed": "Falha ao salvar nota",
     "weekVisits": "Visitas da Semana",
     "nextWeekTodos": "Tarefas da Próxima Semana",
-    "moreCount": "Mais {count}..."
+    "moreCount": "Mais {count}...",
+    "exportWord": "Exportar Word",
+    "exported": "Exportado",
+    "exportWordFailed": "Falha ao exportar Word",
+    "exportWordTip": "Exportar como documento Word",
+    "customPrompt": "Prompt Personalizado",
+    "template": "Modelo",
+    "noTemplate": "Modelo Padrao"
   }
 }

@@ -1711,7 +1711,34 @@
         "webSearch": "聯網搜尋 Key"
       }
     },
-    "backToMain": "返回主畫面"
+    "backToMain": "返回主畫面",
+    "report": {
+      "title": "週報",
+      "desc": "設定週報生成模型和自訂模板",
+      "model": {
+        "title": "週報生成模型",
+        "desc": "用於 AI 一鍵生成週報的模型"
+      },
+      "customTemplates": {
+        "title": "自訂模板",
+        "desc": "為週報 AI 生成建立自訂提示詞模板",
+        "add": "新增模板",
+        "edit": "編輯",
+        "delete": "刪除",
+        "nameLabel": "模板名稱",
+        "namePlaceholder": "輸入模板名稱",
+        "promptLabel": "提示詞",
+        "promptPlaceholder": "輸入自訂提示詞，描述你希望週報的生成風格和重點...",
+        "promptHint": "提示詞將附加到預設系統提示之後，影響 AI 生成的內容風格和結構。",
+        "cancel": "取消",
+        "save": "儲存",
+        "dialogTitleNew": "新增模板",
+        "dialogTitleEdit": "編輯模板",
+        "deleteConfirmTitle": "確認刪除",
+        "deleteConfirmDesc": "確定要刪除模板「{name}」嗎？此操作不可復原。",
+        "invalidToast": "模板名稱和提示詞不能為空"
+      }
+    }
   },
   "record": {
     "trash": {
@@ -3490,7 +3517,9 @@
     "summaryEditedSinceSync": "紀要已修改，同步以更新知識庫與待辦",
     "syncingKnowledge": "同步中...",
     "syncKnowledgeSuccess": "已同步到客戶知識庫",
-    "syncKnowledgeFailed": "同步失敗，請重試"
+    "syncKnowledgeFailed": "同步失敗，請重試",
+    "exportWord": "匯出 Word",
+    "exportedWord": "已匯出 Word"
   },
   "customer": {
     "postvisitTodoEmptyCoach": "拜訪紀要生成後，待辦事項會自動出現在這裡",
@@ -3669,6 +3698,13 @@
     "saveNoteFailed": "儲存筆記失敗",
     "weekVisits": "本週拜訪",
     "nextWeekTodos": "下週待辦",
-    "moreCount": "還有 {count} 條..."
+    "moreCount": "還有 {count} 條...",
+    "exportWord": "匯出 Word",
+    "exported": "已匯出",
+    "exportWordFailed": "匯出 Word 失敗",
+    "exportWordTip": "匯出為 Word 文件",
+    "customPrompt": "自訂提示詞",
+    "template": "生成模板",
+    "noTemplate": "預設模板"
   }
 }

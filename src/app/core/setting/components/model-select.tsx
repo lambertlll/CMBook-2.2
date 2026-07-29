@@ -41,7 +41,7 @@ export function ModelSelect({
   clearTooltip?: string
 }) {
   const [groupedModels, setGroupedModels] = useState<GroupedModel[]>([])
-  const { setCompletionModel, setMarkDescModel, setPrimaryModel, setImageMethodModel, setAudioModel, setSttModel, setEmbeddingModel, setRerankingModel, setCondenseModel, setInspirationModel } = useSettingStore()
+  const { setCompletionModel, setMarkDescModel, setPrimaryModel, setImageMethodModel, setAudioModel, setSttModel, setEmbeddingModel, setRerankingModel, setCondenseModel, setInspirationModel, setReportModel } = useSettingStore()
   const [model, setModel] = useState<string>('')
   const [open, setOpen] = React.useState(false)
   const t = useTranslations('settings.defaultModel')
@@ -70,6 +70,8 @@ export function ModelSelect({
         return 'condenseModel'
       case 'inspiration':
         return 'inspirationModel'
+      case 'report':
+        return 'reportModel'
       default:
         return `${modelKey}Model`
     }
@@ -108,6 +110,9 @@ export function ModelSelect({
         break;
       case 'inspiration':
         setInspirationModel(primaryModel)
+        break
+      case 'report':
+        setReportModel(primaryModel)
         break;
       default:
         break;

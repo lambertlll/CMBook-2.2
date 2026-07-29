@@ -43,7 +43,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Copy, Save, RefreshCw, Check, FileText, Mic2, Mic, Sparkles, Loader2, RotateCcw, Library, FolderInput, Building2, User, Search, ChevronLeft, Calendar, Clock, ChevronDown, ChevronUp, MoreHorizontal } from 'lucide-react'
+import { Copy, Save, RefreshCw, Check, FileText, Mic2, Mic, Sparkles, Loader2, RotateCcw, Library, FolderInput, Building2, User, Search, ChevronLeft, Calendar, Clock, ChevronDown, ChevronUp, MoreHorizontal, FileType } from 'lucide-react'
 import { Progress } from '@/components/ui/progress'
 import { useTranslations } from 'next-intl'
 import { toast } from '@/hooks/use-toast'
@@ -74,6 +74,7 @@ import { cn } from '@/lib/utils'
 import { useSidebarStore } from '@/stores/sidebar'
 import { getFilePathOptions, getWorkspacePath } from '@/lib/workspace'
 import { writeTextFile } from '@tauri-apps/plugin-fs'
+import { exportMarkdownToWord } from '@/lib/export-word'
 // 复用主编辑器的排版样式（.tiptap-editor），替换未生效的 prose 类（项目无 typography 插件）
 import '../editor/markdown/style.css'
 
@@ -1199,6 +1200,20 @@ export function MeetingResult({ meeting }: MeetingResultProps) {
     }
   }, [meeting.summary, meeting.title, meeting.createdAt, t])
 
+  const handleExportWord = useCallback(async () => {
+    if (!meeting.summary) return
+    try {
+      const dateStr = new Date(meeting.createdAt).toISOString().slice(0, 10)
+      const safeTitle = (meeting.title || '会议纪要').replace(/[\\/:*?"<>|]/g, '_').slice(0, 30)
+      const fileName = `${safeTitle}-${dateStr}`
+      await exportMarkdownToWord(meeting.summary, fileName)
+      toast({ description: t('exportedWord') })
+    } catch (error) {
+      console.error('Word export failed:', error)
+      toast({ description: '导出 Word 失败', variant: 'destructive' })
+    }
+  }, [meeting.summary, meeting.title, meeting.createdAt, t])
+
   /**
    * 自动识别客户并归类（纪要生成成功且未关联客户时后台触发，不阻塞主流程）：
    * 识别中/失败均静默（不写错误状态），仅成功时 toast；失败/无法判断时保留手动归类按钮。
@@ -1637,6 +1652,10 @@ export function MeetingResult({ meeting }: MeetingResultProps) {
         <Button size="sm" variant="outline" onClick={handleSaveAsNote}>
           <Save className="w-4 h-4 mr-1" />
           {t('saveAsNote')}
+        </Button>
+        <Button size="sm" variant="outline" onClick={handleExportWord}>
+          <FileType className="w-4 h-4 mr-1" />
+          {t('exportWord')}
         </Button>
 
         {/* 右侧：润色提示 / 识别中 / 未同步警示 / 归类·同步（⋯ 菜单）/ 实时转写开关 */}
