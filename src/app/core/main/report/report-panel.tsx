@@ -7,6 +7,8 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { Loader2, Save, Check, PenLine, Eye } from 'lucide-react'
 import { useReportStore, formatWeekRange, formatWeekLabel } from './report-store'
+// 复用主编辑器的排版样式（.tiptap-editor .ProseMirror），与笔记/会议纪要保持一致
+import '../editor/markdown/style.css'
 
 // 延迟初始化 markdown-it（仅预览模式时加载）
 let mdRenderer: ((markdown: string) => string) | null = null
@@ -162,14 +164,16 @@ export function ReportPanel() {
             value={localContent}
             onChange={(e) => handleContentChange(e.target.value)}
             placeholder={t('editPlaceholder')}
-            className="h-full w-full resize-none rounded-none border-0 font-mono text-sm focus-visible:ring-0"
+            className="h-full w-full resize-none rounded-none border-0 text-base leading-relaxed focus-visible:ring-0"
           />
         ) : (
           <ScrollArea className="h-full">
-            <div
-              className="report-preview prose prose-sm max-w-none px-6 py-4 text-foreground"
-              dangerouslySetInnerHTML={{ __html: htmlContent }}
-            />
+            <div className="tiptap-editor">
+              <div
+                className="ProseMirror"
+                dangerouslySetInnerHTML={{ __html: htmlContent }}
+              />
+            </div>
           </ScrollArea>
         )}
       </div>
