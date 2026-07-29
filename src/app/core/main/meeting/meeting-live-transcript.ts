@@ -96,9 +96,6 @@ let dsAudioSeconds = 0
 // 会话级失败标记：置位后 getFullTranscript 返回 null，回退整段重转
 let dsFailed = false
 let dsUnlisteners: UnlistenFn[] = []
-// 热词 corpus 兼容性标记：专有云/金融云网关可能不接受 input_audio_transcription.corpus.text
-// （报 InvalidParameter: messages 缺 user），拒绝过后续会话一律跳过 corpus
-let dsCorpusRejected = false
 // 录音中会话断线的自动重连状态（限时限量，防无限重连）
 let dsReconnecting = false
 let dsReconnectAttempts = 0
@@ -169,7 +166,7 @@ export function startLiveTranscript(meetingId: string): void {
   dsAudioSeconds = 0
   dsFailed = false
   dsSendQueue = Promise.resolve()
-  // 新录音会话：重置断线重连状态（dsCorpusRejected 跨会话保留，网关兼容性一旦确认不再重试）
+  // 新录音会话：重置断线重连状态
   dsReconnecting = false
   dsReconnectAttempts = 0
   if (dsReconnectTimer) {
@@ -558,7 +555,6 @@ async function connectDsSession(token: number): Promise<void> {
         '[LiveTranscript] 热词上下文被网关拒绝，降级为无热词重连:',
         err
       )
-      dsCorpusRejected = true
       setLiveError('热词上下文不被当前网关支持，已自动降级为无热词转写')
       try {
         const sessionId = await invoke<string>('dashscope_asr_connect', {
@@ -629,10 +625,6 @@ function onDsError(payload: DashscopeAsrErrorEvent): void {
     updateSegment(dsInterimId, { status: 'failed' })
     dsInterimId = null
     dsInterimItemId = null
-  }
-  // 参数类错误疑似热词不兼容：标记后续会话跳过 corpus
-  if (isInvalidParameterError(`${payload.code} ${payload.message}`)) {
-    dsCorpusRejected = true
   }
   // 录音仍在进行： teardown 死会话并尝试自动重连（断点音频已在 dsPending 缓冲）
   if (capturing) {
