@@ -6,15 +6,15 @@ import {
   remove,
   readDir,
   stat,
-  BaseDirectory,
 } from '@tauri-apps/plugin-fs'
 import { saveMeetingAudio } from './meeting-save-audio'
+import { getStoragePathOptions } from '@/lib/storage'
 
 /**
  * 录音分片落盘 + 崩溃恢复。
  *
  * 背景：MediaRecorder 的 audioChunks 纯内存持有，应用崩溃/被杀会丢失整场录音。
- * 方案：录音中每个分片（约每秒一块）在入内存的同时，异步追加写入 AppData 下的
+ * 方案：录音中每个分片（约每秒一块）在入内存的同时，异步追加写入数据存储目录下的
  * 临时文件 meetings/recording-<meetingId>.part（内容与最终 Blob 完全一致，
  * 是同一容器格式的连续分片）。正常停止/销毁录音器时删除 .part 不留痕；
  * 崩溃时 .part 残留，下次启动在会议列表顶部提示恢复或丢弃。
@@ -29,7 +29,7 @@ const PART_SUFFIX = '.part'
 /** 一场未正常结束的录音残留 */
 export interface InterruptedRecording {
   meetingId: string
-  filePath: string // 相对 AppData 的路径
+  filePath: string // 相对存储目录的路径
   sizeBytes: number
   mtime: number // 最后修改时间（毫秒时间戳），不可用时为 0
 }
@@ -72,20 +72,24 @@ export function appendRecordingChunk(meetingId: string, chunk: Blob): void {
 
   s.queue = s.queue.then(async () => {
     try {
-      const dirExists = await exists(PART_DIR, {
-        baseDir: BaseDirectory.AppData,
-      })
+      const dirOpts = await getStoragePathOptions(PART_DIR)
+      const dirExists = dirOpts.baseDir
+        ? await exists(dirOpts.path, { baseDir: dirOpts.baseDir })
+        : await exists(dirOpts.path)
       if (!dirExists) {
-        await mkdir(PART_DIR, {
-          baseDir: BaseDirectory.AppData,
-          recursive: true,
-        })
+        if (dirOpts.baseDir) {
+          await mkdir(dirOpts.path, { baseDir: dirOpts.baseDir, recursive: true })
+        } else {
+          await mkdir(dirOpts.path, { recursive: true })
+        }
       }
       const bytes = new Uint8Array(await chunk.arrayBuffer())
-      await writeFile(partPathFor(meetingId), bytes, {
-        baseDir: BaseDirectory.AppData,
-        append: true,
-      })
+      const fileOpts = await getStoragePathOptions(partPathFor(meetingId))
+      if (fileOpts.baseDir) {
+        await writeFile(fileOpts.path, bytes, { baseDir: fileOpts.baseDir, append: true })
+      } else {
+        await writeFile(fileOpts.path, bytes, { append: true })
+      }
     } catch (err) {
       s.failed = true
       if (!s.warned) {
@@ -108,15 +112,20 @@ export async function endRecordingSpill(meetingId: string): Promise<void> {
   if (!s || s.meetingId !== meetingId) return
   session = null
   await s.queue.catch(() => {})
-  await remove(partPathFor(meetingId), { baseDir: BaseDirectory.AppData }).catch(
-    () => {
-      // 文件不存在等情况忽略
+  try {
+    const opts = await getStoragePathOptions(partPathFor(meetingId))
+    if (opts.baseDir) {
+      await remove(opts.path, { baseDir: opts.baseDir })
+    } else {
+      await remove(opts.path)
     }
-  )
+  } catch {
+    // 文件不存在等情况忽略
+  }
 }
 
 /**
- * 扫描 AppData 下残留的 recording-*.part（大小 > 0），即未正常结束的录音。
+ * 扫描数据存储目录下残留的 recording-*.part（大小 > 0），即未正常结束的录音。
  * 探测失败（目录不存在等）视为无残留。
  */
 export async function findInterruptedRecordings(): Promise<
@@ -124,7 +133,10 @@ export async function findInterruptedRecordings(): Promise<
 > {
   let entries
   try {
-    entries = await readDir(PART_DIR, { baseDir: BaseDirectory.AppData })
+    const dirOpts = await getStoragePathOptions(PART_DIR)
+    entries = dirOpts.baseDir
+      ? await readDir(dirOpts.path, { baseDir: dirOpts.baseDir })
+      : await readDir(dirOpts.path)
   } catch {
     return []
   }
@@ -136,7 +148,10 @@ export async function findInterruptedRecordings(): Promise<
     if (!name.startsWith(PART_PREFIX) || !name.endsWith(PART_SUFFIX)) continue
     const filePath = `${PART_DIR}/${name}`
     try {
-      const info = await stat(filePath, { baseDir: BaseDirectory.AppData })
+      const fileOpts = await getStoragePathOptions(filePath)
+      const info = fileOpts.baseDir
+        ? await stat(fileOpts.path, { baseDir: fileOpts.baseDir })
+        : await stat(fileOpts.path)
       if (!info.isFile || info.size <= 0) continue
       result.push({
         meetingId: name.slice(
@@ -200,9 +215,10 @@ export async function recoverInterruptedRecording(
   item: InterruptedRecording,
   existingSegmentCount: number
 ): Promise<string> {
-  const bytes = await readFile(item.filePath, {
-    baseDir: BaseDirectory.AppData,
-  })
+  const fileOpts = await getStoragePathOptions(item.filePath)
+  const bytes = fileOpts.baseDir
+    ? await readFile(fileOpts.path, { baseDir: fileOpts.baseDir })
+    : await readFile(fileOpts.path)
   const mime = sniffAudioMime(bytes)
   const blob = new Blob([bytes], { type: mime })
   // 续录段命名规则与正常停录一致：首段 {id}.{ext}，第 N 段 {id}-N.{ext}
@@ -211,9 +227,16 @@ export async function recoverInterruptedRecording(
     blob,
     existingSegmentCount + 1
   )
-  await remove(item.filePath, { baseDir: BaseDirectory.AppData }).catch(() => {
+  try {
+    const removeOpts = await getStoragePathOptions(item.filePath)
+    if (removeOpts.baseDir) {
+      await remove(removeOpts.path, { baseDir: removeOpts.baseDir })
+    } else {
+      await remove(removeOpts.path)
+    }
+  } catch {
     // 删除失败不影响恢复结果，残留文件下次仍会提示
-  })
+  }
   return savedPath
 }
 
@@ -221,7 +244,14 @@ export async function recoverInterruptedRecording(
 export async function discardInterruptedRecording(
   item: InterruptedRecording
 ): Promise<void> {
-  await remove(item.filePath, { baseDir: BaseDirectory.AppData }).catch(() => {
+  try {
+    const opts = await getStoragePathOptions(item.filePath)
+    if (opts.baseDir) {
+      await remove(opts.path, { baseDir: opts.baseDir })
+    } else {
+      await remove(opts.path)
+    }
+  } catch {
     // 文件不存在等情况忽略
-  })
+  }
 }

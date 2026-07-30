@@ -33,6 +33,10 @@ interface TodoConfirmState {
   }) => boolean
   toggle: (index: number) => void
   toggleAll: (selected: boolean) => void
+  /** 编辑某条待办的内容 */
+  updateTodoContent: (index: number, content: string) => void
+  /** 编辑某条待办的负责人 */
+  updateTodoOwner: (index: number, owner: string) => void
   /** 确认选中项 → confirmed=1 写入；未选中项 → confirmed=0 写入；关闭弹窗 */
   confirm: () => Promise<void>
   /** 跳过：全部以 confirmed=0 写入（待确认区），关闭弹窗 */
@@ -73,6 +77,18 @@ export const useTodoConfirmStore = create<TodoConfirmState>((set, get) => ({
   toggleAll: (selected) => {
     set((state) => ({
       selected: state.todos.map(() => selected),
+    }))
+  },
+
+  updateTodoContent: (index, content) => {
+    set((state) => ({
+      todos: state.todos.map((todo, i) => (i === index ? { ...todo, content } : todo)),
+    }))
+  },
+
+  updateTodoOwner: (index, owner) => {
+    set((state) => ({
+      todos: state.todos.map((todo, i) => (i === index ? { ...todo, owner } : todo)),
     }))
   },
 

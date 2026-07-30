@@ -37,13 +37,7 @@ import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Switch } from '@/components/ui/switch'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { Copy, Save, RefreshCw, Check, FileText, Mic2, Mic, Sparkles, Loader2, RotateCcw, Library, FolderInput, Building2, User, Search, ChevronLeft, Calendar, Clock, ChevronDown, ChevronUp, MoreHorizontal, FileType } from 'lucide-react'
+import { Copy, Save, RefreshCw, Check, FileText, Mic2, Mic, Sparkles, Loader2, RotateCcw, Library, FolderInput, Building2, User, Search, ChevronLeft, Calendar, Clock, ChevronDown, ChevronUp, FileType, Square, ListChecks } from 'lucide-react'
 import { Progress } from '@/components/ui/progress'
 import { useTranslations } from 'next-intl'
 import { toast } from '@/hooks/use-toast'
@@ -867,6 +861,10 @@ export function MeetingResult({ meeting }: MeetingResultProps) {
   const aiModelList = useSettingStore((s) => s.aiModelList)
   const primaryModel = useSettingStore((s) => s.primaryModel)
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // AI 纪要生成的 AbortController：支持中途停止
+  const abortControllerRef = useRef<AbortController | null>(null)
+  // 待办确认：纪要生成后不自动弹窗，等用户确认纪要内容后再弹出
+  const [pendingTodoSummary, setPendingTodoSummary] = useState<string | null>(null)
 
   // 卸载时清理复制状态的定时器
   useEffect(() => {
@@ -1306,6 +1304,12 @@ export function MeetingResult({ meeting }: MeetingResultProps) {
     // 先设置状态，清空旧纪要和错误信息
     updateMeeting(meeting.id, { status: 'generating', summary: '', error: '' })
     setActiveTab('summary')
+    // 清除上次待办确认状态
+    setPendingTodoSummary(null)
+
+    // 创建 AbortController 支持中途停止
+    const controller = new AbortController()
+    abortControllerRef.current = controller
 
     try {
       // 读取最新的 meeting 数据（包含刚选的模型）
@@ -1322,6 +1326,7 @@ export function MeetingResult({ meeting }: MeetingResultProps) {
         customerName: linkedCustomerName,
         createdAt: latest.createdAt,
         modelId: latest.selectedModel || undefined,
+        signal: controller.signal,
         onStream: (chunk) => {
           updateMeeting(meeting.id, { summary: chunk })
         },
@@ -1341,24 +1346,51 @@ export function MeetingResult({ meeting }: MeetingResultProps) {
         } else {
           void autoClassifyMeeting(meeting.id, fullSummary)
         }
-        // 待办确认弹窗（弹窗内会获取最新的 customerId/visitId，autoClassify 完成后自动更新）
-        useTodoConfirmStore.getState().showFromSummary({
-          meetingId: meeting.id,
-          meetingTitle: meeting.title,
-          customerId: finished.customerId || '',
-          visitId: finished.visitId || '',
-          summary: fullSummary,
-        })
+        // 待办确认改为延迟触发：先让用户确认纪要内容，再弹出待办确认
+        setPendingTodoSummary(fullSummary)
       }
     } catch (err) {
-      console.error('生成纪要失败:', err)
-      const errorMsg = err instanceof Error ? err.message : '生成失败'
-      updateMeeting(meeting.id, {
-        summary: `## ❌ 生成失败\n\n${errorMsg}`,
-      })
-      setMeetingError(meeting.id, errorMsg)
+      // 用户主动停止：保留已生成内容，状态回到已完成
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        const partial = useMeetingStore.getState().meetings.find((m) => m.id === meeting.id)?.summary || ''
+        updateMeeting(meeting.id, {
+          summary: partial,
+          status: 'completed',
+        })
+        if (partial) {
+          setPendingTodoSummary(partial)
+        }
+      } else {
+        console.error('生成纪要失败:', err)
+        const errorMsg = err instanceof Error ? err.message : '生成失败'
+        updateMeeting(meeting.id, {
+          summary: `## ❌ 生成失败\n\n${errorMsg}`,
+        })
+        setMeetingError(meeting.id, errorMsg)
+      }
+    } finally {
+      abortControllerRef.current = null
     }
   }, [meeting.id, meeting.transcript, meeting.manualNotes, linkedCustomerName, updateMeeting, setMeetingError, autoClassifyMeeting])
+
+  // 停止 AI 生成：abort 后 handleRegenerate 的 catch 会保留已生成内容
+  const handleStopGenerate = useCallback(() => {
+    abortControllerRef.current?.abort()
+  }, [])
+
+  // 手动触发待办确认（用户确认纪要内容后点击）
+  const handleConfirmTodos = useCallback(() => {
+    if (!pendingTodoSummary) return
+    const current = useMeetingStore.getState().meetings.find((m) => m.id === meeting.id)
+    useTodoConfirmStore.getState().showFromSummary({
+      meetingId: meeting.id,
+      meetingTitle: meeting.title,
+      customerId: current?.customerId || '',
+      visitId: current?.visitId || '',
+      summary: pendingTodoSummary,
+    })
+    setPendingTodoSummary(null)
+  }, [pendingTodoSummary, meeting.id, meeting.title])
 
   // 重新生成保护：已有纪要（可能含手动编辑）时先弹确认，避免误覆盖
   const [regenerateConfirmOpen, setRegenerateConfirmOpen] = useState(false)
@@ -1566,7 +1598,7 @@ export function MeetingResult({ meeting }: MeetingResultProps) {
           | 复制 / 继续录音 / 保存为笔记 | 右侧：提示与次要项（⋯ 菜单）+ 实时转写开关
           （AI 面板展开压缩中栏时：允许换行自适应，避免内容变形） */}
       <div className="flex flex-wrap items-center gap-2 border-t px-3 py-2">
-        {/* 会议纪要模型：触发器只显示友好名（规范：技术型号不外露），选项内保留具体模型供辨认 */}
+        {/* 会议纪要模型：触发器显示已选模型名，未选时回退到通用文案 */}
         <Select
           value={effectiveModel}
           disabled={meeting.status === 'generating'}
@@ -1575,7 +1607,9 @@ export function MeetingResult({ meeting }: MeetingResultProps) {
           }
         >
           <SelectTrigger className="w-auto min-w-[132px] h-8 text-xs">
-            <span className="truncate">{t('summaryModel')}</span>
+            <span className="truncate">
+              {chatModels.find((m) => m.id === effectiveModel)?.label || t('summaryModel')}
+            </span>
           </SelectTrigger>
           <SelectContent>
             {chatModels.map((m) => (
@@ -1617,20 +1651,37 @@ export function MeetingResult({ meeting }: MeetingResultProps) {
             )}
           </SelectContent>
         </Select>
-        {/* 生成入口：全页唯一（空态的中央大按钮是其在空态的形态；已有纪要时先弹覆盖确认） */}
-        {(meeting.transcript || meeting.manualNotes) && (
+        {/* 生成入口 + 停止按钮：生成中可中途停止或更换模型 */}
+        {(meeting.transcript || meeting.manualNotes) && meeting.status !== 'generating' && (
           <Button
             size="sm"
             variant={meeting.summary ? 'outline' : 'default'}
-            disabled={meeting.status === 'generating'}
             onClick={requestRegenerate}
           >
-            {meeting.status === 'generating' ? (
-              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-            ) : (
-              <RefreshCw className="w-4 h-4 mr-1" />
-            )}
+            <RefreshCw className="w-4 h-4 mr-1" />
             {meeting.summary ? t('regenerate') : t('generateSummary')}
+          </Button>
+        )}
+        {meeting.status === 'generating' && (
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={handleStopGenerate}
+          >
+            <Square className="w-4 h-4 mr-1" />
+            {t('stopGenerate')}
+          </Button>
+        )}
+        {/* 待办确认：纪要生成完成后提示用户确认待办事项 */}
+        {pendingTodoSummary && meeting.status !== 'generating' && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-primary text-primary"
+            onClick={handleConfirmTodos}
+          >
+            <ListChecks className="w-4 h-4 mr-1" />
+            {t('confirmTodos')}
           </Button>
         )}
         <span className="mx-1 h-5 w-px bg-border" aria-hidden />
@@ -1657,6 +1708,32 @@ export function MeetingResult({ meeting }: MeetingResultProps) {
           <FileType className="w-4 h-4 mr-1" />
           {t('exportWord')}
         </Button>
+        {/* 同步到知识库 / 归类到客户知识库：独立按钮，与保存为笔记、导出Word并列 */}
+        {meeting.summary && !meeting.customerId && (
+          <Button size="sm" variant="outline" onClick={() => setClassifyOpen(true)}>
+            <FolderInput className="w-4 h-4 mr-1" />
+            {t('classifyToCustomer')}
+          </Button>
+        )}
+        {meeting.summary && meeting.customerId && (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={syncingKnowledge}
+            onClick={handleSyncToKnowledge}
+            className="relative"
+          >
+            {syncingKnowledge ? (
+              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+            ) : (
+              <Library className="w-4 h-4 mr-1" />
+            )}
+            {syncingKnowledge ? t('syncingKnowledge') : t('syncToKnowledge')}
+            {summaryDirtySinceSync && !syncingKnowledge && (
+              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-warning" />
+            )}
+          </Button>
+        )}
 
         {/* 右侧：润色提示 / 识别中 / 未同步警示 / 归类·同步（⋯ 菜单）/ 实时转写开关 */}
         <div className="ml-auto flex items-center gap-2">
@@ -1673,52 +1750,11 @@ export function MeetingResult({ meeting }: MeetingResultProps) {
               {t('autoIdentifying')}
             </span>
           )}
-          {/* 纪要编辑后未同步：琥珀点（⋯ 上）+ 提示文案（菜单内同步后消失） */}
+          {/* 纪要编辑后未同步：提示文案（同步按钮已独立显示） */}
           {meeting.customerId && meeting.summary && summaryDirtySinceSync && !syncingKnowledge && (
             <span className="text-xs text-warning whitespace-nowrap">
               {t('summaryEditedSinceSync')}
             </span>
-          )}
-          {/* 次要项收进 ⋯ 菜单：归类到客户知识库（未关联）/ 同步到知识库（已关联），二者互斥 */}
-          {meeting.summary && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="relative h-8 w-8"
-                  title={t('moreActions')}
-                >
-                  <MoreHorizontal className="w-4 h-4" />
-                  {meeting.customerId && summaryDirtySinceSync && !syncingKnowledge && (
-                    <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-warning" />
-                  )}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {!meeting.customerId && (
-                  <DropdownMenuItem onClick={() => setClassifyOpen(true)}>
-                    <FolderInput className="w-4 h-4 mr-2" />
-                    {t('classifyToCustomer')}
-                  </DropdownMenuItem>
-                )}
-                {meeting.customerId && (
-                  <DropdownMenuItem
-                    disabled={syncingKnowledge}
-                    onClick={handleSyncToKnowledge}
-                  >
-                    {syncingKnowledge ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <Library className="w-4 h-4 mr-2" />
-                    )}
-                    {syncingKnowledge
-                      ? t('syncingKnowledge')
-                      : t('syncToKnowledge')}
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
           )}
           {/* 实时转写开关（复用现有全局设置，影响后续录音） */}
           <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">

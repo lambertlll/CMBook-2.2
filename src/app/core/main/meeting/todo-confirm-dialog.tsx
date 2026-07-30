@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Loader2, CheckCheck, SkipForward } from 'lucide-react'
 import { useState } from 'react'
@@ -18,8 +19,9 @@ import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 
 /**
- * 待办确认弹窗：纪要生成成功后自动弹出，展示从纪要中解析的待办事项。
- * 用户可勾选/取消每条待办 → 确认后选中项以 confirmed=1 写入（直接进入正式分组），
+ * 待办确认弹窗：纪要生成成功后弹出（由用户在会议纪要页手动触发），
+ * 展示从纪要中解析的待办事项。用户可勾选/取消、编辑每条待办内容与负责人 →
+ * 确认后选中项以 confirmed=1 写入（直接进入正式分组），
  * 未选中项以 confirmed=0 写入（进入"待确认"区）。点击"全部跳过"则全部以 confirmed=0 写入。
  */
 export function TodoConfirmDialog() {
@@ -30,6 +32,8 @@ export function TodoConfirmDialog() {
   const meetingTitle = useTodoConfirmStore((s) => s.meetingTitle)
   const toggle = useTodoConfirmStore((s) => s.toggle)
   const toggleAll = useTodoConfirmStore((s) => s.toggleAll)
+  const updateTodoContent = useTodoConfirmStore((s) => s.updateTodoContent)
+  const updateTodoOwner = useTodoConfirmStore((s) => s.updateTodoOwner)
   const confirm = useTodoConfirmStore((s) => s.confirm)
   const skip = useTodoConfirmStore((s) => s.skip)
   const close = useTodoConfirmStore((s) => s.close)
@@ -91,7 +95,7 @@ export function TodoConfirmDialog() {
           </span>
         </div>
 
-        <ScrollArea className="max-h-[300px] rounded-md border">
+        <ScrollArea className="max-h-[350px] rounded-md border">
           <div className="p-1">
             {todos.map((todo, i) => (
               <div
@@ -104,20 +108,21 @@ export function TodoConfirmDialog() {
                 <Checkbox
                   checked={selected[i]}
                   onCheckedChange={() => toggle(i)}
-                  className="mt-0.5 shrink-0"
+                  className="mt-1.5 shrink-0"
                 />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm leading-snug break-words">{todo.content}</p>
-                  {(todo.owner || todo.dueText) && (
-                    <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px] text-muted-foreground">
-                      {todo.owner && (
-                        <span>{t('ownerLabel')} {todo.owner}</span>
-                      )}
-                      {todo.dueText && (
-                        <span>{t('dueLabel')} {todo.dueText}</span>
-                      )}
-                    </div>
-                  )}
+                <div className="min-w-0 flex-1 space-y-1">
+                  <Input
+                    value={todo.content}
+                    onChange={(e) => updateTodoContent(i, e.target.value)}
+                    className="h-7 text-sm"
+                    placeholder={t('todoContentPlaceholder')}
+                  />
+                  <Input
+                    value={todo.owner || ''}
+                    onChange={(e) => updateTodoOwner(i, e.target.value)}
+                    className="h-6 text-xs text-muted-foreground"
+                    placeholder={t('ownerPlaceholder')}
+                  />
                 </div>
               </div>
             ))}
@@ -130,11 +135,11 @@ export function TodoConfirmDialog() {
             onClick={handleSkip}
             disabled={processing}
           >
-            {processing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <SkipForward className="h-4 w-4 mr-1" />}
+            {processing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <SkipForward className="w-4 h-4 mr-1" />}
             {t('skipAll')}
           </Button>
           <Button onClick={handleConfirm} disabled={processing}>
-            {processing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCheck className="h-4 w-4 mr-1" />}
+            {processing ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <CheckCheck className="w-4 h-4 mr-1" />}
             {t('confirmSelected', { count: selectedCount })}
           </Button>
         </DialogFooter>

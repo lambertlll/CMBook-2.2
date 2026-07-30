@@ -1408,6 +1408,14 @@
         "title": "Assets Path",
         "desc": "Set the asset directory name. Local image insertion in the editor will use this directory name, such as `assets` or `images`.",
         "select": "Set the asset directory name, for example: assets"
+      },
+      "storage": {
+        "current": "Data Storage Path",
+        "desc": "Set the storage location for audio recordings and meeting media files. Defaults to system data directory. Choose another disk or folder to save system drive space. New recordings will be saved to the new path after changing. Database and config files are not affected.",
+        "default": "Using default system data directory",
+        "select": "Select Data Storage Directory",
+        "reset": "Reset to Default",
+        "searchPlaceholder": "Search storage path..."
       }
     },
     "shortcuts": {
@@ -3516,7 +3524,8 @@
     "deselectAll": "Deselect All",
     "selectedCount": "{selected}/{total} selected",
     "skipAll": "Skip All",
-    "confirmSelected": "Confirm {count}"
+    "confirmSelected": "Confirm {count}",
+    "todoContentPlaceholder": "Todo content"
   },
   "meeting": {
     "title": "Meeting Mode",
@@ -3547,6 +3556,8 @@
     "generateSummary": "Generate Summary",
     "summaryTitle": "Meeting Summary",
     "regenerate": "Regenerate",
+    "stopGenerate": "Stop",
+    "confirmTodos": "Confirm Todos",
     "copy": "Copy",
     "copied": "Copied",
     "saveAsNote": "Save as Note",

@@ -11,7 +11,8 @@ import { toast } from '@/hooks/use-toast'
 import { transcribeRecording } from '@/lib/audio'
 import { useRouter } from 'next/navigation'
 import { open } from '@tauri-apps/plugin-dialog'
-import { readFile, writeFile, BaseDirectory, exists, mkdir } from '@tauri-apps/plugin-fs'
+import { readFile, writeFile, exists, mkdir } from '@tauri-apps/plugin-fs'
+import { getStoragePathOptions } from '@/lib/storage'
 import { useRef } from 'react'
 import { isMobileDevice } from '@/lib/check'
 import { convertToWav } from '@/lib/audio-converter'
@@ -131,20 +132,32 @@ export function ControlRecording() {
                       audioBlob.type.includes('aac') ? 'aac' : 'webm'
     const filename = `recording_${timestamp}.${extension}`
     const audioDir = 'recordings'
-    
-    // 确保目录存在
-    const dirExists = await exists(audioDir, { baseDir: BaseDirectory.AppData })
+
+    // 确保目录存在（兼容自定义存储路径）
+    const dirOpts = await getStoragePathOptions(audioDir)
+    const dirExists = dirOpts.baseDir
+      ? await exists(dirOpts.path, { baseDir: dirOpts.baseDir })
+      : await exists(dirOpts.path)
     if (!dirExists) {
-      await mkdir(audioDir, { baseDir: BaseDirectory.AppData, recursive: true })
+      if (dirOpts.baseDir) {
+        await mkdir(dirOpts.path, { baseDir: dirOpts.baseDir, recursive: true })
+      } else {
+        await mkdir(dirOpts.path, { recursive: true })
+      }
     }
-    
+
     // 将 Blob 转换为 ArrayBuffer
     const arrayBuffer = await audioBlob.arrayBuffer()
     const uint8Array = new Uint8Array(arrayBuffer)
-    
+
     // 保存文件
     const filePath = `${audioDir}/${filename}`
-    await writeFile(filePath, uint8Array, { baseDir: BaseDirectory.AppData })
+    const fileOpts = await getStoragePathOptions(filePath)
+    if (fileOpts.baseDir) {
+      await writeFile(fileOpts.path, uint8Array, { baseDir: fileOpts.baseDir })
+    } else {
+      await writeFile(fileOpts.path, uint8Array)
+    }
     
     return filePath
   }

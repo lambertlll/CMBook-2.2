@@ -1408,6 +1408,14 @@
         "title": "写作资源路径",
         "desc": "设置写作资源目录名称。编辑器本地插入图片时会使用该目录名，例如 assets 或 images。",
         "select": "请设置资源目录名称，例如：assets"
+      },
+      "storage": {
+        "current": "数据存储路径",
+        "desc": "设置录音、会议音频等媒体文件的存储位置。默认保存在系统数据目录，可选择其他磁盘或文件夹以节省系统盘空间。更改后新录音将存入新路径，已有文件需手动迁移。数据库和配置文件不受影响。",
+        "default": "当前使用默认系统数据目录",
+        "select": "选择数据存储目录",
+        "reset": "重置为默认路径",
+        "searchPlaceholder": "搜索存储路径..."
       }
     },
     "shortcuts": {
@@ -3516,7 +3524,8 @@
     "deselectAll": "取消全选",
     "selectedCount": "已选 {selected}/{total}",
     "skipAll": "全部跳过",
-    "confirmSelected": "确认 {count} 项"
+    "confirmSelected": "确认 {count} 项",
+    "todoContentPlaceholder": "待办内容"
   },
   "meeting": {
     "title": "会议模式",
@@ -3547,6 +3556,8 @@
     "generateSummary": "生成纪要",
     "summaryTitle": "会议纪要",
     "regenerate": "重新生成",
+    "stopGenerate": "停止生成",
+    "confirmTodos": "确认待办",
     "copy": "复制",
     "copied": "已复制",
     "saveAsNote": "保存为笔记",

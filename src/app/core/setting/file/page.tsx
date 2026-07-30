@@ -1,6 +1,7 @@
 'use client'
 import { SettingWorkspace } from "./setting-workspace"
 import { SettingAssets } from "./setting-assets"
+import { SettingDataStorage } from "./setting-data-storage"
 import { SettingType } from "../components/setting-base"
 import { FolderOpen } from "lucide-react"
 import { useTranslations } from 'next-intl'
@@ -17,6 +18,7 @@ export default function SettingFilePage() {
     >
       <div className="space-y-8">
         <SettingWorkspace />
+        <SettingDataStorage />
         <SettingAssets />
       </div>
     </SettingType>

@@ -268,6 +268,10 @@ interface SettingState {
   workspacePath: string
   setWorkspacePath: (path: string) => Promise<void>
 
+  // 数据存储路径（录音、会议音频、图片等媒体文件的自定义存储位置）
+  dataStoragePath: string
+  setDataStoragePath: (path: string) => Promise<void>
+
   // 工作区历史路径
   workspaceHistory: string[]
   addWorkspaceHistory: (path: string) => Promise<void>
@@ -1105,11 +1109,20 @@ const useSettingStore = create<SettingState>((set, get) => ({
     set({ workspacePath: path })
     const store = await Store.load('store.json');
     await store.set('workspacePath', path)
-    
+
     // 如果路径不为空且不在历史记录中，则添加到历史记录
     if (path && !get().workspaceHistory.includes(path)) {
       await get().addWorkspaceHistory(path)
     }
+  },
+
+  // 数据存储路径：空字符串表示使用默认 AppData 目录
+  dataStoragePath: '',
+  setDataStoragePath: async (path: string) => {
+    set({ dataStoragePath: path })
+    const store = await Store.load('store.json')
+    await store.set('dataStoragePath', path)
+    await store.save()
   },
 
   // 工作区历史路径管理
