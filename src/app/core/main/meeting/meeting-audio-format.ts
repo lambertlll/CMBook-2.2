@@ -6,6 +6,7 @@ const MIME_TO_EXT: Record<string, string> = {
   'audio/webm': 'webm',
   'audio/ogg': 'ogg',
   'audio/mp4': 'm4a',
+  'audio/aac': 'aac',
   'audio/mpeg': 'mp3',
   'audio/wav': 'wav',
   'audio/x-wav': 'wav',
@@ -15,6 +16,7 @@ const EXT_TO_MIME: Record<string, string> = {
   webm: 'audio/webm',
   ogg: 'audio/ogg',
   m4a: 'audio/mp4',
+  aac: 'audio/aac',
   mp3: 'audio/mpeg',
   wav: 'audio/wav',
 }
