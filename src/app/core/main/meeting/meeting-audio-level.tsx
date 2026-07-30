@@ -35,7 +35,13 @@ export function MeetingAudioLevel({ active }: MeetingAudioLevelProps) {
 
     const setup = (stream: MediaStream) => {
       if (disposed) return
-      audioContext = new AudioContext()
+      // 兼容旧版 WebKit：macOS 低版本 Safari 需 webkit 前缀
+      const AudioCtxCtor: typeof AudioContext =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext })
+          .webkitAudioContext
+      if (!AudioCtxCtor) return
+      audioContext = new AudioCtxCtor()
       // 部分浏览器策略下 AudioContext 初始为 suspended，尝试恢复
       if (audioContext.state === 'suspended') {
         audioContext.resume().catch(() => {})
@@ -44,8 +50,13 @@ export function MeetingAudioLevel({ active }: MeetingAudioLevelProps) {
       analyser = audioContext.createAnalyser()
       analyser.fftSize = 64
       analyser.smoothingTimeConstant = 0.7
-      // 只连接分析节点，不接到 destination，避免回放与干扰录音
       source.connect(analyser)
+      // WebKit (macOS WKWebView) 需要连接到 destination 才能驱动音频图，
+      // 通过零增益 GainNode 连接：AnalyserNode 可读到频域数据但不产生回放
+      const silentGain = audioContext.createGain()
+      silentGain.gain.value = 0
+      analyser.connect(silentGain)
+      silentGain.connect(audioContext.destination)
       setHasStream(true)
 
       const freqData = new Uint8Array(analyser.frequencyBinCount)

@@ -69,6 +69,8 @@ interface DashscopeAsrErrorEvent {
 let audioContext: AudioContext | null = null
 let sourceNode: MediaStreamAudioSourceNode | null = null
 let captureNode: AudioWorkletNode | ScriptProcessorNode | null = null
+// AudioWorklet → 零增益 GainNode → destination：WebKit 需此路径驱动音频图处理
+let silentGainNode: GainNode | null = null
 let streamPollTimer: ReturnType<typeof setInterval> | null = null
 // 会话令牌：异步初始化完成前会话已切换时丢弃结果
 let sessionToken = 0
@@ -300,7 +302,15 @@ export function getFullTranscript(meetingId: string): string | null {
 
 async function setupCapture(stream: MediaStream, token: number): Promise<void> {
   try {
-    const ctx = new AudioContext()
+    // 兼容旧版 WebKit：macOS 低版本 Safari 需 webkit 前缀
+    const AudioCtxCtor: typeof AudioContext =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext })
+        .webkitAudioContext
+    if (!AudioCtxCtor) {
+      throw new Error('当前环境不支持 AudioContext')
+    }
+    const ctx = new AudioCtxCtor()
     if (token !== sessionToken) {
       await ctx.close().catch(() => {})
       return
@@ -311,25 +321,88 @@ async function setupCapture(stream: MediaStream, token: number): Promise<void> {
     audioContext = ctx
     sourceNode = ctx.createMediaStreamSource(stream)
 
-    if (ctx.audioWorklet) {
+    let useWorklet = !!ctx.audioWorklet
+    if (useWorklet) {
       const url = URL.createObjectURL(
         new Blob([WORKLET_CODE], { type: 'application/javascript' })
       )
       try {
-        await ctx.audioWorklet.addModule(url)
+        await ctx.audioWorklet!.addModule(url)
+      } catch (e) {
+        console.warn(
+          '[LiveTranscript] AudioWorklet addModule 失败，降级 ScriptProcessor:',
+          e
+        )
+        useWorklet = false
       } finally {
         URL.revokeObjectURL(url)
       }
-      if (token !== sessionToken || audioContext !== ctx) return
+    }
+
+    if (token !== sessionToken || audioContext !== ctx) return
+
+    if (useWorklet) {
       const node = new AudioWorkletNode(ctx, 'meeting-live-pcm')
-      node.port.onmessage = (e: MessageEvent<Float32Array>) => onPcm(e.data)
       captureNode = node
-      // 只采集分析，不接 destination，避免回放与干扰录音
       sourceNode.connect(node)
+      // WebKit (macOS WKWebView) 需要节点连接到 destination 才能驱动音频图处理，
+      // 通过零增益 GainNode 连接：process() 回调可触发，但不产生音频回放
+      silentGainNode = ctx.createGain()
+      silentGainNode.gain.value = 0
+      node.connect(silentGainNode)
+      silentGainNode.connect(ctx.destination)
+
+      // 安全网：WebKit 中 AudioWorklet 属性可能存在但 process() 不触发，
+      // 3 秒内未收到 PCM 数据则降级为 ScriptProcessor
+      let workletActive = false
+      const fallbackTimer = setTimeout(() => {
+        if (workletActive || token !== sessionToken || audioContext !== ctx)
+          return
+        console.warn(
+          '[LiveTranscript] AudioWorklet 3秒未收到PCM，降级为ScriptProcessor'
+        )
+        try {
+          node.port.onmessage = null
+        } catch {
+          // ignore
+        }
+        try {
+          node.disconnect()
+        } catch {
+          // ignore
+        }
+        try {
+          silentGainNode?.disconnect()
+        } catch {
+          // ignore
+        }
+        silentGainNode = null
+        if (captureNode !== node) return
+        try {
+          const sp = ctx.createScriptProcessor(4096, 1, 1)
+          sp.onaudioprocess = (e: AudioProcessingEvent) => {
+            onPcm(e.inputBuffer.getChannelData(0))
+          }
+          captureNode = sp
+          sourceNode?.connect(sp)
+          sp.connect(ctx.destination)
+          console.log('[LiveTranscript] 已降级为ScriptProcessor')
+        } catch (spErr) {
+          console.error('[LiveTranscript] ScriptProcessor降级失败:', spErr)
+        }
+      }, 3000)
+
+      node.port.onmessage = (e: MessageEvent<Float32Array>) => {
+        if (!workletActive) {
+          workletActive = true
+          clearTimeout(fallbackTimer)
+        }
+        onPcm(e.data)
+      }
     } else {
       // ScriptProcessor 兜底：需接 destination 才触发回调，但不写输出缓冲（输出静音）
       const node = ctx.createScriptProcessor(4096, 1, 1)
-      node.onaudioprocess = (e) => {
+      node.onaudioprocess = (e: AudioProcessingEvent) => {
         onPcm(e.inputBuffer.getChannelData(0))
       }
       captureNode = node
@@ -339,7 +412,11 @@ async function setupCapture(stream: MediaStream, token: number): Promise<void> {
 
     capturing = true
     useLiveTranscriptStore.setState({ active: true })
-    console.log('[LiveTranscript] 开始采集, 采样率:', ctx.sampleRate)
+    console.log(
+      '[LiveTranscript] 开始采集, 采样率:',
+      ctx.sampleRate,
+      useWorklet ? '(AudioWorklet+静音增益)' : '(ScriptProcessor)'
+    )
     // realtime：采集就绪后建立 WebSocket 会话（异步，连接完成前的 PCM 先攒在尾包缓冲里）
     if (dsMode) {
       void connectDsSession(token)
@@ -703,6 +780,14 @@ function teardownCapture(): void {
       // ignore
     }
     sourceNode = null
+  }
+  if (silentGainNode) {
+    try {
+      silentGainNode.disconnect()
+    } catch {
+      // ignore
+    }
+    silentGainNode = null
   }
   if (captureNode) {
     try {
