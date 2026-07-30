@@ -20,13 +20,23 @@ export class MeetingAudioRecorder {
     this.destroy()
     this.audioChunks = []
 
-    this.stream = await navigator.mediaDevices.getUserMedia({
+    // getUserMedia 在某些 macOS WKWebView 版本可能不支持 sampleRate 约束，
+    // 先尝试带约束的请求，失败则回退到基础约束
+    const constraints: MediaStreamConstraints = {
       audio: {
         echoCancellation: true,
         noiseSuppression: true,
         sampleRate: 16000,
       },
-    })
+    }
+    try {
+      this.stream = await navigator.mediaDevices.getUserMedia(constraints)
+    } catch {
+      // 回退：去掉 sampleRate 约束，让浏览器使用默认采样率
+      this.stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true },
+      })
+    }
 
     try {
       this.mediaRecorder = new MediaRecorder(this.stream, {
@@ -147,11 +157,13 @@ export class MeetingAudioRecorder {
    * 获取浏览器支持的音频 MIME 类型
    */
   private getSupportedMimeType(): string {
+    // macOS Safari/WKWebView 不支持 audio/webm，优先尝试兼容格式
     const types = [
       'audio/webm;codecs=opus',
       'audio/webm',
+      'audio/mp4',  // macOS Safari 原生支持
+      'audio/aac',  // macOS Safari 备选
       'audio/ogg;codecs=opus',
-      'audio/mp4',
     ]
 
     for (const type of types) {
@@ -161,6 +173,6 @@ export class MeetingAudioRecorder {
     }
 
     // 无匹配格式时直接抛出明确错误，而不是返回必失败的默认值
-    throw new Error('当前环境不支持任何可用的音频录制格式（webm/ogg/mp4）')
+    throw new Error('当前环境不支持任何可用的音频录制格式（webm/mp4/aac/ogg）')
   }
 }

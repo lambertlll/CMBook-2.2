@@ -14,6 +14,9 @@ import { useCallback, useRef, useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import useArticleStore from '@/stores/article'
 import { exportMarkdownToWord } from '@/lib/export-word'
+import { save } from '@tauri-apps/plugin-dialog'
+import { writeTextFile, writeFile } from '@tauri-apps/plugin-fs'
+import { checkIsTauri } from '@/lib/check'
 
 interface ExportMenuProps {
   editor: Editor
@@ -40,8 +43,21 @@ export function ExportMenu({ editor }: ExportMenuProps) {
     return editor.getText()
   }, [editor])
 
-  // Download file helper
-  const downloadFile = useCallback((content: string, filename: string, mimeType: string) => {
+  // Download file helper — Tauri 环境用系统保存对话框，兼容 macOS WKWebView
+  const downloadFile = useCallback(async (content: string, filename: string, mimeType: string) => {
+    const extension = filename.split('.').pop() || 'txt'
+    if (checkIsTauri()) {
+      const selectedPath = await save({
+        title: '导出',
+        defaultPath: filename,
+        filters: [{ name: extension.toUpperCase(), extensions: [extension] }],
+      })
+      if (!selectedPath) return
+      const filePath = selectedPath.endsWith(`.${extension}`) ? selectedPath : `${selectedPath}.${extension}`
+      await writeTextFile(filePath, content)
+      return
+    }
+    // 非 Tauri 回退
     const blob = new Blob([content], { type: mimeType })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -54,15 +70,15 @@ export function ExportMenu({ editor }: ExportMenuProps) {
   }, [])
 
   // Export handlers
-  const exportMarkdown = useCallback(() => {
+  const exportMarkdown = useCallback(async () => {
     const content = getMarkdown()
     const activeFilePath = useArticleStore.getState().activeFilePath
     const fileName = activeFilePath?.replace(/\.md$/, '') || 'document'
-    downloadFile(content, `${fileName}.md`, 'text/markdown')
+    await downloadFile(content, `${fileName}.md`, 'text/markdown')
     setIsOpen(false)
   }, [getMarkdown, downloadFile])
 
-  const exportHtml = useCallback(() => {
+  const exportHtml = useCallback(async () => {
     const content = getHtml()
     const activeFilePath = useArticleStore.getState().activeFilePath
     const fileName = activeFilePath?.replace(/\.md$/, '') || 'document'
@@ -115,23 +131,23 @@ export function ExportMenu({ editor }: ExportMenuProps) {
 ${content}
 </body>
 </html>`
-    downloadFile(htmlContent, `${fileName}.html`, 'text/html')
+    await downloadFile(htmlContent, `${fileName}.html`, 'text/html')
     setIsOpen(false)
   }, [getHtml, downloadFile])
 
-  const exportJson = useCallback(() => {
+  const exportJson = useCallback(async () => {
     const content = getJson()
     const activeFilePath = useArticleStore.getState().activeFilePath
     const fileName = activeFilePath?.replace(/\.md$/, '') || 'document'
-    downloadFile(content, `${fileName}.json`, 'application/json')
+    await downloadFile(content, `${fileName}.json`, 'application/json')
     setIsOpen(false)
   }, [getJson, downloadFile])
 
-  const exportText = useCallback(() => {
+  const exportText = useCallback(async () => {
     const content = getText()
     const activeFilePath = useArticleStore.getState().activeFilePath
     const fileName = activeFilePath?.replace(/\.md$/, '') || 'document'
-    downloadFile(content, `${fileName}.txt`, 'text/plain')
+    await downloadFile(content, `${fileName}.txt`, 'text/plain')
     setIsOpen(false)
   }, [getText, downloadFile])
 
@@ -199,7 +215,21 @@ ${content}
         heightLeft -= pageHeight
       }
 
-      pdf.save(`${fileName}.pdf`)
+      // Tauri 环境用系统保存对话框，兼容 macOS WKWebView
+      if (checkIsTauri()) {
+        const selectedPath = await save({
+          title: '导出 PDF',
+          defaultPath: `${fileName}.pdf`,
+          filters: [{ name: 'PDF', extensions: ['pdf'] }],
+        })
+        if (selectedPath) {
+          const filePath = selectedPath.endsWith('.pdf') ? selectedPath : `${selectedPath}.pdf`
+          const pdfBytes = pdf.output('arraybuffer')
+          await writeFile(filePath, new Uint8Array(pdfBytes))
+        }
+      } else {
+        pdf.save(`${fileName}.pdf`)
+      }
     } catch (error) {
       console.error('PDF export failed:', error)
     }

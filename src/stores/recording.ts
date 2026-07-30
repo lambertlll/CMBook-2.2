@@ -37,17 +37,18 @@ const useRecordingStore = create<RecordingState>((set, get) => ({
   startRecording: async () => {
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error('当前环境不支持麦克风录音，请检查 Android WebView 或应用权限配置')
+        throw new Error('当前环境不支持麦克风录音，请检查应用权限配置')
       }
 
       // 请求麦克风权限
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       
-      // 优先尝试更兼容的格式
+      // 优先尝试更兼容的格式（macOS Safari 不支持 audio/webm）
       let mimeType = 'audio/webm'
       const supportedTypes = [
         'audio/wav',
         'audio/mp4',
+        'audio/aac',
         'audio/webm;codecs=opus',
         'audio/ogg;codecs=opus',
         'audio/webm'

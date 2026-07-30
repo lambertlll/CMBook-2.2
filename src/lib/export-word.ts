@@ -1,10 +1,14 @@
 /**
- * Word 导出工具：将 Markdown 转换为 Word 兼容的 HTML 并下载为 .doc 文件。
+ * Word 导出工具：将 Markdown 转换为 Word 兼容的 HTML 并保存为 .doc 文件。
  *
  * 原理：生成带有 Office 命名空间的 HTML，以 application/msword MIME 类型保存为 .doc 文件。
  * Microsoft Word、WPS Office、LibreOffice 等均可正常打开。
- * 这种方式不需要额外的 npm 依赖，在 Tauri webview 中运行可靠。
+ * Tauri 环境下通过系统保存对话框 + 本地文件写入，兼容 macOS WKWebView。
  */
+
+import { save } from '@tauri-apps/plugin-dialog'
+import { writeFile } from '@tauri-apps/plugin-fs'
+import { checkIsTauri } from '@/lib/check'
 
 let mdRenderer: ((markdown: string) => string) | null = null
 
@@ -106,9 +110,23 @@ ${bodyHtml}
 }
 
 /**
- * 下载 Blob 为文件
+ * 保存 Word 文档：Tauri 环境用系统保存对话框 + 本地文件写入，
+ * 非 Tauri 环境（如浏览器预览）回退到 anchor download。
  */
-function downloadBlob(blob: Blob, filename: string) {
+async function saveWordDocument(blob: Blob, filename: string): Promise<void> {
+  if (checkIsTauri()) {
+    const selectedPath = await save({
+      title: '导出 Word',
+      defaultPath: filename,
+      filters: [{ name: 'Word 文档', extensions: ['doc'] }],
+    })
+    if (!selectedPath) return
+    const arrayBuffer = await blob.arrayBuffer()
+    const filePath = selectedPath.endsWith('.doc') ? selectedPath : `${selectedPath}.doc`
+    await writeFile(filePath, new Uint8Array(arrayBuffer))
+    return
+  }
+  // 非 Tauri 回退：anchor download（WKWebView 可能无效，仅作兜底）
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
@@ -128,7 +146,7 @@ export async function exportMarkdownToWord(markdown: string, filename: string): 
   const wordHtml = await markdownToWordHtml(markdown, filename)
   // BOM + HTML content, application/msword 让浏览器识别为 Word 文档
   const blob = new Blob(['\ufeff', wordHtml], { type: 'application/msword' })
-  downloadBlob(blob, `${filename}.doc`)
+  await saveWordDocument(blob, `${filename}.doc`)
 }
 
 /**
@@ -218,5 +236,5 @@ ${html}
 </body>
 </html>`
   const blob = new Blob(['\ufeff', wordHtml], { type: 'application/msword' })
-  downloadBlob(blob, `${filename}.doc`)
+  await saveWordDocument(blob, `${filename}.doc`)
 }

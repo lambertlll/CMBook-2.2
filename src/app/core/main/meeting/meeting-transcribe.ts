@@ -103,7 +103,11 @@ export async function transcribeAudio(options: TranscribeOptions): Promise<Trans
 
   // 解码音频为 PCM
   onProgress?.(5)
-  const audioContext = new AudioContext({ sampleRate: 16000 })
+  // 兼容 macOS WKWebView 的 webkit 前缀
+  const AudioCtxCtor: typeof AudioContext =
+    window.AudioContext ||
+    (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+  const audioContext = new AudioCtxCtor({ sampleRate: 16000 })
   let audioBuffer: AudioBuffer
 
   try {

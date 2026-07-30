@@ -3,8 +3,11 @@
  */
 export async function convertToWav(audioBlob: Blob): Promise<Blob> {
   try {
-    // 创建 Audio Context
-    const audioContext = new AudioContext()
+    // 创建 Audio Context（兼容 macOS WKWebView 的 webkit 前缀）
+    const AudioCtxCtor: typeof AudioContext =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+    const audioContext = new AudioCtxCtor()
     
     // 读取音频数据
     const arrayBuffer = await audioBlob.arrayBuffer()
