@@ -161,7 +161,7 @@ export function PostvisitSection({ visit }: { visit: VisitRecord }) {
                   </>
                 )}
                 <div className="min-w-0 flex-1">
-                  <p
+                  <div
                     className={cn(
                       'text-sm leading-snug break-words',
                       isDone && 'text-muted-foreground line-through',
@@ -177,7 +177,7 @@ export function PostvisitSection({ visit }: { visit: VisitRecord }) {
                       </Badge>
                     )}
                     {todo.content}
-                  </p>
+                  </div>
                   {metaSegments.length > 0 && (
                     <p className="text-xs text-muted-foreground">
                       {metaSegments.join(' · ')}

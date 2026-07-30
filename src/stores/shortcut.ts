@@ -39,25 +39,34 @@ function emitShortcutEvent(key: string) {
   emitter.emit(key)
 }
 
+// 串行化 bindShortcuts 调用，防止 React StrictMode 双重调用或快速连续调用时
+// unregisterAll / register 交叉执行导致 "HotKey already registered" 竞态
+let bindChain: Promise<void> = Promise.resolve()
+
 async function bindShortcuts(shortcuts: Shortcut[]) {
-  await unregisterAll()
+  bindChain = bindChain.then(async () => {
+    await unregisterAll()
 
-  const registeredValues = new Set<string>()
+    const registeredValues = new Set<string>()
 
-  for (const shortcut of shortcuts) {
-    try {
-      if (shortcut.value && !registeredValues.has(shortcut.value)) {
-        await register(shortcut.value, (event) => {
-        if (event.state === 'Pressed') {
-            emitShortcutEvent(shortcut.key)
+    for (const shortcut of shortcuts) {
+      try {
+        if (shortcut.value && !registeredValues.has(shortcut.value)) {
+          await register(shortcut.value, (event) => {
+          if (event.state === 'Pressed') {
+              emitShortcutEvent(shortcut.key)
+          }
+        });
+          registeredValues.add(shortcut.value)
         }
-      });
-        registeredValues.add(shortcut.value)
+      } catch (error) {
+        console.error(`Failed to register shortcut ${shortcut.value}:`, error);
       }
-    } catch (error) {
-      console.error(`Failed to register shortcut ${shortcut.value}:`, error);
     }
-  }
+  })
+  // 如果链中某次调用抛错，不能让后续调用永远 pending
+  bindChain = bindChain.catch(() => {})
+  return bindChain
 }
 
 const useShortcutStore = create<SettingState>((set, get) => ({
