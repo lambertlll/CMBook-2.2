@@ -40,8 +40,8 @@ pub fn setup_app(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
                 );
                 handle
                     .dialog()
-                    .title("系统版本不支持")
                     .message(&msg)
+                    .title("系统版本不支持")
                     .blocking_show();
                 handle.exit(0);
                 return Ok(());
