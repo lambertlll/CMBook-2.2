@@ -5,9 +5,15 @@ import { useTranslations } from 'next-intl'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
-import { Loader2, Save, Check, PenLine, Eye } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Loader2, Save, Check, PenLine, Eye, Sparkles } from 'lucide-react'
 import { useReportStore, formatWeekRange, formatWeekLabel } from './report-store'
 import { MarkdownToolbar } from './markdown-toolbar'
+import emitter from '@/lib/emitter'
+import useChatStore from '@/stores/chat'
+import { getFilePathOptions, getWorkspacePath } from '@/lib/workspace'
+import { writeTextFile } from '@tauri-apps/plugin-fs'
+import type { MarkdownFile } from '@/lib/files'
 // 复用主编辑器的排版样式（.tiptap-editor .ProseMirror），与笔记/会议纪要保持一致
 import '../editor/markdown/style.css'
 
@@ -104,6 +110,41 @@ export function ReportPanel() {
     scheduleSave(value)
   }
 
+  /**
+   * 对 AI 分析：将当前周报内容写入 .ai-tmp/ 隐藏目录临时 md 文件，
+   * 作为关联文件注入右侧 AI 对话（与会议纪要体验一致，聊天输入框出现 @周报标签）。
+   */
+  const handleAskAI = useCallback(async () => {
+    const content = localContent.trim()
+    if (!content) return
+
+    try {
+      const weekLabel = formatWeekLabel(currentWeekStart).replace(/[\\/:*?"<>|]/g, '_').slice(0, 20)
+      const relDir = '.ai-tmp'
+      const fileName = `${relDir}/__ai_周报-${weekLabel}.md`
+      const displayName = `周报（${formatWeekLabel(currentWeekStart)}）.md`
+      const workspace = await getWorkspacePath()
+      const pathOptions = await getFilePathOptions(fileName)
+      if (workspace.isCustom) {
+        await writeTextFile(pathOptions.path, content)
+      } else {
+        await writeTextFile(pathOptions.path, content, { baseDir: pathOptions.baseDir })
+      }
+
+      const linkedFile: MarkdownFile = {
+        name: displayName,
+        path: workspace.isCustom ? pathOptions.path : fileName,
+        relativePath: workspace.isCustom ? `${workspace.path}/${fileName}` : fileName,
+      }
+
+      // 与 chat-input 的 fileSelected 监听保持一致：本地 state + chat store 双写
+      useChatStore.getState().setLinkedResource(linkedFile)
+      emitter.emit('fileSelected', linkedFile)
+    } catch (error) {
+      console.error('[ReportPanel] 关联 AI 对话失败:', error)
+    }
+  }, [localContent, currentWeekStart])
+
   // 空态
   if (!currentReport) {
     return (
@@ -126,6 +167,11 @@ export function ReportPanel() {
           </span>
         </div>
         <div className="flex items-center gap-2">
+          {/* 对AI分析：将周报内容作为关联文件注入右侧 AI 对话 */}
+          <Button variant="outline" size="sm" onClick={handleAskAI} disabled={generating}>
+            <Sparkles className="mr-1 size-3" />
+            {t('askAI')}
+          </Button>
           {/* 保存状态指示 */}
           {generating ? (
             <span className="flex items-center gap-1 text-xs text-primary">

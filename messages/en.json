@@ -3847,6 +3847,7 @@
     "saved": "Saved",
     "edit": "Edit",
     "preview": "Preview",
+    "askAI": "Ask AI",
     "editPlaceholder": "Edit your weekly report here, or click AI Generate on the right...",
     "emptyHint": "Report is empty. Click AI Generate to create one.",
     "assistTitle": "Report Assistant",

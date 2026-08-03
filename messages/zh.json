@@ -3847,6 +3847,7 @@
     "saved": "已保存",
     "edit": "编辑",
     "preview": "预览",
+    "askAI": "对 AI 分析",
     "editPlaceholder": "在此编辑周报内容，或点击右侧 AI 生成按钮一键生成...",
     "emptyHint": "周报内容为空，点击右侧 AI 生成按钮一键生成",
     "assistTitle": "周报助手",
