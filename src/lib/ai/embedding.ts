@@ -30,12 +30,22 @@ async function getEmbeddingModelInfo() {
   if (!aiModelList) return null;
   
   // 在新的数据结构中，需要找到包含指定模型ID的配置
+  // 支持裸 id（model.id）与组合键（${config.key}-${model.id}）两种格式
   for (const config of aiModelList) {
     // 检查新的 models 数组结构
     if (config.models && config.models.length > 0) {
-      const targetModel = config.models.find(model => 
-        model.id === embeddingModel && model.modelType === 'embedding'
-      );
+      let targetModel: { id: string; model: string; modelType?: string; temperature?: number; topP?: number; voice?: string; enableStream?: boolean } | undefined =
+        config.models.find(model => model.id === embeddingModel && model.modelType === 'embedding');
+
+      // 组合键格式 ${config.key}-${model.id} 回退匹配
+      if (!targetModel && typeof embeddingModel === 'string' && embeddingModel.includes('-')) {
+        const expectedPrefix = `${config.key}-`
+        if (embeddingModel.startsWith(expectedPrefix)) {
+          const originalModelId = embeddingModel.substring(expectedPrefix.length)
+          targetModel = config.models.find(model => model.id === originalModelId && model.modelType === 'embedding')
+        }
+      }
+
       if (targetModel) {
         // 返回合并了模型配置的 AiConfig
         return {
@@ -71,12 +81,23 @@ export async function getRerankModelInfo() {
   if (!aiModelList) return null;
   
   // 在新的数据结构中，需要找到包含指定模型ID的配置
+  // 支持裸 id 与组合键（${config.key}-${model.id}）两种格式
   for (const config of aiModelList) {
     // 检查新的 models 数组结构
     if (config.models && config.models.length > 0) {
-      const targetModel = config.models.find(model => 
+      let targetModel = config.models.find(model => 
         model.id === rerankModel && model.modelType === 'rerank'
       );
+
+      // 组合键格式回退匹配
+      if (!targetModel && typeof rerankModel === 'string' && rerankModel.includes('-')) {
+        const expectedPrefix = `${config.key}-`
+        if (rerankModel.startsWith(expectedPrefix)) {
+          const originalModelId = rerankModel.substring(expectedPrefix.length)
+          targetModel = config.models.find(model => model.id === originalModelId && model.modelType === 'rerank')
+        }
+      }
+
       if (targetModel) {
         // 返回合并了模型配置的 AiConfig
         return {

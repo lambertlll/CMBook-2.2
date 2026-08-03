@@ -293,6 +293,11 @@ export async function createOpenAIClient(AiConfig?: AiConfig): Promise<OpenAICom
   const baseURL = await store.get<string>('baseURL')
   const apiKey = await store.get<string>('apiKey')
 
+  // 无显式配置且旧字段为空时，抛出明确错误而非发到空地址后失败（消除静默断链）
+  if (!baseURL || !apiKey) {
+    throw new Error('未配置 AI 模型（baseURL/apiKey 为空），请先在「设置 → AI 模型」中配置')
+  }
+
   return createTauriOpenAIClient({
     key: 'runtime',
     title: 'Runtime',

@@ -87,16 +87,24 @@ export async function fetchAudioSpeech(text: string, customVoice?: string, custo
     throw new Error('未配置音频模型')
   }
 
-  // 查找音频模型配置
+  // 查找音频模型配置（支持裸 id 与组合键 ${config.key}-${model.id} 两种格式）
   let audioConfig = null
   
   // 在新的数据结构中，需要找到包含指定模型ID的配置
   for (const config of aiModelList) {
     // 检查新的 models 数组结构
     if (config.models && config.models.length > 0) {
-      const targetModel = config.models.find(model => 
+      let targetModel = config.models.find(model => 
         model.id === audioModel && model.modelType === 'tts'
       )
+      // 组合键格式回退匹配
+      if (!targetModel && typeof audioModel === 'string' && audioModel.includes('-')) {
+        const expectedPrefix = `${config.key}-`
+        if (audioModel.startsWith(expectedPrefix)) {
+          const originalModelId = audioModel.substring(expectedPrefix.length)
+          targetModel = config.models.find(model => model.id === originalModelId && model.modelType === 'tts')
+        }
+      }
       if (targetModel) {
         // 返回合并了模型配置的 AiConfig
         audioConfig = {

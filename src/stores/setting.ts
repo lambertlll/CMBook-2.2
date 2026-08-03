@@ -59,10 +59,7 @@ interface SettingState {
   setAiModelList: (aiModelList: AiConfig[]) => void
 
   primaryModel: string
-  setPrimaryModel: (primaryModel: string) => void
-
-  placeholderModel: string
-  setPlaceholderModel: (placeholderModel: string) => Promise<void>
+  setPrimaryModel: (primaryModel: string) => Promise<void>
 
   completionModel: string
   setCompletionModel: (completionModel: string) => Promise<void>
@@ -451,7 +448,7 @@ const useSettingStore = create<SettingState>((set, get) => ({
       ])
       // 清理指向已删除供应商的模型设置，重置后由下方默认逻辑重新分配或保持空态
       const modelSettingKeys = [
-        'primaryModel', 'placeholderModel', 'completionModel', 'markDescModel',
+        'primaryModel', 'completionModel', 'markDescModel',
         'commitModel', 'embeddingModel', 'rerankingModel', 'imageMethodModel',
         'audioModel', 'sttModel', 'condenseModel', 'inspirationModel',
         'reportModel'
@@ -558,7 +555,10 @@ const useSettingStore = create<SettingState>((set, get) => ({
     set({ speechToTextMode: normalizeSpeechMode(currentSpeechToTextMode) })
 
     // 检查并初始化其他模型类型
+    // 注：primaryModel 未配置时也自动取第一个可用聊天模型，
+    // 否则"留空回退 primaryModel"的所有链路（会议纪要/周报/翻译/摘要等）都会断链
     const modelTypes = [
+      { storeKey: 'primaryModel', modelType: 'chat' },
       { storeKey: 'completionModel', modelType: 'chat' },
       { storeKey: 'markDescModel', modelType: 'chat' },
       { storeKey: 'commitModel', modelType: 'chat' },
@@ -689,13 +689,12 @@ const useSettingStore = create<SettingState>((set, get) => ({
   setAiModelList: (aiModelList) => set({ aiModelList }),
 
   primaryModel: '',
-  setPrimaryModel: (primaryModel) => set({ primaryModel }),
-
-  placeholderModel: '',
-  setPlaceholderModel: async (placeholderModel) => {
+  setPrimaryModel: async (primaryModel) => {
+    // 与其他模型 setter 保持一致：同步写入 store.json，避免刷新后主模型配置丢失
     const store = await Store.load('store.json');
-    await store.set('placeholderModel', placeholderModel)
-    set({ placeholderModel })
+    await store.set('primaryModel', primaryModel)
+    await store.save()
+    set({ primaryModel })
   },
 
   completionModel: '',
