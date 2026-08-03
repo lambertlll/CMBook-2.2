@@ -56,12 +56,14 @@ export function ReportPanel() {
   }, [currentReport?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // 选中文字 → 右侧 AI 对话（与笔记 tiptap syncEditorSelectionQuote 同机制）：
-  // textarea 选区变化时构造 PendingQuote 写入 chat store，AI 对话输入框上方出现引用卡片
+  // 编辑模式：textarea 选区变化；预览模式：document 选区（getSelection）。统一写入 chat store。
   useEffect(() => {
     const textarea = textareaRef.current
-    if (!textarea) return
+    const isEditMode = mode === 'edit' && !generating
 
-    const syncSelectionQuote = () => {
+    // 编辑模式：textarea 选区（仅当 textarea 聚焦时）
+    const syncTextareaSelection = () => {
+      if (!textarea || document.activeElement !== textarea) return
       const { selectionStart, selectionEnd } = textarea
       if (selectionStart === selectionEnd) {
         useChatStore.getState().setEditorSelectionQuote(null)
@@ -89,16 +91,56 @@ export function ReportPanel() {
       })
     }
 
-    textarea.addEventListener('selectionchange', syncSelectionQuote)
-    // mouseup/click 兜底（selectionchange 在部分浏览器对 textarea 不触发）
-    textarea.addEventListener('mouseup', syncSelectionQuote)
-    textarea.addEventListener('keyup', syncSelectionQuote)
-    return () => {
-      textarea.removeEventListener('selectionchange', syncSelectionQuote)
-      textarea.removeEventListener('mouseup', syncSelectionQuote)
-      textarea.removeEventListener('keyup', syncSelectionQuote)
+    // 预览模式：document 选区（选中渲染后的 HTML 文字）
+    const syncDocumentSelection = () => {
+      // 排除 textarea 内的选区（编辑模式由 syncTextareaSelection 处理）
+      if (document.activeElement === textarea) return
+      const sel = window.getSelection()
+      if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
+        useChatStore.getState().setEditorSelectionQuote(null)
+        return
+      }
+      const quote = sel.toString().trim()
+      if (!quote) {
+        useChatStore.getState().setEditorSelectionQuote(null)
+        return
+      }
+      // 预览模式无精确行号/位置，用近似值（全文中首次出现的位置）
+      const idx = localContent.indexOf(quote)
+      const before = localContent.substring(0, idx > -1 ? idx : 0)
+      const startLine = (before.match(/\n/g)?.length || 0) + 1
+      const endLine = startLine + (quote.match(/\n/g)?.length || 0)
+
+      useChatStore.getState().setEditorSelectionQuote({
+        quote,
+        fullContent: quote,
+        fileName: formatWeekLabel(currentWeekStart) || '周报',
+        startLine,
+        endLine,
+        from: idx > -1 ? idx : 0,
+        to: idx > -1 ? idx + quote.length : quote.length,
+        articlePath: currentReport?.id || '',
+      })
     }
-  }, [localContent, currentReport?.id, currentWeekStart])
+
+    // 用 document 级 selectionchange（textarea 元素上的 selectionchange 多数浏览器不触发）
+    const handleDocumentSelectionChange = () => {
+      if (isEditMode) syncTextareaSelection()
+      else syncDocumentSelection()
+    }
+    document.addEventListener('selectionchange', handleDocumentSelectionChange)
+    if (isEditMode && textarea) {
+      textarea.addEventListener('mouseup', syncTextareaSelection)
+      textarea.addEventListener('keyup', syncTextareaSelection)
+    }
+    return () => {
+      document.removeEventListener('selectionchange', handleDocumentSelectionChange)
+      if (isEditMode && textarea) {
+        textarea.removeEventListener('mouseup', syncTextareaSelection)
+        textarea.removeEventListener('keyup', syncTextareaSelection)
+      }
+    }
+  }, [mode, generating, localContent, currentReport?.id, currentWeekStart])
 
   // AI 生成完成后，同步最终内容到本地编辑状态
   // markGenerated 更新了 currentReport.content 但 id 不变，上面的 effect 不会触发

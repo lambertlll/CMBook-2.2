@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTranslations } from 'next-intl'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,7 @@ import { useReportStore, formatWeekLabel } from './report-store'
 import { generateWeeklyReport } from './report-generator'
 import { copyReportToClipboard, saveReportAsNote, exportReportToWord } from './report-exporter'
 import useSettingStore from '@/stores/setting'
+import useChatStore from '@/stores/chat'
 import { cn } from '@/lib/utils'
 import Chat from '../chat'
 
@@ -25,6 +26,16 @@ import Chat from '../chat'
 export function ReportAssistPanel() {
   const t = useTranslations('report')
   const [tab, setTab] = useState<'assist' | 'chat'>('assist')
+  const editorSelectionQuote = useChatStore((s) => s.editorSelectionQuote)
+
+  // 选中周报文字 → 自动切到 AI 对话 tab（与笔记体验一致：选中即见引用卡片）
+  const prevQuoteRef = useRef(editorSelectionQuote)
+  useEffect(() => {
+    if (editorSelectionQuote && prevQuoteRef.current !== editorSelectionQuote) {
+      setTab('chat')
+    }
+    prevQuoteRef.current = editorSelectionQuote
+  }, [editorSelectionQuote])
 
   return (
     <div className="flex h-full flex-col">
