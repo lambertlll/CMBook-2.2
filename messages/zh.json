@@ -3854,6 +3854,7 @@
     "editPlaceholder": "在此编辑周报内容，或点击右侧 AI 生成按钮一键生成...",
     "emptyHint": "周报内容为空，点击右侧 AI 生成按钮一键生成",
     "assistTitle": "周报助手",
+    "tabChat": "AI 对话",
     "statVisits": "本周拜访",
     "statCustomers": "拜访客户",
     "statCompleted": "已完成待办",

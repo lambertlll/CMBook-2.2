@@ -5,8 +5,7 @@ import { useTranslations } from 'next-intl'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
-import { Button } from '@/components/ui/button'
-import { Loader2, Save, Check, PenLine, Eye, Sparkles } from 'lucide-react'
+import { Loader2, Save, Check, PenLine, Eye } from 'lucide-react'
 import { useReportStore, formatWeekRange, formatWeekLabel } from './report-store'
 import { MarkdownToolbar } from './markdown-toolbar'
 import emitter from '@/lib/emitter'
@@ -53,6 +52,35 @@ export function ReportPanel() {
     setLocalContent(content)
     setDirty(false)
   }, [currentReport?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 选中文字 AI 改写：指令询问 + 调 LLM 改写（reportModel 优先，回退 primaryModel）
+  const [aiProcessing, setAiProcessing] = useState(false)
+  const handleAskAI = useCallback(async (selectedText: string): Promise<string | null> => {
+    if (aiProcessing) return null
+    const instruction = window.prompt('输入修改指令（如：更简洁、更正式、扩充细节）：')
+    if (instruction === null) return null
+    if (!instruction.trim()) {
+      alert('请输入修改指令')
+      return null
+    }
+    setAiProcessing(true)
+    try {
+      const { rewriteReportSelection } = await import('./report-generator')
+      const weekLabel = formatWeekLabel(currentWeekStart)
+      const result = await rewriteReportSelection({
+        selectedText,
+        instruction: instruction.trim(),
+        weekLabel,
+      })
+      return result || null
+    } catch (err) {
+      console.error('[ReportPanel] AI 改写失败:', err)
+      alert(err instanceof Error ? err.message : 'AI 改写失败，请重试')
+      return null
+    } finally {
+      setAiProcessing(false)
+    }
+  }, [aiProcessing, currentWeekStart])
 
   // AI 生成完成后，同步最终内容到本地编辑状态
   // markGenerated 更新了 currentReport.content 但 id 不变，上面的 effect 不会触发
@@ -111,39 +139,54 @@ export function ReportPanel() {
   }
 
   /**
-   * 对 AI 分析：将当前周报内容写入 .ai-tmp/ 隐藏目录临时 md 文件，
-   * 作为关联文件注入右侧 AI 对话（与会议纪要体验一致，聊天输入框出现 @周报标签）。
+   * 自动关联当前周报到右侧 AI 对话（与笔记 activeFilePath / 会议 meeting.id 选中体验一致）：
+   * 切换周报或内容变化时，把内容写入 .ai-tmp/ 隐藏目录临时 md 文件并注入 LinkedResource，
+   * AI 对话输入框上方出现「@周报（第X周）.md」标签；周报为空时清空关联。
    */
-  const handleAskAI = useCallback(async () => {
-    const content = localContent.trim()
-    if (!content) return
-
-    try {
-      const weekLabel = formatWeekLabel(currentWeekStart).replace(/[\\/:*?"<>|]/g, '_').slice(0, 20)
-      const relDir = '.ai-tmp'
-      const fileName = `${relDir}/__ai_周报-${weekLabel}.md`
-      const displayName = `周报（${formatWeekLabel(currentWeekStart)}）.md`
-      const workspace = await getWorkspacePath()
-      const pathOptions = await getFilePathOptions(fileName)
-      if (workspace.isCustom) {
-        await writeTextFile(pathOptions.path, content)
-      } else {
-        await writeTextFile(pathOptions.path, content, { baseDir: pathOptions.baseDir })
+  useEffect(() => {
+    async function autoLinkReportToChat() {
+      const content = (currentReport?.content || '').trim()
+      if (!content) {
+        useChatStore.getState().setLinkedResource(null)
+        return
       }
 
-      const linkedFile: MarkdownFile = {
-        name: displayName,
-        path: workspace.isCustom ? pathOptions.path : fileName,
-        relativePath: workspace.isCustom ? `${workspace.path}/${fileName}` : fileName,
-      }
+      try {
+        const weekLabel = formatWeekLabel(currentWeekStart).replace(/[\\/:*?"<>|]/g, '_').slice(0, 20)
+        const relDir = '.ai-tmp'
+        const fileName = `${relDir}/__ai_周报-${weekLabel}.md`
+        const displayName = `周报（${formatWeekLabel(currentWeekStart)}）.md`
+        const workspace = await getWorkspacePath()
+        const pathOptions = await getFilePathOptions(fileName)
+        if (workspace.isCustom) {
+          await writeTextFile(pathOptions.path, content)
+        } else {
+          await writeTextFile(pathOptions.path, content, { baseDir: pathOptions.baseDir })
+        }
 
-      // 与 chat-input 的 fileSelected 监听保持一致：本地 state + chat store 双写
-      useChatStore.getState().setLinkedResource(linkedFile)
-      emitter.emit('fileSelected', linkedFile)
-    } catch (error) {
-      console.error('[ReportPanel] 关联 AI 对话失败:', error)
+        const linkedFile: MarkdownFile = {
+          name: displayName,
+          path: workspace.isCustom ? pathOptions.path : fileName,
+          relativePath: workspace.isCustom ? `${workspace.path}/${fileName}` : fileName,
+        }
+
+        // 与 chat-input 的 fileSelected 监听保持一致：本地 state + chat store 双写
+        useChatStore.getState().setLinkedResource(linkedFile)
+        emitter.emit('fileSelected', linkedFile)
+      } catch (error) {
+        console.error('[ReportPanel] 关联 AI 对话失败:', error)
+      }
     }
-  }, [localContent, currentWeekStart])
+
+    autoLinkReportToChat()
+  }, [currentReport?.id, currentReport?.content, currentWeekStart])
+
+  // 卸载（切离周报 tab）时清空 AI 对话关联，避免残留「@周报」标签
+  useEffect(() => {
+    return () => {
+      useChatStore.getState().setLinkedResource(null)
+    }
+  }, [])
 
   // 空态
   if (!currentReport) {
@@ -167,11 +210,6 @@ export function ReportPanel() {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          {/* 对AI分析：将周报内容作为关联文件注入右侧 AI 对话 */}
-          <Button variant="outline" size="sm" onClick={handleAskAI} disabled={generating}>
-            <Sparkles className="mr-1 size-3" />
-            {t('askAI')}
-          </Button>
           {/* 保存状态指示 */}
           {generating ? (
             <span className="flex items-center gap-1 text-xs text-primary">
@@ -209,7 +247,7 @@ export function ReportPanel() {
       <div className="min-h-0 flex-1">
         {mode === 'edit' && !generating ? (
           <div className="flex h-full flex-col">
-            <MarkdownToolbar textareaRef={textareaRef} value={localContent} onChange={handleContentChange} />
+            <MarkdownToolbar textareaRef={textareaRef} value={localContent} onChange={handleContentChange} onAskAI={handleAskAI} aiProcessing={aiProcessing} />
             <Textarea
               ref={textareaRef}
               value={localContent}

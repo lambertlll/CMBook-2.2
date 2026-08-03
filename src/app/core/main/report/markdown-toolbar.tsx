@@ -7,6 +7,7 @@
 import {
   Bold, Italic, Strikethrough, Heading1, Heading2, Heading3,
   List, ListOrdered, ListTodo, Quote, Code2, Table, Minus, Undo, Redo,
+  Sparkles, Loader2,
 } from 'lucide-react'
 import { useRef } from 'react'
 
@@ -14,6 +15,10 @@ interface MarkdownToolbarProps {
   textareaRef: React.RefObject<HTMLTextAreaElement | null>
   value: string
   onChange: (value: string) => void
+  /** 选中文字 AI 改写：调用方负责指令询问、LLM 调用并返回改写后的文字 */
+  onAskAI?: (selectedText: string) => Promise<string | null>
+  /** AI 改写进行中状态（用于按钮 loading 与禁用） */
+  aiProcessing?: boolean
 }
 
 interface InsertAction {
@@ -47,7 +52,7 @@ function ToolbarButton({
 
 const Separator = () => <div className="h-5 w-px bg-border mx-1" />
 
-export function MarkdownToolbar({ textareaRef, value, onChange }: MarkdownToolbarProps) {
+export function MarkdownToolbar({ textareaRef, value, onChange, onAskAI, aiProcessing }: MarkdownToolbarProps) {
   const historyRef = useRef<string[]>([value])
   const historyIdx = useRef(0)
 
@@ -230,6 +235,45 @@ export function MarkdownToolbar({ textareaRef, value, onChange }: MarkdownToolba
       </ToolbarButton>
       <ToolbarButton onClick={insertDivider} title="分割线">
         <Minus className="h-4 w-4" />
+      </ToolbarButton>
+
+      <Separator />
+
+      {/* 选中文字 AI 改写 */}
+      <ToolbarButton
+        onClick={() => {
+          const textarea = textareaRef.current
+          if (!textarea || !onAskAI) return
+          const start = textarea.selectionStart
+          const end = textarea.selectionEnd
+          const selectedText = value.substring(start, end)
+          if (!selectedText.trim()) {
+            // 无选区时提示用户先选中文字
+            textarea.focus()
+            alert('请先选中要改写的文字')
+            return
+          }
+          const instruction = window.prompt('输入修改指令（如：更简洁、更正式、扩充细节）：')
+          if (instruction === null) return
+          if (!instruction.trim()) {
+            alert('请输入修改指令')
+            return
+          }
+          // 触发 AI 改写：调用方拿到结果后替换选区
+          void (async () => {
+            const result = await onAskAI(selectedText)
+            if (!result || result === selectedText) return
+            pushHistory(value.substring(0, start) + result + value.substring(end))
+            onChange(value.substring(0, start) + result + value.substring(end))
+            requestAnimationFrame(() => {
+              textarea.focus()
+              textarea.setSelectionRange(start, start + result.length)
+            })
+          })()
+        }}
+        title="AI 改写选中文字"
+      >
+        {aiProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
       </ToolbarButton>
     </div>
   )

@@ -183,3 +183,53 @@ export async function generateWeeklyReport(
     return content
   }
 }
+
+/** 选中文字 AI 改写的系统提示词 */
+const REWRITE_SELECTION_SYSTEM_PROMPT = `你是一位银行客户经理的工作助手，擅长撰写结构化、专业、简洁的周报。
+用户选中了周报中的一段文字并提出修改指令，请严格按要求改写。
+要求：
+- 只输出改写后的内容，不要任何解释或前后缀
+- 保持 Markdown 格式与原文风格一致
+- 语言简洁专业，不要编造不存在的信息`
+
+/**
+ * 周报选中文字 AI 改写：选中 textarea 中的一段文字，按指令调用 LLM 改写并返回结果。
+ * 与会议纪要 rewriteSummarySelection 同模式，模型配置优先 reportModel，回退 primaryModel。
+ */
+export async function rewriteReportSelection(options: {
+  selectedText: string
+  instruction: string
+  weekLabel?: string
+  modelId?: string
+  signal?: AbortSignal
+}): Promise<string> {
+  const { selectedText, instruction, weekLabel } = options
+  const signal = options.signal ?? AbortSignal.timeout(2 * 60 * 1000)
+
+  // 与生成周报同一模型配置：reportModel 优先，留空回退 primaryModel
+  const settingStore = useSettingStore.getState()
+  const reportModel = settingStore.reportModel
+  const aiConfig = resolveModelConfig(options.modelId || reportModel || undefined)
+  if (!aiConfig) {
+    throw new Error('AI 模型未配置，请在设置中配置周报生成模型或主模型后重试')
+  }
+  if (!aiConfig.baseURL || !aiConfig.apiKey) {
+    throw new Error('AI 模型配置不完整，请检查 Base URL 和 API Key')
+  }
+
+  const userMessage = `${weekLabel ? `周报标题：${weekLabel}\n\n` : ''}选中文字：\n${selectedText}\n\n修改指令：${instruction}`
+
+  const openai = await createOpenAIClient(aiConfig)
+  const completion = await openai.chat.completions.create({
+    model: aiConfig.model || '',
+    messages: [
+      { role: 'system', content: REWRITE_SELECTION_SYSTEM_PROMPT },
+      { role: 'user', content: userMessage },
+    ],
+    temperature: aiConfig.temperature ?? 0.5,
+    top_p: aiConfig.topP ?? 1,
+    stream: false,
+  }, { signal })
+
+  return completion.choices[0]?.message?.content?.trim() || ''
+}

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
@@ -15,11 +16,42 @@ import { generateWeeklyReport } from './report-generator'
 import { copyReportToClipboard, saveReportAsNote, exportReportToWord } from './report-exporter'
 import useSettingStore from '@/stores/setting'
 import { cn } from '@/lib/utils'
+import Chat from '../chat'
 
 /**
- * 周报右栏 AI 辅助面板：周数据统计概览 + AI 一键生成 + 导出操作。
+ * 周报右栏面板：默认显示「周报助手」（统计概览 + AI 一键生成 + 导出操作），
+ * 可切换到「AI 对话」——选中周报后像笔记/会议一样，内容自动关联到对话中。
  */
 export function ReportAssistPanel() {
+  const t = useTranslations('report')
+  const [tab, setTab] = useState<'assist' | 'chat'>('assist')
+
+  return (
+    <div className="flex h-full flex-col">
+      {/* 面板切换：周报助手 / AI 对话 */}
+      <div className="flex justify-center border-b p-2">
+        <Tabs value={tab} onValueChange={(v) => setTab(v as 'assist' | 'chat')}>
+          <TabsList className="h-8">
+            <TabsTrigger value="assist" className="text-xs px-3">
+              {t('assistTitle')}
+            </TabsTrigger>
+            <TabsTrigger value="chat" className="text-xs px-3">
+              {t('tabChat')}
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+      <div className="flex-1 min-h-0 overflow-hidden">
+        {tab === 'assist' ? <ReportAssistContent /> : <Chat />}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * 周报助手内容：周数据统计概览 + AI 一键生成 + 导出操作。
+ */
+function ReportAssistContent() {
   const t = useTranslations('report')
   const currentReport = useReportStore((s) => s.currentReport)
   const weekData = useReportStore((s) => s.weekData)
