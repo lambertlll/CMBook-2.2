@@ -9,7 +9,7 @@ import {
   List, ListOrdered, ListTodo, Quote, Code2, Table, Minus, Undo, Redo,
   Sparkles, Loader2, Languages, ChevronRight,
 } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 
 // 常用翻译语言（与笔记/会议编辑器对齐）
@@ -93,7 +93,7 @@ export function MarkdownToolbar({ textareaRef, value, onChange, onAskAI, aiProce
       const result = await onAskAI(instruction)
       if (!result || result === selectedText) return
       const newValue = value.substring(0, start) + result + value.substring(end)
-      pushHistory(newValue)
+      markInternalChange(newValue)
       onChange(newValue)
       requestAnimationFrame(() => {
         textarea.focus()
@@ -109,6 +109,25 @@ export function MarkdownToolbar({ textareaRef, value, onChange, onAskAI, aiProce
     historyIdx.current = historyRef.current.length - 1
   }
 
+  // 标记"由内部操作触发 onChange"（格式化/AI改写），避免这些操作被再次记录
+  const internalChangeRef = useRef(false)
+  const markInternalChange = (newVal: string) => {
+    internalChangeRef.current = true
+    pushHistory(newVal)
+  }
+
+  // 监听外部 value 变化（键盘输入/AI生成等非工具栏操作）：记录到历史，保证撤销可回退打字
+  const prevValueRef = useRef(value)
+  useEffect(() => {
+    if (prevValueRef.current !== value) {
+      if (!internalChangeRef.current) {
+        pushHistory(value)
+      }
+      prevValueRef.current = value
+      internalChangeRef.current = false
+    }
+  }, [value]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const undo = () => {
     if (historyIdx.current > 0) {
       historyIdx.current--
@@ -122,6 +141,9 @@ export function MarkdownToolbar({ textareaRef, value, onChange, onAskAI, aiProce
       onChange(historyRef.current[historyIdx.current])
     }
   }
+
+  const canUndo = historyIdx.current > 0
+  const canRedo = historyIdx.current < historyRef.current.length - 1
 
   const applyAction = (action: InsertAction) => {
     const textarea = textareaRef.current
@@ -158,7 +180,7 @@ export function MarkdownToolbar({ textareaRef, value, onChange, onAskAI, aiProce
       newCursorStart = lineStart + prefix.length
       newCursorEnd = newCursorStart + (selectedText || placeholder).length
       const newValue = insertText
-      pushHistory(newValue)
+      markInternalChange(newValue)
       onChange(newValue)
       requestAnimationFrame(() => {
         textarea.focus()
@@ -172,7 +194,7 @@ export function MarkdownToolbar({ textareaRef, value, onChange, onAskAI, aiProce
     }
 
     const newValue = beforeText + insertText + afterText
-    pushHistory(newValue)
+    markInternalChange(newValue)
     onChange(newValue)
     requestAnimationFrame(() => {
       textarea.focus()
@@ -188,7 +210,7 @@ export function MarkdownToolbar({ textareaRef, value, onChange, onAskAI, aiProce
     const afterText = value.substring(start)
     const table = '\n| 列1 | 列2 | 列3 |\n|------|------|------|\n| 内容 | 内容 | 内容 |\n'
     const newValue = beforeText + table + afterText
-    pushHistory(newValue)
+    markInternalChange(newValue)
     onChange(newValue)
     requestAnimationFrame(() => {
       textarea.focus()
@@ -205,7 +227,7 @@ export function MarkdownToolbar({ textareaRef, value, onChange, onAskAI, aiProce
     const afterText = value.substring(start)
     const divider = '\n---\n'
     const newValue = beforeText + divider + afterText
-    pushHistory(newValue)
+    markInternalChange(newValue)
     onChange(newValue)
     requestAnimationFrame(() => {
       textarea.focus()
@@ -217,10 +239,10 @@ export function MarkdownToolbar({ textareaRef, value, onChange, onAskAI, aiProce
   return (
     <div className="flex items-center gap-0.5 px-2 h-10 bg-muted/50 border-b border-border overflow-x-auto shrink-0">
       {/* 撤销/重做 */}
-      <ToolbarButton onClick={undo} title="撤销">
+      <ToolbarButton onClick={undo} title="撤销" disabled={!canUndo}>
         <Undo className="h-4 w-4" />
       </ToolbarButton>
-      <ToolbarButton onClick={redo} title="重做">
+      <ToolbarButton onClick={redo} title="重做" disabled={!canRedo}>
         <Redo className="h-4 w-4" />
       </ToolbarButton>
 

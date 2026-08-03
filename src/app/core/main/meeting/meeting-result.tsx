@@ -605,8 +605,8 @@ function SummaryEditor({ meeting }: { meeting: Meeting }) {
 
   return (
     <div className="flex h-full flex-col">
-      {/* 格式工具栏（与笔记编辑器一致） */}
-      <EditorToolbar editor={editor} />
+      {/* 格式工具栏（与笔记编辑器一致）；会议无标签栏，开启内置撤销/重做按钮 */}
+      <EditorToolbar editor={editor} showUndoRedo />
       <div ref={scrollRef} className="relative flex-1 overflow-y-auto tiptap-editor">
         <EditorContent editor={editor} />
         {editor && (

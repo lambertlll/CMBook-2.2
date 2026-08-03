@@ -19,6 +19,8 @@ import {
   Upload,
   Palette,
   Highlighter,
+  Undo2,
+  Redo2,
 } from 'lucide-react'
 import { useState, useCallback } from 'react'
 import { cn } from '@/lib/utils'
@@ -34,6 +36,8 @@ import {
 
 interface EditorToolbarProps {
   editor: Editor | null
+  /** 在工具栏开头渲染撤销/重做按钮（会议纪要等无标签栏的编辑器使用；笔记标签栏自带按钮，默认 false） */
+  showUndoRedo?: boolean
 }
 
 const TEXT_COLORS = [
@@ -101,7 +105,7 @@ function ToolbarButton({
   )
 }
 
-export function EditorToolbar({ editor }: EditorToolbarProps) {
+export function EditorToolbar({ editor, showUndoRedo = false }: EditorToolbarProps) {
   const [colorOpen, setColorOpen] = useState(false)
   const [highlightOpen, setHighlightOpen] = useState(false)
 
@@ -186,6 +190,26 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
 
   return (
     <div className="flex items-center gap-0.5 px-2 h-10 bg-muted/50 border-b border-border overflow-x-auto shrink-0">
+      {/* 撤销/重做（无标签栏的编辑器：会议纪要等） */}
+      {showUndoRedo && (
+        <>
+          <ToolbarButton
+            onClick={() => editor?.chain().focus().undo().run()}
+            title="撤销"
+            active={false}
+          >
+            <Undo2 className="h-4 w-4" />
+          </ToolbarButton>
+          <ToolbarButton
+            onClick={() => editor?.chain().focus().redo().run()}
+            title="重做"
+            active={false}
+          >
+            <Redo2 className="h-4 w-4" />
+          </ToolbarButton>
+          <Separator orientation="vertical" className="h-5 mx-1" />
+        </>
+      )}
       {/* 文本类型选择 */}
       <Select value={getCurrentTextType()} onValueChange={handleTextTypeChange}>
         <SelectTrigger className="h-7 w-[90px] text-xs border-none bg-transparent hover:bg-accent focus:ring-0 focus:ring-offset-0">
