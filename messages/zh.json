@@ -3615,6 +3615,8 @@
     "bubblePolish": "润色",
     "bubbleConcise": "精简",
     "bubbleExpand": "扩写",
+    "bubbleTranslate": "翻译",
+    "bubbleCustomLanguagePlaceholder": "输入语言，如：日语",
     "bubbleCustomPlaceholder": "输入修改指令，如：改成三条待办",
     "bubbleApply": "应用",
     "bubbleWorking": "修改中",

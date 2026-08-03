@@ -3615,6 +3615,8 @@
     "bubblePolish": "Polish",
     "bubbleConcise": "Condense",
     "bubbleExpand": "Expand",
+    "bubbleTranslate": "Translate",
+    "bubbleCustomLanguagePlaceholder": "Enter language, e.g.: Japanese",
     "bubbleCustomPlaceholder": "Enter an instruction, e.g.: turn into three to-dos",
     "bubbleApply": "Apply",
     "bubbleWorking": "Working",

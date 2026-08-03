@@ -2,12 +2,13 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Editor } from '@tiptap/react'
-import { Sparkles, Minimize2, Maximize2, Loader2, Wand2 } from 'lucide-react'
+import { Sparkles, Minimize2, Maximize2, Loader2, Wand2, Languages, ChevronRight } from 'lucide-react'
 import { useTranslations } from 'next-intl'
+import { cn } from '@/lib/utils'
 
 /**
  * 纪要编辑器的选中气泡菜单（主编辑器 bubble-menu.tsx 的简化版）：
- * 预设操作（润色/精简/扩写）+ 自定义指令输入，AI 只改写选中部分。
+ * 预设操作（润色/精简/扩写/翻译）+ 自定义指令输入，AI 只改写选中部分。
  * 之所以不直接复用主编辑器的气泡菜单：那个组件绑定了大量主编辑器扩展
  * （下划线/高亮/链接等）和 emitter 建议模式，嫁接成本高于独立实现。
  */
@@ -18,6 +19,19 @@ const PRESET_INSTRUCTIONS = {
   concise: '精简这段文字，去除冗余，只保留关键信息',
   expand: '扩写这段文字，补充合理的细节说明',
 } as const
+
+// 常用翻译语言（与笔记编辑器 POPULAR_LANGUAGES 对齐）
+const POPULAR_LANGUAGES = [
+  { name: 'English', code: '英语' },
+  { name: '日本語', code: '日语' },
+  { name: '한국어', code: '韩语' },
+  { name: 'Français', code: '法语' },
+  { name: 'Deutsch', code: '德语' },
+  { name: 'Español', code: '西班牙语' },
+  { name: 'Português', code: '葡萄牙语' },
+  { name: 'Русский', code: '俄语' },
+  { name: 'العربية', code: '阿拉伯语' },
+]
 
 interface SummaryBubbleMenuProps {
   editor: Editor
@@ -50,11 +64,15 @@ export function SummaryBubbleMenu({
   const [show, setShow] = useState(false)
   const [position, setPosition] = useState({ top: 0, left: 0 })
   const [customInstruction, setCustomInstruction] = useState('')
+  const [showTranslate, setShowTranslate] = useState(false)
+  const [customTranslateLang, setCustomTranslateLang] = useState('')
   const menuRef = useRef<HTMLDivElement>(null)
   // processing 的最新值供事件回调读取（监听器不随 processing 重建）
   const hideMenu = useCallback(() => {
     setShow(false)
     setCustomInstruction('')
+    setShowTranslate(false)
+    setCustomTranslateLang('')
   }, [])
 
   const processingRef = useRef(processing)
@@ -174,6 +192,54 @@ export function SummaryBubbleMenu({
             <Maximize2 className="w-3.5 h-3.5" />
             {t('bubbleExpand')}
           </button>
+          {/* 翻译子菜单（与笔记编辑器对齐） */}
+          <div
+            className="relative"
+            onMouseEnter={() => setShowTranslate(true)}
+            onMouseLeave={() => setShowTranslate(false)}
+          >
+            <button
+              className="px-2 py-1 rounded hover:bg-muted transition-colors text-xs flex items-center gap-1 disabled:opacity-50"
+              disabled={processing}
+              onClick={() => setShowTranslate(!showTranslate)}
+            >
+              <Languages className="w-3.5 h-3.5" />
+              {t('bubbleTranslate')}
+              <ChevronRight className={cn('w-3 h-3 transition-transform', showTranslate && 'rotate-90')} />
+            </button>
+            {showTranslate && (
+              <div className="absolute top-0 left-full ml-1 py-1 bg-background border border-border rounded-lg shadow-lg min-w-36 z-50 max-h-60 overflow-y-auto">
+                {POPULAR_LANGUAGES.map((lang) => (
+                  <button
+                    key={lang.code}
+                    className="w-full px-3 py-1 text-left text-xs hover:bg-muted flex items-center gap-2"
+                    onClick={() => { setShowTranslate(false); apply(`将这段文字翻译成${lang.code}`) }}
+                  >
+                    <span>{lang.name}</span>
+                  </button>
+                ))}
+                <div className="border-t border-border my-1" />
+                <div className="px-2 py-1 flex items-center gap-1">
+                  <input
+                    type="text"
+                    value={customTranslateLang}
+                    placeholder={t('bubbleCustomLanguagePlaceholder')}
+                    onChange={(e) => setCustomTranslateLang(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && customTranslateLang.trim()) {
+                        setShowTranslate(false)
+                        apply(`将这段文字翻译成${customTranslateLang.trim()}`)
+                      } else if (e.key === 'Escape') {
+                        setShowTranslate(false)
+                        setCustomTranslateLang('')
+                      }
+                    }}
+                    className="w-full px-2 py-1 text-xs bg-muted rounded border border-border focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
         </div>
         {/* 自定义指令 */}
         <div className="flex items-center gap-1">

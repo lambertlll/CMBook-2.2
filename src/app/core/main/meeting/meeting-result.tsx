@@ -512,6 +512,62 @@ function SummaryEditor({ meeting }: { meeting: Meeting }) {
     lastContentRef.current = meeting.summary
   }, [meeting.summary, editor])
 
+  // 选中文字 → 右侧 AI 对话（与笔记 tiptap-editor syncEditorSelectionQuote 同机制）：
+  // 选区变化时把选中内容构造为 PendingQuote 写入 chat store，AI 对话输入框上方出现引用卡片
+  useEffect(() => {
+    if (!editor) return
+
+    const syncEditorSelectionQuote = () => {
+      const { from, to } = editor.state.selection
+      if (from === to) {
+        useChatStore.getState().setEditorSelectionQuote(null)
+        return
+      }
+      const quote = editor.state.doc.textBetween(from, to, '\n', '\n')
+      if (!quote.trim()) {
+        useChatStore.getState().setEditorSelectionQuote(null)
+        return
+      }
+
+      // 完整内容：尝试用 markdown 序列化（与笔记一致），失败回退纯文本
+      let fullContent = quote
+      if (editor.markdown) {
+        try {
+          const slice = editor.state.doc.slice(from, to)
+          const json = { type: 'doc', content: slice.content.toJSON() }
+          fullContent = editor.markdown.serialize(json).trim() || quote
+        } catch {
+          fullContent = quote
+        }
+      }
+
+      const textBeforeFrom = editor.state.doc.textBetween(0, from, '\n', '\n')
+      const startLine = (textBeforeFrom.match(/\n/g)?.length || 0) + 1
+      const textBeforeTo = editor.state.doc.textBetween(0, to, '\n', '\n')
+      const endLine = (textBeforeTo.match(/\n/g)?.length || 0) + 1
+
+      useChatStore.getState().setEditorSelectionQuote({
+        quote,
+        fullContent,
+        fileName: meeting.title || '会议纪要',
+        startLine,
+        endLine,
+        from,
+        to,
+        articlePath: meeting.id,
+      })
+    }
+
+    editor.on('selectionUpdate', syncEditorSelectionQuote)
+    editor.on('transaction', syncEditorSelectionQuote)
+    return () => {
+      editor.off('selectionUpdate', syncEditorSelectionQuote)
+      editor.off('transaction', syncEditorSelectionQuote)
+      // 卸载时清空，避免残留会议选区引用
+      useChatStore.getState().setEditorSelectionQuote(null)
+    }
+  }, [editor, meeting.id, meeting.title])
+
   // 局部 AI 修改：选中文字 + 指令发给 AI（用该会议已选模型），
   // 返回后在 TipTap 事务中原地替换选区（保持可撤销）；失败 toast 且不改内容
   const handleApplyRewrite = useCallback(
