@@ -21,21 +21,13 @@ const defaultShortcuts: Shortcut[] = [
     value: "CommandOrControl+Shift+W"
   },
   {
-    key: 'screenshotRecord',
-    value: 'CommandOrControl+Shift+S'
-  },
-  {
     key: 'startMeeting',
     value: 'CommandOrControl+Shift+M'
   }
 ]
 
 function emitShortcutEvent(key: string) {
-  if (key === 'screenshotRecord') {
-    emitter.emit('toolbar-shortcut-scan')
-    return
-  }
-
+  // screenshotRecord（原记录截图快捷键）已随「记录」模块移除，不再发出失效事件
   emitter.emit(key)
 }
 

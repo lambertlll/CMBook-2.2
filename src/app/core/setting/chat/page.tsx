@@ -6,7 +6,6 @@ import { MessageSquare } from 'lucide-react'
 import { CondenseSettings } from './condense-settings'
 import { DefaultModelsSettings } from '../components/default-models-settings'
 import { ToolbarSettings as ChatToolbarSettings } from './toolbar-settings'
-import { ToolbarSettings as RecordToolbarSettings } from '../record/toolbar-settings'
 
 export default function ChatSettingsPage() {
   const t = useTranslations('settings.chat')
@@ -20,9 +19,9 @@ export default function ChatSettingsPage() {
     >
       <div className="space-y-4">
         <DefaultModelsSettings type="chat" />
+        {/* 记录描述模型：仍被图片识别/记录描述功能使用，保留 */}
         <DefaultModelsSettings type="record" />
         <ChatToolbarSettings />
-        <RecordToolbarSettings />
         <CondenseSettings />
       </div>
     </SettingType>

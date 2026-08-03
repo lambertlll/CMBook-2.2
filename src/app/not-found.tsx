@@ -9,8 +9,9 @@ import { Store } from '@tauri-apps/plugin-store';
 export default function NotFound() {
   const router = useRouter();
   const mobile = isMobileDevice()
-  const fallbackPath = mobile ? '/mobile/record' : '/core/main'
-  const fallbackLabel = mobile ? 'Record' : 'Main'
+  // 移动端路由已移除，统一回主界面
+  const fallbackPath = '/core/main'
+  const fallbackLabel = mobile ? 'Main' : 'Main'
   const [countdown, setCountdown] = useState(2);
 
   async function resetRouteStore() {

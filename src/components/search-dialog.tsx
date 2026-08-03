@@ -361,8 +361,8 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
         // PC 端：原切换到记录标签页；「记录」Tab 已移除，兜底回笔记 Tab
         await setLeftSidebarTab('files')
       } else {
-        // 移动端：进入记录页
-        router.push('/mobile/record')
+        // 移动端路由已移除（/mobile/record 不存在），兜底回笔记 Tab
+        await setLeftSidebarTab('files')
       }
 
       emitter.emit(EmitterRecordEvents.refreshMarks)

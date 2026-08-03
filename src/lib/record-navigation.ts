@@ -1,31 +1,13 @@
-import { isMobileDevice } from './check'
 import { useSidebarStore } from '@/stores/sidebar'
-
-type RecordRouter = {
-  push: (path: string) => void
-}
 
 /**
  * 记录完成后的导航处理
- * 桌面端：切换到记录 tab
- * 移动端：跳转到记录页面
+ * 「记录」Tab 与移动端路由均已移除，统一兜底回笔记 Tab
  */
-export function handleRecordComplete(router?: RecordRouter) {
-  const isMobile = isMobileDevice()
-  
-  if (isMobile) {
-    // 移动端：跳转到记录页面
-    if (router) {
-      router.push('/mobile/record')
-    } else if (typeof window !== 'undefined') {
-      window.location.href = '/mobile/record'
-    }
-  } else {
-    // 桌面端：原切换到记录 tab；「记录」Tab 已移除，兜底回笔记 Tab
-    const { leftSidebarVisible, setLeftSidebarTab, toggleLeftSidebar } = useSidebarStore.getState()
-    if (!leftSidebarVisible) {
-      void toggleLeftSidebar()
-    }
-    void setLeftSidebarTab('files')
+export function handleRecordComplete() {
+  const { leftSidebarVisible, setLeftSidebarTab, toggleLeftSidebar } = useSidebarStore.getState()
+  if (!leftSidebarVisible) {
+    void toggleLeftSidebar()
   }
+  void setLeftSidebarTab('files')
 }
