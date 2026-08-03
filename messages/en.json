@@ -3688,11 +3688,7 @@
     "syncKnowledgeSuccess": "Synced to customer knowledge base",
     "syncKnowledgeFailed": "Sync failed, please try again",
     "exportWord": "Export Word",
-    "exportedWord": "Exported Word",
-    "askAI": "Ask AI",
-    "askAIPrompt": "Please analyze the following meeting content and summarize key points and action items:",
-    "addedToChat": "Added to AI chat",
-    "noContentToAnalyze": "Content is empty, nothing to analyze"
+    "exportedWord": "Exported Word"
   },
   "customer": {
     "postvisitTodoEmptyCoach": "Once the visit summary is generated, todos will appear here automatically",

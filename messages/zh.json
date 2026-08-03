@@ -3688,11 +3688,7 @@
     "syncKnowledgeSuccess": "已同步到客户知识库",
     "syncKnowledgeFailed": "同步失败，请重试",
     "exportWord": "导出 Word",
-    "exportedWord": "已导出 Word",
-    "askAI": "对 AI 分析",
-    "askAIPrompt": "请分析以下会议内容，总结要点与后续行动项：",
-    "addedToChat": "已加入 AI 对话",
-    "noContentToAnalyze": "当前内容为空，无法分析"
+    "exportedWord": "已导出 Word"
   },
   "customer": {
     "postvisitTodoEmptyCoach": "拜访纪要生成后，待办事项会自动出现在这里",
