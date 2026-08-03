@@ -411,8 +411,8 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
       const { readArticle } = useArticleStore.getState()
       await readArticle(filePath)
       
-      // 跳转到对应平台页面
-      router.push(isMobileRoute ? '/mobile/writing' : '/core/main')
+      // 跳转到主界面（移动端路由已移除，PC/窄窗口统一回主界面）
+      router.push('/core/main')
     }
     
     setupAndNavigate()

@@ -580,7 +580,8 @@ export function SyncToggle({ presentation = 'popover' }: SyncToggleProps) {
   }
 
   function openSyncSettings() {
-    const settingPath = isMobile ? '/mobile/setting/pages/sync' : '/core/setting?anchor=sync'
+    // 移动端路由已移除，统一跳桌面设置页
+    const settingPath = '/core/setting?anchor=sync'
     setOpen(false)
     router.push(settingPath)
   }
@@ -604,8 +605,8 @@ export function SyncToggle({ presentation = 'popover' }: SyncToggleProps) {
     // 如果选择了未配置的方案，跳转到设置页面
     if (selectedProvider?.status === 'unconfigured') {
       await setPrimaryBackupMethod(value as SyncPlatform)
-      // 跳转到同步设置页面，区分移动端和 PC 端
-      const settingPath = isMobile ? '/mobile/setting/pages/sync' : '/core/setting?anchor=sync'
+      // 跳转到同步设置页面（移动端路由已移除，统一桌面设置页）
+      const settingPath = '/core/setting?anchor=sync'
       router.push(settingPath)
       return
     }
