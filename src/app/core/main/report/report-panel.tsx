@@ -158,9 +158,16 @@ export function ReportPanel() {
         const displayName = `周报（${formatWeekLabel(currentWeekStart)}）.md`
         const workspace = await getWorkspacePath()
         const pathOptions = await getFilePathOptions(fileName)
+        // 确保 .ai-tmp/ 目录存在（writeTextFile 不自动建父目录；recursive 幂等）
+        const { mkdir } = await import('@tauri-apps/plugin-fs')
         if (workspace.isCustom) {
+          await mkdir(`${workspace.path}/${relDir}`, { recursive: true })
           await writeTextFile(pathOptions.path, content)
         } else {
+          await mkdir(pathOptions.path.substring(0, pathOptions.path.lastIndexOf('/')) || relDir, {
+            baseDir: pathOptions.baseDir,
+            recursive: true,
+          })
           await writeTextFile(pathOptions.path, content, { baseDir: pathOptions.baseDir })
         }
 
