@@ -6,7 +6,7 @@
  * Tauri 环境下通过系统保存对话框 + 本地文件写入，兼容 macOS WKWebView。
  */
 
-import { save } from '@tauri-apps/plugin-dialog'
+import { save, open } from '@tauri-apps/plugin-dialog'
 import { writeFile } from '@tauri-apps/plugin-fs'
 import { checkIsTauri } from '@/lib/check'
 
@@ -237,4 +237,35 @@ ${html}
 </html>`
   const blob = new Blob(['\ufeff', wordHtml], { type: 'application/msword' })
   await saveWordDocument(blob, `${filename}.doc`)
+}
+
+/**
+ * 批量将 Markdown 内容导出为 Word 文档（选择目录后批量写入）
+ * @param items 导出项数组：每项含 markdown、文件名
+ * @returns 成功导出的文件数
+ */
+export async function batchExportMarkdownToWord(
+  items: { markdown: string; filename: string }[]
+): Promise<number> {
+  if (!checkIsTauri() || items.length === 0) return 0
+
+  // 让用户选择保存目录
+  const dir = await open({ directory: true, title: '选择导出目录' })
+  if (!dir) return 0
+
+  let count = 0
+  for (const item of items) {
+    try {
+      const wordHtml = await markdownToWordHtml(item.markdown, item.filename)
+      const content = '\ufeff' + wordHtml
+      const encoder = new TextEncoder()
+      const filePath = `${dir}/${item.filename}.doc`
+        .replace(/[\\/]+/g, '/')
+      await writeFile(filePath, encoder.encode(content))
+      count++
+    } catch (err) {
+      console.error(`[BatchExport] 导出失败: ${item.filename}`, err)
+    }
+  }
+  return count
 }

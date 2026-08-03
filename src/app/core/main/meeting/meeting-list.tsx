@@ -25,10 +25,11 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
-import { Plus, Mic, Search, Users, AlertTriangle, FolderInput } from 'lucide-react'
+import { Plus, Mic, Search, Users, AlertTriangle, FolderInput, Trash2, FileDown, X, CheckSquare } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import { toast } from '@/hooks/use-toast'
+import { batchExportMarkdownToWord } from '@/lib/export-word'
 import { getMeetingAudioPaths } from './meeting-store'
 import {
   findInterruptedRecordings,
@@ -109,16 +110,23 @@ export function MeetingList() {
   const createMeeting = useMeetingStore((s) => s.createMeeting)
   const setActiveMeeting = useMeetingStore((s) => s.setActiveMeeting)
   const deleteMeeting = useMeetingStore((s) => s.deleteMeeting)
+  const deleteMeetings = useMeetingStore((s) => s.deleteMeetings)
   const loadMeetings = useMeetingStore((s) => s.loadMeetings)
   const updateMeeting = useMeetingStore((s) => s.updateMeeting)
   const recordingMeetingId = useMeetingStore((s) => s.recordingMeetingId)
   const initialized = useMeetingStore((s) => s.initialized)
+  // 批量选择
+  const selectedMeetingIds = useMeetingStore((s) => s.selectedMeetingIds)
+  const toggleMeetingSelection = useMeetingStore((s) => s.toggleMeetingSelection)
+  const clearSelectedMeetingIds = useMeetingStore((s) => s.clearSelectedMeetingIds)
   // 客户名称映射：有关联客户的会议显示客户名小徽章（客户列表未加载时静默不显示）
   const customers = useCustomerStore((s) => s.customers)
   const customersInitialized = useCustomerStore((s) => s.initialized)
   const loadCustomers = useCustomerStore((s) => s.loadCustomers)
   const [searchQuery, setSearchQuery] = useState('')
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
+  const [batchDeleteOpen, setBatchDeleteOpen] = useState(false)
+  const [batchExporting, setBatchExporting] = useState(false)
   // 归类到客户知识库的目标会议（右键菜单触发，对话框独立于菜单生命周期）
   const [classifyTarget, setClassifyTarget] = useState<Meeting | null>(null)
   // 崩溃残留的未正常结束录音（.part 临时文件）
@@ -232,6 +240,53 @@ export function MeetingList() {
     createMeeting()
   }
 
+  // Ctrl/Cmd+点击切换选择
+  const handleMeetingClick = (e: React.MouseEvent, meetingId: string) => {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault()
+      e.stopPropagation()
+      toggleMeetingSelection(meetingId)
+    } else {
+      setActiveMeeting(meetingId)
+    }
+  }
+
+  // 批量删除
+  const handleBatchDelete = () => {
+    deleteMeetings(selectedMeetingIds)
+    setBatchDeleteOpen(false)
+    toast({ description: t('batchDeleteDone', { count: selectedMeetingIds.length }) })
+  }
+
+  // 批量导出 Word
+  const handleBatchExport = async () => {
+    const selectedMeetings = meetings.filter(
+      (m) => selectedMeetingIds.includes(m.id) && m.summary
+    )
+    if (selectedMeetings.length === 0) {
+      toast({ description: t('noSummaryToExport'), variant: 'destructive' })
+      return
+    }
+    setBatchExporting(true)
+    try {
+      const items = selectedMeetings.map((m) => {
+        const dateStr = new Date(m.createdAt).toISOString().slice(0, 10)
+        const safeTitle = (m.title || t('untitledMeeting')).replace(/[\\/:*?"<>|]/g, '_').slice(0, 30)
+        return { markdown: m.summary, filename: `${safeTitle}-${dateStr}` }
+      })
+      const count = await batchExportMarkdownToWord(items)
+      if (count > 0) {
+        toast({ description: t('batchExportDone', { count }) })
+        clearSelectedMeetingIds()
+      }
+    } catch (err) {
+      console.error('[Meeting] 批量导出失败:', err)
+      toast({ description: t('batchExportFailed'), variant: 'destructive' })
+    } finally {
+      setBatchExporting(false)
+    }
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Header with new meeting button */}
@@ -308,6 +363,42 @@ export function MeetingList() {
         </div>
       )}
 
+      {/* 批量操作工具栏（选中会议时显示） */}
+      {selectedMeetingIds.length > 0 && (
+        <div className="p-2 border-b bg-primary/5 flex items-center gap-2">
+          <span className="text-xs font-medium flex-1">
+            {t('selectedCount', { count: selectedMeetingIds.length })}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs"
+            disabled={batchExporting}
+            onClick={handleBatchExport}
+          >
+            <FileDown className="w-3.5 h-3.5 mr-1" />
+            {batchExporting ? t('exporting') : t('batchExport')}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs text-destructive hover:text-destructive"
+            onClick={() => setBatchDeleteOpen(true)}
+          >
+            <Trash2 className="w-3.5 h-3.5 mr-1" />
+            {t('batchDelete')}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2"
+            onClick={clearSelectedMeetingIds}
+          >
+            <X className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      )}
+
       {/* Meeting list */}
       <ScrollArea className="flex-1">
         {meetings.length === 0 ? (
@@ -326,28 +417,33 @@ export function MeetingList() {
           </div>
         ) : (
           <div className="p-1">
-            {filteredMeetings.map((meeting) => (
+            {filteredMeetings.map((meeting) => {
+              const isSelected = selectedMeetingIds.includes(meeting.id)
+              return (
               <ContextMenu key={meeting.id}>
                 <ContextMenuTrigger asChild>
                   <div
                     className={cn(
                       'group relative w-full text-left p-2.5 rounded-md transition-colors cursor-pointer',
                       'hover:bg-accent/50',
-                      activeMeetingId === meeting.id && 'bg-accent'
+                      activeMeetingId === meeting.id && !isSelected && 'bg-accent',
+                      isSelected && 'bg-primary/10 ring-1 ring-primary/30'
                     )}
-                    onClick={() => setActiveMeeting(meeting.id)}
+                    onClick={(e) => handleMeetingClick(e, meeting.id)}
                   >
-                    <div className="flex items-center justify-between gap-2">
+                    {isSelected && (
+                      <CheckSquare className="absolute left-1 top-2 w-3.5 h-3.5 text-primary" />
+                    )}
+                    <div className={cn('flex items-center justify-between gap-2', isSelected && 'ml-4')}>
                       <span className="text-sm font-medium truncate flex-1">
                         {meeting.title || t('untitledMeeting')}
                       </span>
                       <StatusBadge status={meeting.status} />
                     </div>
-                    <div className="flex items-center gap-1.5 mt-1">
+                    <div className={cn('flex items-center gap-1.5 mt-1', isSelected && 'ml-4')}>
                       <span className="text-xs text-muted-foreground">
                         {formatTime(meeting.createdAt)}
                       </span>
-                      {/* 关联客户的会议显示客户名小徽章（客户未加载/已删除时不显示） */}
                       {meeting.customerId &&
                         customerNameMap.get(meeting.customerId) && (
                           <Badge
@@ -365,7 +461,12 @@ export function MeetingList() {
                   <ContextMenuItem onClick={() => setActiveMeeting(meeting.id)}>
                     查看会议
                   </ContextMenuItem>
-                  {/* 归类到客户知识库：已出纪要但未关联客户时可用（与会议结果页同一对话框） */}
+                  {/* 批量选择 */}
+                  <ContextMenuItem onClick={() => toggleMeetingSelection(meeting.id)}>
+                    <CheckSquare className="w-4 h-4 mr-2" />
+                    {isSelected ? t('deselect') : t('select')}
+                  </ContextMenuItem>
+                  {/* 归类到客户知识库：已出纪要但未关联客户时可用 */}
                   {meeting.summary && !meeting.customerId && (
                     <ContextMenuItem onClick={() => setClassifyTarget(meeting)}>
                       <FolderInput className="w-4 h-4 mr-2" />
@@ -381,7 +482,8 @@ export function MeetingList() {
                   </ContextMenuItem>
                 </ContextMenuContent>
               </ContextMenu>
-            ))}
+              )
+            })}
           </div>
         )}
       </ScrollArea>
@@ -416,6 +518,27 @@ export function MeetingList() {
                 if (deleteTargetId) deleteMeeting(deleteTargetId)
                 setDeleteTargetId(null)
               }}
+            >
+              {t('delete')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 批量删除确认对话框 */}
+      <AlertDialog open={batchDeleteOpen} onOpenChange={setBatchDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('batchDeleteConfirmTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('batchDeleteConfirmDesc', { count: selectedMeetingIds.length })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleBatchDelete}
             >
               {t('delete')}
             </AlertDialogAction>

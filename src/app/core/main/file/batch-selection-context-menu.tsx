@@ -7,10 +7,13 @@ import {
 import { Kbd } from "@/components/ui/kbd"
 import { toast } from "@/hooks/use-toast"
 import useClipboardStore from "@/stores/clipboard"
-import { Copy, File, Trash2 } from "lucide-react"
+import { Copy, File, Trash2, FileDown } from "lucide-react"
 import { useTranslations } from "next-intl"
 import type { FileSelectionEntry } from "./file-selection"
 import { toClipboardItems } from "./file-selection"
+import { open } from "@tauri-apps/plugin-dialog"
+import { readTextFile, writeFile } from "@tauri-apps/plugin-fs"
+import { checkIsTauri } from "@/lib/check"
 
 interface BatchSelectionContextMenuProps {
   entries: FileSelectionEntry[]
@@ -44,6 +47,34 @@ export function BatchSelectionContextMenu({
     window.dispatchEvent(new CustomEvent('filemanager-delete-selection'))
   }
 
+  async function handleExportSelected() {
+    if (!checkIsTauri()) return
+    // 只导出本地文件（不含目录和远程文件）
+    const files = entries.filter((e) => e.isFile && e.isLocale)
+    if (files.length === 0) {
+      toast({ description: '无可导出的本地文件' })
+      return
+    }
+    const dir = await open({ directory: true, title: '选择导出目录' })
+    if (!dir) return
+    let count = 0
+    for (const entry of files) {
+      try {
+        const content = await readTextFile(entry.path)
+        const safeName = entry.name.replace(/[\\/:*?"<>|]/g, '_')
+        const filePath = `${dir}/${safeName}`.replace(/[\\/]+/g, '/')
+        const encoder = new TextEncoder()
+        await writeFile(filePath, encoder.encode(content))
+        count++
+      } catch (err) {
+        console.error(`[BatchExport] 导出失败: ${entry.name}`, err)
+      }
+    }
+    if (count > 0) {
+      toast({ description: `已导出 ${count} 个文件` })
+    }
+  }
+
   return (
     <>
       <ContextMenuLabel menuType="file">
@@ -63,6 +94,10 @@ export function BatchSelectionContextMenu({
         <ContextMenuShortcut menuType="file">
           <Kbd>{modKey}C</Kbd>
         </ContextMenuShortcut>
+      </ContextMenuItem>
+      <ContextMenuItem inset disabled={!allLocal} onClick={handleExportSelected} menuType="file">
+        <FileDown className="mr-2 h-4 w-4" />
+        批量导出
       </ContextMenuItem>
       <ContextMenuSeparator />
       <ContextMenuItem

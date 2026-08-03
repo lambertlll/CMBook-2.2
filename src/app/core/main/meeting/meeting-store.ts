@@ -56,12 +56,18 @@ interface MeetingStoreState {
   recordingMeetingId: string | null // 当前正在录音的会议
   initialized: boolean
 
+  // 批量选择
+  selectedMeetingIds: string[]
+  toggleMeetingSelection: (id: string) => void
+  clearSelectedMeetingIds: () => void
+
   // Actions
   loadMeetings: () => Promise<void>
   createMeeting: (options?: CreateMeetingOptions) => string // 返回新会议 ID
   setActiveMeeting: (id: string | null) => void
   updateMeeting: (id: string, updates: Partial<Meeting>) => void
   deleteMeeting: (id: string) => void
+  deleteMeetings: (ids: string[]) => void // 批量删除
   setMeetingError: (id: string, message: string) => void // 记录失败并回退到可重试状态
   getActiveMeeting: () => Meeting | undefined
   getRecordingMeeting: () => Meeting | undefined
@@ -259,6 +265,19 @@ export const useMeetingStore = create<MeetingStoreState>((set, get) => ({
   recordingMeetingId: null,
   initialized: false,
 
+  selectedMeetingIds: [],
+  toggleMeetingSelection: (id) => {
+    set((state) => {
+      const exists = state.selectedMeetingIds.includes(id)
+      return {
+        selectedMeetingIds: exists
+          ? state.selectedMeetingIds.filter((mid) => mid !== id)
+          : [...state.selectedMeetingIds, id]
+      }
+    })
+  },
+  clearSelectedMeetingIds: () => set({ selectedMeetingIds: [] }),
+
   loadMeetings: async () => {
     try {
       // 列表只加载元数据，大字段在查看会议时按需加载
@@ -418,6 +437,47 @@ export const useMeetingStore = create<MeetingStoreState>((set, get) => ({
     deleteMeetingRecord(id).catch((err) => {
       console.error('[MeetingStore] 删除会议失败:', err)
     })
+  },
+
+  deleteMeetings: (ids) => {
+    const idSet = new Set(ids)
+    const meetingsToDelete = get().meetings.filter((m) => idSet.has(m.id))
+
+    // 更新内存状态
+    set((state) => ({
+      meetings: state.meetings.filter((m) => !idSet.has(m.id)),
+      activeMeetingId: idSet.has(state.activeMeetingId || '') ? null : state.activeMeetingId,
+      recordingMeetingId: idSet.has(state.recordingMeetingId || '') ? null : state.recordingMeetingId,
+      selectedMeetingIds: [],
+    }))
+
+    // 逐个清理：挂起保存、音频文件、导出文件、数据库记录
+    for (const meeting of meetingsToDelete) {
+      const id = meeting.id
+      const timer = saveTimers.get(id)
+      if (timer) clearTimeout(timer)
+      saveTimers.delete(id)
+      pendingFields.delete(id)
+      insertPromises.delete(id)
+      loadedDetails.delete(id)
+
+      removeMeetingAudio(id, meeting.audioPath || undefined, meeting.audioSegments).catch((err) => {
+        console.error('[MeetingStore] 批量删除-音频文件失败:', err)
+      })
+
+      if (meeting.exportedFilePath) {
+        const exportedPath = meeting.exportedFilePath
+        import('./meeting-customer-export')
+          .then((m) => m.removeMeetingCustomerExport(exportedPath))
+          .catch((err) => {
+            console.error('[MeetingStore] 批量删除-导出文件失败:', err)
+          })
+      }
+
+      deleteMeetingRecord(id).catch((err) => {
+        console.error('[MeetingStore] 批量删除-数据库失败:', err)
+      })
+    }
   },
 
   setMeetingError: (id, message) => {
