@@ -2459,6 +2459,7 @@
           "loading": "Loading..."
         },
         "clearChat": "Clear chat",
+        "clearChatConfirm": "Are you sure you want to clear all conversations in the current tag? This cannot be undone.",
         "clearContext": {
           "tooltip": "Clear context"
         }
@@ -3583,6 +3584,8 @@
     "savedAsNote": "Saved as note",
     "searchMeetings": "Search meetings...",
     "noSearchResults": "No matching results",
+    "loadFailed": "Failed to load meeting list",
+    "retry": "Retry",
     "deleteMeeting": "Delete meeting",
     "deleteConfirmTitle": "Confirm Deletion",
     "deleteConfirmDesc": "This action cannot be undone. Are you sure you want to delete this meeting?",

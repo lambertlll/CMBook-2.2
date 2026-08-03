@@ -58,6 +58,8 @@ interface MeetingStoreState {
   activeMeetingId: string | null // 当前查看的会议
   recordingMeetingId: string | null // 当前正在录音的会议
   initialized: boolean
+  /** 列表加载失败时的错误信息（未失败为 null），用于 UI 区分"加载失败"与"确实无数据" */
+  loadError: string | null
 
   // 批量选择
   selectedMeetingIds: string[]
@@ -267,6 +269,7 @@ export const useMeetingStore = create<MeetingStoreState>((set, get) => ({
   activeMeetingId: null,
   recordingMeetingId: null,
   initialized: false,
+  loadError: null,
 
   selectedMeetingIds: [],
   toggleMeetingSelection: (id) => {
@@ -302,10 +305,13 @@ export const useMeetingStore = create<MeetingStoreState>((set, get) => ({
         }
         return m
       })
-      set({ meetings: restored, initialized: true })
+      set({ meetings: restored, initialized: true, loadError: null })
     } catch (err) {
       console.error('[MeetingStore] 加载会议数据失败:', err)
-      set({ initialized: true })
+      set({
+        initialized: true,
+        loadError: err instanceof Error ? err.message : '加载会议列表失败',
+      })
     }
   },
 

@@ -25,7 +25,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
-import { Plus, Mic, Search, Users, AlertTriangle, FolderInput, Trash2, FileDown, X, CheckSquare } from 'lucide-react'
+import { Plus, Mic, Search, Users, AlertTriangle, AlertCircle, RefreshCw, FolderInput, Trash2, FileDown, X, CheckSquare } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import { toast } from '@/hooks/use-toast'
@@ -115,6 +115,7 @@ export function MeetingList() {
   const updateMeeting = useMeetingStore((s) => s.updateMeeting)
   const recordingMeetingId = useMeetingStore((s) => s.recordingMeetingId)
   const initialized = useMeetingStore((s) => s.initialized)
+  const loadError = useMeetingStore((s) => s.loadError)
   // 批量选择
   const selectedMeetingIds = useMeetingStore((s) => s.selectedMeetingIds)
   const toggleMeetingSelection = useMeetingStore((s) => s.toggleMeetingSelection)
@@ -401,7 +402,16 @@ export function MeetingList() {
 
       {/* Meeting list */}
       <ScrollArea className="flex-1">
-        {meetings.length === 0 ? (
+        {loadError ? (
+          <div className="flex flex-col items-center justify-center p-6 text-center">
+            <AlertCircle className="w-8 h-8 text-destructive/60 mb-2" />
+            <p className="text-sm text-destructive">{t('loadFailed')}</p>
+            <Button variant="outline" size="sm" className="mt-3" onClick={() => loadMeetings()}>
+              <RefreshCw className="w-3.5 h-3.5 mr-1" />
+              {t('retry')}
+            </Button>
+          </div>
+        ) : meetings.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-6 text-center">
             <Mic className="w-8 h-8 text-muted-foreground/50 mb-2" />
             <p className="text-sm text-muted-foreground">

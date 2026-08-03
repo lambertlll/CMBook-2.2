@@ -2374,6 +2374,7 @@
           "loading": "加载中..."
         },
         "clearChat": "清空对话",
+        "clearChatConfirm": "确定要清空当前标签下的全部对话吗？此操作不可撤销。",
         "clearContext": {
           "tooltip": "清除上下文"
         }
@@ -3583,6 +3584,8 @@
     "savedAsNote": "已保存为笔记",
     "searchMeetings": "搜索会议...",
     "noSearchResults": "无匹配结果",
+    "loadFailed": "会议列表加载失败",
+    "retry": "重试",
     "deleteMeeting": "删除会议",
     "deleteConfirmTitle": "确认删除",
     "deleteConfirmDesc": "删除后无法恢复，确认要删除这个会议吗？",
