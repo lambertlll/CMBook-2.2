@@ -34,6 +34,10 @@ export default function RootLayout({
               检测到不兼容的 WKWebView 时替换页面为升级提示，避免白屏。 */}
           {/* eslint-disable-next-line @next/next/no-sync-scripts -- 必须同步阻塞执行，确保在应用 JS 之前完成检测 */}
           <script src="/browser-check.js" />
+          {/* 首帧主题初始化：默认「东方纸韵」(paper)，同步设置 data-theme 避免首屏闪烁；
+              用户持久化的其他主题由 ui-theme store 启动时异步覆盖 */}
+          {/* eslint-disable-next-line @next/next/no-sync-scripts -- 必须在任何应用 JS 前同步应用主题 */}
+          <script src="/theme-init.js" />
           {/* Define isSpace function globally to fix markdown-it issues with Next.js + Turbopack
           https://github.com/markdown-it/markdown-it/issues/1082#issuecomment-2749656365 */}
           <Script id="markdown-it-fix" strategy="beforeInteractive">

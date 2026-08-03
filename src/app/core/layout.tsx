@@ -277,6 +277,9 @@ export default function RootLayout({
 
     const initializeApp = async () => {
       try {
+        // 界面主题（2.1）：置于初始化链最前，避免等待 DB/skills 等耗时初始化
+        // 导致首屏先以 classic 渲染、后跳变为纸韵的闪烁
+        await useUiThemeStore.getState().initUiTheme()
         await initSettingData()
         initMainHosting()
 
@@ -304,8 +307,6 @@ export default function RootLayout({
 
         initShowWindow()
         initMcp()
-        // 界面主题（2.1）：尽早应用 data-theme，避免首屏闪烁
-        useUiThemeStore.getState().initUiTheme()
         // 待办到期系统提醒（B2-7）：设置与数据库就绪后启动，启动即检查一次，之后每 6 小时复查
         initTodoNotifyScheduler()
       } catch (error) {
