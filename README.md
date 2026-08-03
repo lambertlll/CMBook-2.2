@@ -2,7 +2,7 @@
   <h1>CMBook（招本）</h1>
   <p><strong>招本，记录招行智慧 —— 录音 + 笔记 → AI 智能纪要，一站式客户会议管理工具</strong></p>
   <p>
-    <img alt="Version" src="https://img.shields.io/badge/version-2.7.0-0f766e?style=flat-square">
+    <img alt="Version" src="https://img.shields.io/badge/version-2.8.0-0f766e?style=flat-square">
     <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-ffc131?style=flat-square&logo=tauri&logoColor=111111">
     <img alt="Next.js 15" src="https://img.shields.io/badge/Next.js-15-000000?style=flat-square&logo=nextdotjs&logoColor=white">
     <img alt="React 19" src="https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react&logoColor=111111">
