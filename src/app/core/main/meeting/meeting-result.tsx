@@ -1307,8 +1307,10 @@ export function MeetingResult({ meeting }: MeetingResultProps) {
         const tabLabel =
           activeTab === 'notes' ? '手记' : activeTab === 'transcript' ? '转录' : '纪要'
         const safeTitle = (meeting.title || '会议').replace(/[\\/:*?"<>|]/g, '_').slice(0, 20)
-        // 文件名带 __ai_ 前缀避免与用户文件冲突，displayName 给用户友好显示
-        const fileName = `__ai_${safeTitle}-${tabLabel}.md`
+        // 写入 .ai-tmp/ 隐藏子目录：文件树过滤点开头目录（files.ts:57），避免污染用户笔记列表；
+        // chat-send 读取时 getFilePathOptions 能正确解析到 article/.ai-tmp/（默认工作区）
+        const relDir = '.ai-tmp'
+        const fileName = `${relDir}/__ai_${safeTitle}-${tabLabel}.md`
         const displayName = `${meeting.title || '会议'}（${tabLabel}）.md`
         const workspace = await getWorkspacePath()
         const pathOptions = await getFilePathOptions(fileName)
@@ -1318,7 +1320,7 @@ export function MeetingResult({ meeting }: MeetingResultProps) {
           await writeTextFile(pathOptions.path, content, { baseDir: pathOptions.baseDir })
         }
 
-        // path 传相对文件名（默认工作区 chat-send 读取时 getFilePathOptions 会拼 article/ 前缀），
+        // path 传相对路径（默认工作区 chat-send 读取时 getFilePathOptions 会拼 article/ 前缀），
         // custom 工作区传绝对路径——避免 article/article/x.md 路径重复
         const linkedFile: MarkdownFile = {
           name: displayName,
