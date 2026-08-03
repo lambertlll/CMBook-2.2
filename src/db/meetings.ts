@@ -236,11 +236,13 @@ export async function deleteMeetingRecord(id: string) {
 
 /**
  * 清空某客户名下所有会议的客户/拜访关联（删除客户时级联调用，会议本身保留）
+ * 同时清空 exportedFilePath：客户知识库文件夹与其向量索引已随客户删除，
+ * 会议上的导出路径引用必须清空，避免"文件在、索引无"的悬空引用
  */
 export async function clearMeetingCustomerLink(customerId: string) {
   const db = await getDb()
   await db.execute(
-    `UPDATE meetings SET customerId = '', visitId = '', updatedAt = $2 WHERE customerId = $1`,
+    `UPDATE meetings SET customerId = '', visitId = '', exportedFilePath = '', updatedAt = $2 WHERE customerId = $1`,
     [customerId, Date.now()]
   )
 }

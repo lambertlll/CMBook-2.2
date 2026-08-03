@@ -239,3 +239,14 @@ export async function deleteVisitsByCustomer(customerId: string) {
   const db = await getDb()
   await db.execute('DELETE FROM visits WHERE customerId = $1', [customerId])
 }
+
+/**
+ * 清空某会议在拜访记录中的关联（删除会议时调用，避免悬空 meetingId 引用）
+ */
+export async function clearVisitMeetingLink(meetingId: string) {
+  const db = await getDb()
+  await db.execute(
+    'UPDATE visits SET meetingId = $1, updatedAt = $2 WHERE meetingId = $3',
+    ['', Date.now(), meetingId]
+  )
+}

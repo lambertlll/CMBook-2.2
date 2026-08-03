@@ -459,3 +459,11 @@ export async function deleteVisitTodosByCustomer(customerId: string) {
   const db = await getDb()
   await db.execute('DELETE FROM visit_todos WHERE customerId = $1', [customerId])
 }
+
+/**
+ * 删除某会议产生的全部待办（删除会议时级联清理，避免待办面板残留"幽灵待办"）
+ */
+export async function deleteVisitTodosByMeeting(meetingId: string) {
+  const db = await getDb()
+  await db.execute('DELETE FROM visit_todos WHERE meetingId = $1', [meetingId])
+}

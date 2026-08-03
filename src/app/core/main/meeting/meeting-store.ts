@@ -9,6 +9,9 @@ import {
   type MeetingListRecord,
 } from '@/db/meetings'
 import { removeMeetingAudio } from './meeting-save-audio'
+import { deleteVisitTodosByMeeting } from '@/db/visit-todos'
+import { clearVisitMeetingLink } from '@/db/visits'
+import { destroyRecorder } from './meeting-recorder-manager'
 
 export type MeetingStatus =
   | 'idle'
@@ -410,6 +413,13 @@ export const useMeetingStore = create<MeetingStoreState>((set, get) => ({
       }
     })
 
+    // 删除正在录音的会议：销毁录音器，停止麦克风采集与 .part 分片落盘
+    // （record 状态或暂停状态都属于活跃录音）
+    const wasRecording = meeting?.status === 'recording' || meeting?.status === 'paused'
+    if (wasRecording) {
+      destroyRecorder()
+    }
+
     // 清理挂起的保存任务与缓存条目
     const timer = saveTimers.get(id)
     if (timer) clearTimeout(timer)
@@ -417,6 +427,15 @@ export const useMeetingStore = create<MeetingStoreState>((set, get) => ({
     pendingFields.delete(id)
     insertPromises.delete(id)
     loadedDetails.delete(id)
+
+    // 级联删除该会议产生的待办（避免待办面板残留"幽灵待办"）
+    deleteVisitTodosByMeeting(id).catch((err) => {
+      console.error('[MeetingStore] 删除会议待办失败:', err)
+    })
+    // 清空拜访记录中对该会议的悬空引用
+    clearVisitMeetingLink(id).catch((err) => {
+      console.error('[MeetingStore] 清理拜访会议关联失败:', err)
+    })
 
     // 删除本地音频文件（含续录的多段，兼容多种扩展名及旧版 .wav）
     removeMeetingAudio(id, meeting?.audioPath || undefined, meeting?.audioSegments).catch((err) => {
@@ -451,7 +470,12 @@ export const useMeetingStore = create<MeetingStoreState>((set, get) => ({
       selectedMeetingIds: [],
     }))
 
-    // 逐个清理：挂起保存、音频文件、导出文件、数据库记录
+    // 若批量删除包含正在录音的会议，销毁录音器
+    if (meetingsToDelete.some((m) => m.status === 'recording' || m.status === 'paused')) {
+      destroyRecorder()
+    }
+
+    // 逐个清理：挂起保存、音频文件、导出文件、待办、拜访关联、数据库记录
     for (const meeting of meetingsToDelete) {
       const id = meeting.id
       const timer = saveTimers.get(id)
@@ -460,6 +484,14 @@ export const useMeetingStore = create<MeetingStoreState>((set, get) => ({
       pendingFields.delete(id)
       insertPromises.delete(id)
       loadedDetails.delete(id)
+
+      // 级联删除该会议产生的待办与拜访关联
+      deleteVisitTodosByMeeting(id).catch((err) => {
+        console.error('[MeetingStore] 批量删除-待办失败:', err)
+      })
+      clearVisitMeetingLink(id).catch((err) => {
+        console.error('[MeetingStore] 批量删除-拜访关联失败:', err)
+      })
 
       removeMeetingAudio(id, meeting.audioPath || undefined, meeting.audioSegments).catch((err) => {
         console.error('[MeetingStore] 批量删除-音频文件失败:', err)

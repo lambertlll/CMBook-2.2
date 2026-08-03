@@ -184,6 +184,18 @@ export const useCustomerStore = create<CustomerStoreState>((set, get) => ({
       await deleteCustomerRecord(id)
       // 同步剔除待办面板中该客户的条目，避免面板残留已删客户的待办
       useVisitTodosStore.getState().dropTodosByCustomer(id)
+      // 同步内存态的会议关联：清空 customerId/visitId/exportedFilePath（与 DB 侧一致，
+      // 避免已渲染的会议仍显示"已同步到客户知识库"或保留失效的导出路径）
+      const meetingStore = useMeetingStore.getState()
+      for (const m of meetingStore.meetings) {
+        if (m.customerId === id) {
+          meetingStore.updateMeeting(m.id, {
+            customerId: '',
+            visitId: '',
+            exportedFilePath: '',
+          })
+        }
+      }
     } catch (err) {
       // 失败回滚快照，由调用方提示
       set(snapshot)
