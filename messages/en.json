@@ -2537,7 +2537,7 @@
     "noResults": "No search results",
     "tryDifferentKeywords": "Try using different keywords",
     "item": {
-      "record": "Record",
+      "record": "Notes",
       "article": "Article",
       "matches": "{count} matches",
       "scanType": "scan"
@@ -3688,7 +3688,11 @@
     "syncKnowledgeSuccess": "Synced to customer knowledge base",
     "syncKnowledgeFailed": "Sync failed, please try again",
     "exportWord": "Export Word",
-    "exportedWord": "Exported Word"
+    "exportedWord": "Exported Word",
+    "askAI": "Ask AI",
+    "askAIPrompt": "Please analyze the following meeting content and summarize key points and action items:",
+    "addedToChat": "Added to AI chat",
+    "noContentToAnalyze": "Content is empty, nothing to analyze"
   },
   "customer": {
     "postvisitTodoEmptyCoach": "Once the visit summary is generated, todos will appear here automatically",

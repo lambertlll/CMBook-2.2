@@ -77,6 +77,9 @@ import { useSidebarStore } from '@/stores/sidebar'
 import { getFilePathOptions, getWorkspacePath } from '@/lib/workspace'
 import { writeTextFile } from '@tauri-apps/plugin-fs'
 import { exportMarkdownToWord } from '@/lib/export-word'
+import emitter from '@/lib/emitter'
+import useChatStore from '@/stores/chat'
+import type { MarkdownFile } from '@/lib/files'
 // 复用主编辑器的排版样式（.tiptap-editor），替换未生效的 prose 类（项目无 typography 插件）
 import '../editor/markdown/style.css'
 
@@ -1286,6 +1289,63 @@ export function MeetingResult({ meeting }: MeetingResultProps) {
   }, [meeting.summary, meeting.title, meeting.createdAt, t])
 
   /**
+   * 对 AI 分析：将当前 tab 内容（手动笔记 / 录音转录 / AI 纪要）写入临时 md 文件，
+   * 作为关联文件注入右侧 AI 对话，展开聊天面板并预填提示词。
+   * 复用 handleSaveAsNote 的文件写入 + askWithCustomerKnowledge 的关联注入模式。
+   */
+  const handleAskAI = useCallback(async () => {
+    const content = getContentForTab()
+    if (!content.trim()) {
+      toast({ description: t('noContentToAnalyze'), variant: 'destructive' })
+      return
+    }
+
+    try {
+      // 写入临时 md 文件到工作区（关联文件形态，AI 对话发送时读全文入上下文）
+      // 固定命名（会议+tab，无日期）：同一会议同一 tab 反复分析覆盖同一文件，避免堆积
+      const tabLabel =
+        activeTab === 'notes' ? '手记' : activeTab === 'transcript' ? '转录' : '纪要'
+      const safeTitle = (meeting.title || '会议').replace(/[\\/:*?"<>|]/g, '_').slice(0, 20)
+      const fileName = `__ai_${safeTitle}-${tabLabel}.md`
+      const workspace = await getWorkspacePath()
+      const pathOptions = await getFilePathOptions(fileName)
+      if (workspace.isCustom) {
+        await writeTextFile(pathOptions.path, content)
+      } else {
+        await writeTextFile(pathOptions.path, content, { baseDir: pathOptions.baseDir })
+      }
+
+      // 构造关联文件（与 chat-input 的 fileSelected 监听类型一致）
+      // 注意：path 传相对文件名（自定义工作区为完整绝对路径），chat-send 读取时
+      // 会通过 getFilePathOptions 重新解析（默认工作区会拼上 article/ 前缀）
+      const linkedFile: MarkdownFile = {
+        name: fileName,
+        path: workspace.isCustom ? pathOptions.path : fileName,
+        relativePath: workspace.isCustom
+          ? `${workspace.path}/${fileName}`
+          : fileName,
+      }
+
+      // 右侧聊天面板可能被收起，确保展开
+      const sidebar = useSidebarStore.getState()
+      if (!sidebar.rightSidebarVisible) {
+        await sidebar.toggleRightSidebar()
+      }
+
+      // 与 chat-input 的 fileSelected 监听保持一致：本地 state + chat store 双写
+      useChatStore.getState().setLinkedResource(linkedFile)
+      emitter.emit('fileSelected', linkedFile)
+      // 预填提示词并聚焦输入框
+      emitter.emit('quick-prompt-insert', t('askAIPrompt'))
+
+      toast({ description: t('addedToChat') })
+    } catch (error) {
+      console.error('Ask AI failed:', error)
+      toast({ description: '加入 AI 对话失败，请重试', variant: 'destructive' })
+    }
+  }, [getContentForTab, activeTab, meeting.title, t])
+
+  /**
    * 自动识别客户并归类（纪要生成成功且未关联客户时后台触发，不阻塞主流程）：
    * 识别中/失败均静默（不写错误状态），仅成功时 toast；失败/无法判断时保留手动归类按钮。
    * 防重复：仅 customerId 为空时触发；同一会议同时只跑一轮（inFlight 去重）；
@@ -1758,6 +1818,11 @@ export function MeetingResult({ meeting }: MeetingResultProps) {
           </Button>
         )}
         <span className="mx-1 h-5 w-px bg-border" aria-hidden />
+        {/* 对AI分析：将当前 tab 内容（手记/转录/纪要）作为关联文件注入右侧 AI 对话 */}
+        <Button variant="outline" size="sm" onClick={handleAskAI}>
+          <Sparkles className="w-4 h-4 mr-1" />
+          {t('askAI')}
+        </Button>
         <Button variant="outline" size="sm" onClick={handleCopy}>
           {copied ? (
             <Check className="w-4 h-4 mr-1" />
