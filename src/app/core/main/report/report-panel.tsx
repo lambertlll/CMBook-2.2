@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Loader2, Save, Check, PenLine, Eye } from 'lucide-react'
 import { useReportStore, formatWeekRange, formatWeekLabel } from './report-store'
 import { MarkdownToolbar } from './markdown-toolbar'
+import { ReportSelectionMenu } from './report-selection-menu'
 import emitter from '@/lib/emitter'
 import useChatStore from '@/stores/chat'
 import { getFilePathOptions, getWorkspacePath } from '@/lib/workspace'
@@ -45,6 +46,7 @@ export function ReportPanel() {
   const [htmlContent, setHtmlContent] = useState('')
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const editorContainerRef = useRef<HTMLDivElement>(null)
 
   // 同步 store 内容到本地编辑状态（切换周报时）
   useEffect(() => {
@@ -53,34 +55,50 @@ export function ReportPanel() {
     setDirty(false)
   }, [currentReport?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 选中文字 AI 改写：指令询问 + 调 LLM 改写（reportModel 优先，回退 primaryModel）
-  const [aiProcessing, setAiProcessing] = useState(false)
-  const handleAskAI = useCallback(async (selectedText: string): Promise<string | null> => {
-    if (aiProcessing) return null
-    const instruction = window.prompt('输入修改指令（如：更简洁、更正式、扩充细节）：')
-    if (instruction === null) return null
-    if (!instruction.trim()) {
-      alert('请输入修改指令')
-      return null
-    }
-    setAiProcessing(true)
-    try {
-      const { rewriteReportSelection } = await import('./report-generator')
-      const weekLabel = formatWeekLabel(currentWeekStart)
-      const result = await rewriteReportSelection({
-        selectedText,
-        instruction: instruction.trim(),
-        weekLabel,
+  // 选中文字 → 右侧 AI 对话（与笔记 tiptap syncEditorSelectionQuote 同机制）：
+  // textarea 选区变化时构造 PendingQuote 写入 chat store，AI 对话输入框上方出现引用卡片
+  useEffect(() => {
+    const textarea = textareaRef.current
+    if (!textarea) return
+
+    const syncSelectionQuote = () => {
+      const { selectionStart, selectionEnd } = textarea
+      if (selectionStart === selectionEnd) {
+        useChatStore.getState().setEditorSelectionQuote(null)
+        return
+      }
+      const quote = localContent.substring(selectionStart, selectionEnd)
+      if (!quote.trim()) {
+        useChatStore.getState().setEditorSelectionQuote(null)
+        return
+      }
+      const beforeFrom = localContent.substring(0, selectionStart)
+      const startLine = (beforeFrom.match(/\n/g)?.length || 0) + 1
+      const beforeTo = localContent.substring(0, selectionEnd)
+      const endLine = (beforeTo.match(/\n/g)?.length || 0) + 1
+
+      useChatStore.getState().setEditorSelectionQuote({
+        quote,
+        fullContent: quote,
+        fileName: formatWeekLabel(currentWeekStart) || '周报',
+        startLine,
+        endLine,
+        from: selectionStart,
+        to: selectionEnd,
+        articlePath: currentReport?.id || '',
       })
-      return result || null
-    } catch (err) {
-      console.error('[ReportPanel] AI 改写失败:', err)
-      alert(err instanceof Error ? err.message : 'AI 改写失败，请重试')
-      return null
-    } finally {
-      setAiProcessing(false)
     }
-  }, [aiProcessing, currentWeekStart])
+
+    textarea.addEventListener('selectionchange', syncSelectionQuote)
+    // mouseup/click 兜底（selectionchange 在部分浏览器对 textarea 不触发）
+    textarea.addEventListener('mouseup', syncSelectionQuote)
+    textarea.addEventListener('keyup', syncSelectionQuote)
+    return () => {
+      textarea.removeEventListener('selectionchange', syncSelectionQuote)
+      textarea.removeEventListener('mouseup', syncSelectionQuote)
+      textarea.removeEventListener('keyup', syncSelectionQuote)
+    }
+  }, [localContent, currentReport?.id, currentWeekStart])
 
   // AI 生成完成后，同步最终内容到本地编辑状态
   // markGenerated 更新了 currentReport.content 但 id 不变，上面的 effect 不会触发
@@ -137,6 +155,44 @@ export function ReportPanel() {
     setSaved(false)
     scheduleSave(value)
   }
+
+  // 选中文字 AI 改写（与笔记/会议一致：预设指令直接执行）：调用 rewriteReportSelection 调 LLM，
+  // 返回改写结果由调用方（选区浮层/工具栏）负责原位替换
+  const [aiProcessing, setAiProcessing] = useState(false)
+  const handleAskAI = useCallback(async (instruction: string): Promise<string | null> => {
+    if (aiProcessing) return null
+    const textarea = textareaRef.current
+    if (!textarea) return null
+    const { selectionStart: start, selectionEnd: end } = textarea
+    if (start === end) return null
+    const selectedText = localContent.substring(start, end)
+    if (!selectedText.trim()) return null
+
+    setAiProcessing(true)
+    try {
+      const { rewriteReportSelection } = await import('./report-generator')
+      const weekLabel = formatWeekLabel(currentWeekStart)
+      const result = await rewriteReportSelection({
+        selectedText,
+        instruction,
+        weekLabel,
+      })
+      if (result && result !== selectedText) {
+        handleContentChange(localContent.substring(0, start) + result + localContent.substring(end))
+        requestAnimationFrame(() => {
+          textarea.focus()
+          textarea.setSelectionRange(start, start + result.length)
+        })
+      }
+      return result || null
+    } catch (err) {
+      console.error('[ReportPanel] AI 改写失败:', err)
+      alert(err instanceof Error ? err.message : 'AI 改写失败，请重试')
+      return null
+    } finally {
+      setAiProcessing(false)
+    }
+  }, [aiProcessing, currentWeekStart, localContent, handleContentChange])
 
   /**
    * 自动关联当前周报到右侧 AI 对话（与笔记 activeFilePath / 会议 meeting.id 选中体验一致）：
@@ -255,13 +311,22 @@ export function ReportPanel() {
         {mode === 'edit' && !generating ? (
           <div className="flex h-full flex-col">
             <MarkdownToolbar textareaRef={textareaRef} value={localContent} onChange={handleContentChange} onAskAI={handleAskAI} aiProcessing={aiProcessing} />
-            <Textarea
-              ref={textareaRef}
-              value={localContent}
-              onChange={(e) => handleContentChange(e.target.value)}
-              placeholder={t('editPlaceholder')}
-              className="h-full w-full flex-1 resize-none rounded-none border-0 text-base leading-relaxed focus-visible:ring-0"
-            />
+            {/* 编辑区容器（position: relative 供选区浮层定位） */}
+            <div ref={editorContainerRef} className="relative min-h-0 flex-1">
+              <Textarea
+                ref={textareaRef}
+                value={localContent}
+                onChange={(e) => handleContentChange(e.target.value)}
+                placeholder={t('editPlaceholder')}
+                className="h-full w-full flex-1 resize-none rounded-none border-0 text-base leading-relaxed focus-visible:ring-0"
+              />
+              <ReportSelectionMenu
+                textareaRef={textareaRef}
+                onApply={handleAskAI}
+                processing={aiProcessing}
+                containerRef={editorContainerRef}
+              />
+            </div>
           </div>
         ) : (
           <ScrollArea className="h-full">

@@ -7,16 +7,30 @@
 import {
   Bold, Italic, Strikethrough, Heading1, Heading2, Heading3,
   List, ListOrdered, ListTodo, Quote, Code2, Table, Minus, Undo, Redo,
-  Sparkles, Loader2,
+  Sparkles, Loader2, Languages, ChevronRight,
 } from 'lucide-react'
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
+import { cn } from '@/lib/utils'
+
+// 常用翻译语言（与笔记/会议编辑器对齐）
+const POPULAR_LANGUAGES = [
+  { name: 'English', code: '英语' },
+  { name: '日本語', code: '日语' },
+  { name: '한국어', code: '韩语' },
+  { name: 'Français', code: '法语' },
+  { name: 'Deutsch', code: '德语' },
+  { name: 'Español', code: '西班牙语' },
+  { name: 'Português', code: '葡萄牙语' },
+  { name: 'Русский', code: '俄语' },
+  { name: 'العربية', code: '阿拉伯语' },
+]
 
 interface MarkdownToolbarProps {
   textareaRef: React.RefObject<HTMLTextAreaElement | null>
   value: string
   onChange: (value: string) => void
-  /** 选中文字 AI 改写：调用方负责指令询问、LLM 调用并返回改写后的文字 */
-  onAskAI?: (selectedText: string) => Promise<string | null>
+  /** AI 改写：传入修改指令，调用方读取选区、调 LLM、替换选区（返回是否成功） */
+  onAskAI?: (instruction: string) => Promise<string | null>
   /** AI 改写进行中状态（用于按钮 loading 与禁用） */
   aiProcessing?: boolean
 }
@@ -33,17 +47,20 @@ function ToolbarButton({
   onClick,
   title,
   children,
+  disabled,
 }: {
   onClick: () => void
   title: string
   children: React.ReactNode
+  disabled?: boolean
 }) {
   return (
     <button
       type="button"
-      className="inline-flex items-center justify-center rounded-sm h-7 w-7 text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+      className="inline-flex items-center justify-center rounded-sm h-7 w-7 text-sm transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-50 disabled:pointer-events-none"
       onClick={onClick}
       title={title}
+      disabled={disabled}
     >
       {children}
     </button>
@@ -55,6 +72,35 @@ const Separator = () => <div className="h-5 w-px bg-border mx-1" />
 export function MarkdownToolbar({ textareaRef, value, onChange, onAskAI, aiProcessing }: MarkdownToolbarProps) {
   const historyRef = useRef<string[]>([value])
   const historyIdx = useRef(0)
+  const [showAiMenu, setShowAiMenu] = useState(false)
+  const [showTranslateMenu, setShowTranslateMenu] = useState(false)
+  const [customInstruction, setCustomInstruction] = useState('')
+  const [customTranslateLang, setCustomTranslateLang] = useState('')
+
+  // 选区 AI 改写：读选区 → 调 onAskAI → 成功则替换选区（含历史记录）
+  const runAi = (instruction: string) => {
+    const textarea = textareaRef.current
+    if (!textarea || !onAskAI) return
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const selectedText = value.substring(start, end)
+    if (!selectedText.trim()) {
+      textarea.focus()
+      alert('请先选中要改写的文字')
+      return
+    }
+    void (async () => {
+      const result = await onAskAI(instruction)
+      if (!result || result === selectedText) return
+      const newValue = value.substring(0, start) + result + value.substring(end)
+      pushHistory(newValue)
+      onChange(newValue)
+      requestAnimationFrame(() => {
+        textarea.focus()
+        textarea.setSelectionRange(start, start + result.length)
+      })
+    })()
+  }
 
   const pushHistory = (newVal: string) => {
     // 简单历史记录用于撤销/重做
@@ -239,42 +285,103 @@ export function MarkdownToolbar({ textareaRef, value, onChange, onAskAI, aiProce
 
       <Separator />
 
-      {/* 选中文字 AI 改写 */}
-      <ToolbarButton
-        onClick={() => {
-          const textarea = textareaRef.current
-          if (!textarea || !onAskAI) return
-          const start = textarea.selectionStart
-          const end = textarea.selectionEnd
-          const selectedText = value.substring(start, end)
-          if (!selectedText.trim()) {
-            // 无选区时提示用户先选中文字
-            textarea.focus()
-            alert('请先选中要改写的文字')
-            return
-          }
-          const instruction = window.prompt('输入修改指令（如：更简洁、更正式、扩充细节）：')
-          if (instruction === null) return
-          if (!instruction.trim()) {
-            alert('请输入修改指令')
-            return
-          }
-          // 触发 AI 改写：调用方拿到结果后替换选区
-          void (async () => {
-            const result = await onAskAI(selectedText)
-            if (!result || result === selectedText) return
-            pushHistory(value.substring(0, start) + result + value.substring(end))
-            onChange(value.substring(0, start) + result + value.substring(end))
-            requestAnimationFrame(() => {
-              textarea.focus()
-              textarea.setSelectionRange(start, start + result.length)
-            })
-          })()
-        }}
-        title="AI 改写选中文字"
+      {/* 选中文字 AI 改写（与笔记/会议一致的预设操作） */}
+      <div
+        className="relative"
+        onMouseEnter={() => setShowAiMenu(true)}
+        onMouseLeave={() => setShowAiMenu(false)}
       >
-        {aiProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-      </ToolbarButton>
+        <ToolbarButton onClick={() => setShowAiMenu(!showAiMenu)} title="AI 改写选中文字" disabled={!onAskAI || aiProcessing}>
+          {aiProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+        </ToolbarButton>
+        {showAiMenu && (
+          <div className="absolute top-full right-0 mt-1 py-1 bg-background border border-border rounded-lg shadow-lg min-w-36 z-50">
+            <AiMenuButton onClick={() => { runAi('润色这段文字，语言更专业流畅，保持原意和篇幅'); setShowAiMenu(false) }}>润色</AiMenuButton>
+            <AiMenuButton onClick={() => { runAi('精简这段文字，去除冗余，只保留关键信息'); setShowAiMenu(false) }}>精简</AiMenuButton>
+            <AiMenuButton onClick={() => { runAi('扩写这段文字，补充合理的细节说明'); setShowAiMenu(false) }}>扩写</AiMenuButton>
+            {/* 翻译子菜单 */}
+            <div
+              className="relative"
+              onMouseEnter={() => setShowTranslateMenu(true)}
+              onMouseLeave={() => setShowTranslateMenu(false)}
+            >
+              <AiMenuButton onClick={() => setShowTranslateMenu(!showTranslateMenu)} icon={<Languages className="w-3.5 h-3.5" />} hasSubmenu={true} submenuOpen={showTranslateMenu}>
+                翻译
+              </AiMenuButton>
+              {showTranslateMenu && (
+                <div className="absolute top-0 left-full ml-1 py-1 bg-background border border-border rounded-lg shadow-lg min-w-36 z-50 max-h-60 overflow-y-auto">
+                  {POPULAR_LANGUAGES.map((lang) => (
+                    <AiMenuButton key={lang.code} onClick={() => { runAi(`将这段文字翻译成${lang.code}`); setShowAiMenu(false); setShowTranslateMenu(false) }}>
+                      {lang.name}
+                    </AiMenuButton>
+                  ))}
+                  <div className="border-t border-border my-1" />
+                  <div className="px-2 py-1 flex items-center gap-1">
+                    <input
+                      type="text"
+                      value={customTranslateLang}
+                      placeholder="输入语言，如：日语"
+                      onChange={(e) => setCustomTranslateLang(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && customTranslateLang.trim()) {
+                          runAi(`将这段文字翻译成${customTranslateLang.trim()}`)
+                          setShowAiMenu(false)
+                          setShowTranslateMenu(false)
+                          setCustomTranslateLang('')
+                        } else if (e.key === 'Escape') {
+                          setShowTranslateMenu(false)
+                          setCustomTranslateLang('')
+                        }
+                      }}
+                      className="w-full px-2 py-1 text-xs bg-muted rounded border border-border focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="border-t border-border my-1" />
+            <div className="px-2 py-1 flex items-center gap-1">
+              <input
+                type="text"
+                value={customInstruction}
+                placeholder="输入修改指令，如：改成三条待办"
+                onChange={(e) => setCustomInstruction(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && customInstruction.trim()) {
+                    runAi(customInstruction.trim())
+                    setShowAiMenu(false)
+                    setCustomInstruction('')
+                  } else if (e.key === 'Escape') {
+                    setShowAiMenu(false)
+                    setCustomInstruction('')
+                  }
+                }}
+                className="w-full px-2 py-1 text-xs bg-muted rounded border border-border focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+          </div>
+        )}
+      </div>
     </div>
+  )
+}
+
+/** AI 菜单项按钮 */
+function AiMenuButton({ onClick, icon, children, hasSubmenu, submenuOpen }: {
+  onClick: () => void
+  icon?: React.ReactNode
+  children: React.ReactNode
+  hasSubmenu?: boolean
+  submenuOpen?: boolean
+}) {
+  return (
+    <button
+      className="w-full px-3 py-1 text-left text-xs hover:bg-muted flex items-center gap-2"
+      onClick={onClick}
+    >
+      {icon}
+      <span className="flex-1">{children}</span>
+      {hasSubmenu && <ChevronRight className={cn('w-3 h-3 transition-transform', submenuOpen && 'rotate-90')} />}
+    </button>
   )
 }
