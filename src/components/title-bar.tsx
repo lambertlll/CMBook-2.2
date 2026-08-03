@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { platform } from '@tauri-apps/plugin-os'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { isMobileDevice } from '@/lib/check'
-import { Search, Minus, Square, X, PanelLeft, SquarePen, CalendarDays } from 'lucide-react'
+import { Search, Minus, Square, Copy, X, PanelLeft, SquarePen, CalendarDays } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useSidebarStore } from '@/stores/sidebar'
 import { PinToggle } from './pin-toggle'
@@ -25,6 +25,7 @@ interface TitleBarProps {
 export function TitleBar({ onSearchClick, onActivityClick, activityOpen = false }: TitleBarProps) {
   const [currentPlatform, setCurrentPlatform] = useState<Platform>('unknown')
   const [isMobile, setIsMobile] = useState(true)
+  const [isMaximized, setIsMaximized] = useState(false)
   const { leftSidebarVisible, centerPanelVisible, rightSidebarVisible, toggleLeftSidebar, toggleCenterPanel } = useSidebarStore()
   
   // 检查关闭面板后是否会导致"仅左"状态或无面板状态
@@ -69,6 +70,46 @@ export function TitleBar({ onSearchClick, onActivityClick, activityOpen = false 
     }
   }, [])
 
+  // 同步窗口最大化状态：挂载时查询初始值，监听 onResized 实时更新（点击最大化后按钮图标切换为「还原」）
+  useEffect(() => {
+    let unlisten: (() => void) | null = null
+    let cancelled = false
+
+    const syncMaximizeState = async () => {
+      try {
+        const window = getCurrentWindow()
+        const maximized = await window.isMaximized()
+        if (!cancelled) setIsMaximized(maximized)
+      } catch (error) {
+        console.error('Error checking maximized state:', error)
+      }
+    }
+
+    void syncMaximizeState()
+
+    const setupListener = async () => {
+      try {
+        const window = getCurrentWindow()
+        const u = await window.onResized(() => {
+          void syncMaximizeState()
+        })
+        if (cancelled) {
+          u()
+          return
+        }
+        unlisten = u
+      } catch (error) {
+        console.error('Error listening window resize:', error)
+      }
+    }
+    void setupListener()
+
+    return () => {
+      cancelled = true
+      unlisten?.()
+    }
+  }, [])
+
 
 
   const handleMinimize = async () => {
@@ -84,6 +125,8 @@ export function TitleBar({ onSearchClick, onActivityClick, activityOpen = false 
     try {
       const window = getCurrentWindow()
       await window.toggleMaximize()
+      // toggleMaximize 后 onResized 异步触发，这里主动刷新保证图标即时切换
+      setIsMaximized(await window.isMaximized())
     } catch (error) {
       console.error('Error maximizing window:', error)
     }
@@ -234,8 +277,13 @@ export function TitleBar({ onSearchClick, onActivityClick, activityOpen = false 
               size="icon"
               className="h-9 w-12 rounded-none hover:bg-accent"
               onClick={handleMaximize}
+              title={isMaximized ? '还原' : '最大化'}
             >
-              <Square className="h-3.5 w-3.5" />
+              {isMaximized ? (
+                <Copy className="h-3.5 w-3.5" />
+              ) : (
+                <Square className="h-3.5 w-3.5" />
+              )}
             </Button>
             <Button
               variant="ghost"
