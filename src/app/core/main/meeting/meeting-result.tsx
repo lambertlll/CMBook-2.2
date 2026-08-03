@@ -52,6 +52,14 @@ import { TableRow } from '@tiptap/extension-table-row'
 import { TableHeader } from '@tiptap/extension-table-header'
 import { TableCell } from '@tiptap/extension-table-cell'
 import { Markdown } from '@tiptap/markdown'
+import Color from '@tiptap/extension-color'
+import { TextStyle } from '@tiptap/extension-text-style'
+import Highlight from '@tiptap/extension-highlight'
+import Underline from '@tiptap/extension-underline'
+import TextAlign from '@tiptap/extension-text-align'
+import Link from '@tiptap/extension-link'
+import Image from '@tiptap/extension-image'
+import EditorToolbar from '@/app/core/main/editor/markdown/editor-toolbar'
 import useArticleStore from '@/stores/article'
 import useSettingStore from '@/stores/setting'
 import { generateMeetingSummary, rewriteSummarySelection } from './meeting-generate-summary'
@@ -403,6 +411,18 @@ function SummaryEditor({ meeting }: { meeting: Meeting }) {
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
       }),
+      // 格式工具栏所需扩展（与笔记编辑器对齐）
+      TextStyle,
+      Color,
+      Highlight.configure({ multicolor: true }),
+      Underline,
+      TextAlign.configure({ types: ['heading', 'paragraph'] }),
+      Link.configure({
+        openOnClick: false,
+        autolink: true,
+        defaultProtocol: 'https',
+      }),
+      Image,
       TaskList,
       TaskItem.configure({ nested: true }),
       // 纪要模板包含管道表格，需要表格扩展才能正确解析与序列化
@@ -427,6 +447,55 @@ function SummaryEditor({ meeting }: { meeting: Meeting }) {
       },
     },
   })
+
+  // 本地上传图片：与笔记编辑器同一交互（选文件→本地保存/图床上传→插入节点）
+  const handleLocalImage = useCallback(async () => {
+    if (!editor) return
+    const { open } = await import('@tauri-apps/plugin-dialog')
+    const { readFile } = await import('@tauri-apps/plugin-fs')
+    const { handleImageUpload } = await import('@/lib/image-handler')
+    const insertPos = editor.state.selection.from
+    const placeholder = 'Uploading... '
+
+    editor.chain().focus().insertContentAt(insertPos, { type: 'text', text: placeholder }).run()
+    const placeholderEnd = insertPos + placeholder.length
+
+    try {
+      const file = await open({
+        multiple: false,
+        filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'] }],
+      })
+      if (!file) {
+        editor.chain().focus().deleteRange({ from: insertPos, to: placeholderEnd }).run()
+        return
+      }
+      let fileObject: File
+      if (typeof file === 'string') {
+        const fileData = await readFile(file)
+        const ext = file.split('.').pop() || 'png'
+        const fileName = file.split('/').pop() || `image.${ext}`
+        fileObject = new File([new Uint8Array(fileData)], fileName, { type: `image/${ext}` })
+      } else {
+        fileObject = file
+      }
+      const result = await handleImageUpload(fileObject, meeting.audioPath || '')
+      editor.chain().focus().deleteRange({ from: insertPos, to: placeholderEnd }).run()
+      editor.chain().focus().insertContentAt(insertPos, {
+        type: 'image',
+        attrs: { src: result.src, alt: fileObject.name, relativeSrc: result.relativePath },
+      }).run()
+    } catch (err) {
+      editor.chain().focus().deleteRange({ from: insertPos, to: placeholderEnd }).run()
+      toast({ description: `图片上传失败：${err instanceof Error ? err.message : '未知错误'}`, variant: 'destructive' })
+    }
+  }, [editor, meeting.audioPath])
+
+  // 承接工具栏"本地上传"按钮派发的事件（editor-toolbar 派发 tiptap-insert-image）
+  useEffect(() => {
+    const handler = () => void handleLocalImage()
+    document.addEventListener('tiptap-insert-image', handler)
+    return () => document.removeEventListener('tiptap-insert-image', handler)
+  }, [handleLocalImage])
 
   // 外部更新 summary（如重新生成完成）时同步到编辑器，
   // 与 onUpdate 刚写入的值相同则跳过，避免循环
@@ -476,16 +545,20 @@ function SummaryEditor({ meeting }: { meeting: Meeting }) {
   )
 
   return (
-    <div ref={scrollRef} className="relative flex-1 overflow-y-auto tiptap-editor">
-      <EditorContent editor={editor} />
-      {editor && (
-        <SummaryBubbleMenu
-          editor={editor}
-          containerRef={scrollRef}
-          processing={rewriting}
-          onApply={handleApplyRewrite}
-        />
-      )}
+    <div className="flex h-full flex-col">
+      {/* 格式工具栏（与笔记编辑器一致） */}
+      <EditorToolbar editor={editor} />
+      <div ref={scrollRef} className="relative flex-1 overflow-y-auto tiptap-editor">
+        <EditorContent editor={editor} />
+        {editor && (
+          <SummaryBubbleMenu
+            editor={editor}
+            containerRef={scrollRef}
+            processing={rewriting}
+            onApply={handleApplyRewrite}
+          />
+        )}
+      </div>
     </div>
   )
 }

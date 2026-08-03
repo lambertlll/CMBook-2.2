@@ -16,6 +16,7 @@ import {
   Code2,
   Link,
   Image as ImageIcon,
+  Upload,
   Palette,
   Highlighter,
 } from 'lucide-react'
@@ -24,6 +25,12 @@ import { cn } from '@/lib/utils'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 interface EditorToolbarProps {
   editor: Editor | null
@@ -31,21 +38,38 @@ interface EditorToolbarProps {
 
 const TEXT_COLORS = [
   { name: '黑色', value: '#000000' },
-  { name: '红色', value: '#e53e3e' },
-  { name: '蓝色', value: '#3182ce' },
-  { name: '绿色', value: '#38a169' },
-  { name: '橙色', value: '#dd6b20' },
-  { name: '紫色', value: '#805ad5' },
+  { name: '深灰', value: '#4a5568' },
   { name: '灰色', value: '#718096' },
+  { name: '浅灰', value: '#a0aec0' },
+  { name: '红色', value: '#e53e3e' },
+  { name: '暗红', value: '#c53030' },
+  { name: '橙色', value: '#dd6b20' },
+  { name: '琥珀色', value: '#d69e2e' },
+  { name: '黄色', value: '#ecc94b' },
+  { name: '绿色', value: '#38a169' },
+  { name: '青绿色', value: '#319795' },
+  { name: '青色', value: '#00b5d8' },
+  { name: '蓝色', value: '#3182ce' },
+  { name: '深蓝', value: '#2b6cb0' },
+  { name: '紫色', value: '#805ad5' },
+  { name: '洋红', value: '#d53f8c' },
+  { name: '粉色', value: '#ed64a6' },
   { name: '棕色', value: '#975a16' },
 ]
 
 const HIGHLIGHT_COLORS = [
   { name: '黄色', value: '#fefcbf' },
+  { name: '浅黄', value: '#faf089' },
   { name: '绿色', value: '#c6f6d5' },
+  { name: '浅绿', value: '#9ae6b4' },
   { name: '蓝色', value: '#bee3f8' },
+  { name: '浅蓝', value: '#90cdf4' },
   { name: '粉色', value: '#fed7e2' },
+  { name: '浅红', value: '#feb2b2' },
   { name: '橙色', value: '#feebc8' },
+  { name: '紫色', value: '#e9d8fd' },
+  { name: '青色', value: '#c4f1f9' },
+  { name: '灰色', value: '#e2e8f0' },
 ]
 
 type TextType = 'paragraph' | 'heading-1' | 'heading-2' | 'heading-3' | 'heading-4'
@@ -152,6 +176,12 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
     }
   }, [editor])
 
+  // 本地上传图片：派发 tiptap-insert-image 事件，
+  // 由 tiptap-editor.tsx 的监听器执行完整的选文件→本地保存/图床上传→插入节点链路
+  const handleUploadImage = useCallback(() => {
+    document.dispatchEvent(new CustomEvent('tiptap-insert-image'))
+  }, [])
+
   if (!editor) return null
 
   return (
@@ -219,7 +249,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
           </button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-2" align="start">
-          <div className="grid grid-cols-4 gap-1">
+          <div className="grid grid-cols-6 gap-1">
             {TEXT_COLORS.map((color) => (
               <button
                 key={color.value}
@@ -250,7 +280,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
           </button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-2" align="start">
-          <div className="grid grid-cols-5 gap-1">
+          <div className="grid grid-cols-6 gap-1">
             {HIGHLIGHT_COLORS.map((color) => (
               <button
                 key={color.value}
@@ -335,7 +365,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
 
       <Separator orientation="vertical" className="h-5 mx-1" />
 
-      {/* 链接 / 图片 */}
+      {/* 链接 */}
       <ToolbarButton
         active={editor.isActive('link')}
         onClick={handleSetLink}
@@ -343,12 +373,28 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
       >
         <Link className="h-4 w-4" />
       </ToolbarButton>
-      <ToolbarButton
-        onClick={handleInsertImage}
-        title="图片"
-      >
-        <ImageIcon className="h-4 w-4" />
-      </ToolbarButton>
+      {/* 图片：本地上传为主，链接插入为辅 */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className="inline-flex items-center justify-center rounded-sm h-7 w-7 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+            title="插入图片"
+          >
+            <ImageIcon className="h-4 w-4" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="min-w-[160px]">
+          <DropdownMenuItem onSelect={handleUploadImage}>
+            <Upload className="h-4 w-4 mr-2" />
+            本地上传
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={handleInsertImage}>
+            <Link className="h-4 w-4 mr-2" />
+            图片链接
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   )
 }
