@@ -87,6 +87,11 @@ let queue: Promise<void> = Promise.resolve()
 
 // ---- DashScope realtime 会话状态（dsMode 时生效） ----
 let dsMode = false
+// 实时通道类型：'realtime' = 旧版 qwen3-asr-flash-realtime（session.update 协议）；
+// 'inference' = 新版 qwen-audio-3.0-asr-flash-streaming（run-task/二进制帧协议）。
+// 命令前缀随通道切换（dashscope_asr_* / dashscope_inference_*）
+let dsChannel: 'realtime' | 'inference' = 'realtime'
+const dsCmd = (name: string) => `dashscope_${dsChannel}_${name}`
 let dsSessionId: string | null = null
 // 不足一帧的 PCM 字节尾包（连接就绪前也暂存于此）
 let dsPending = new Uint8Array(0)
@@ -173,6 +178,11 @@ export function startLiveTranscript(meetingId: string): void {
   dsMode = isRealtimeAsrModel(
     useSettingStore.getState().aliyunAsrModel
   )
+  // 设置实时通道：新模型走 inference 协议，旧模型走 realtime 协议
+  dsChannel =
+    useSettingStore.getState().aliyunAsrModel === 'qwen-audio-3.0-asr-flash-streaming'
+      ? 'inference'
+      : 'realtime'
   dsPending = new Uint8Array(0)
   dsInterimId = null
   dsInterimItemId = null
@@ -240,28 +250,28 @@ export async function finalizeLiveTranscript(meetingId: string): Promise<void> {
   if (useLiveTranscriptStore.getState().meetingId !== meetingId) return
   capturing = false
   if (dsMode) {
-    // realtime：送出尾帧后发 session.finish 等 session.finished，事件监听保持到 finish 返回
+    // realtime/inference：送出尾帧后发 finish 指令等结束事件，事件监听保持到 finish 返回
     teardownCapture()
     const sessionId = dsSessionId
     if (dsFailed) {
       // 会话已失败（连接已断）：直接安静断开，不再尝试发送 finish（会产生噪音报错）
       if (sessionId) {
-        invoke('dashscope_asr_disconnect', { sessionId }).catch(() => {})
+        invoke(dsCmd('disconnect'), { sessionId }).catch(() => {})
       }
     } else if (sessionId) {
       try {
         if (dsPending.length > 0) {
-          await invoke('dashscope_asr_send_pcm', {
+          await invoke(dsCmd('send_pcm'), {
             sessionId,
             bytes: Array.from(dsPending),
           })
           dsPending = new Uint8Array(0)
         }
-        await invoke('dashscope_asr_finish', { sessionId })
+        await invoke(dsCmd('finish'), { sessionId })
       } catch (err) {
         console.warn('[LiveTranscript] DashScope realtime 结束会话异常:', err)
         dsFailed = true
-        invoke('dashscope_asr_disconnect', { sessionId }).catch(() => {})
+        invoke(dsCmd('disconnect'), { sessionId }).catch(() => {})
       }
     }
     // 未转为 final 的 interim 片段是未确认文本，不落入全文
@@ -565,7 +575,7 @@ function appendDsPcm(data: Float32Array, fromRate: number): void {
       dsSendQueue = dsSendQueue.then(async () => {
         if (dsFailed) return
         try {
-          await invoke('dashscope_asr_send_pcm', {
+          await invoke(dsCmd('send_pcm'), {
             sessionId: sid,
             bytes: Array.from(bytes),
           })
@@ -620,7 +630,7 @@ async function connectDsSession(token: number): Promise<void> {
   const onConnected = async (sessionId: string): Promise<boolean> => {
     // 等待连接期间会话已切换/清理：立即断开，避免泄漏
     if (token !== sessionToken || !dsMode) {
-      invoke('dashscope_asr_disconnect', { sessionId }).catch(() => {})
+      invoke(dsCmd('disconnect'), { sessionId }).catch(() => {})
       return false
     }
     dsSessionId = sessionId
@@ -639,7 +649,7 @@ async function connectDsSession(token: number): Promise<void> {
   }
 
   try {
-    const sessionId = await invoke<string>('dashscope_asr_connect', {
+    const sessionId = await invoke<string>(dsCmd('connect'), {
       config: buildConfig(wantCorpus),
     })
     await onConnected(sessionId)
@@ -652,7 +662,7 @@ async function connectDsSession(token: number): Promise<void> {
       )
       setLiveError('热词上下文不被当前网关支持，已自动降级为无热词转写')
       try {
-        const sessionId = await invoke<string>('dashscope_asr_connect', {
+        const sessionId = await invoke<string>(dsCmd('connect'), {
           config: buildConfig(false),
         })
         const ok = await onConnected(sessionId)
@@ -756,7 +766,7 @@ function teardownDs(): void {
   dsSessionId = null
   dsPending = new Uint8Array(0)
   if (sessionId) {
-    invoke('dashscope_asr_disconnect', { sessionId }).catch(() => {})
+    invoke(dsCmd('disconnect'), { sessionId }).catch(() => {})
   }
   for (const unlisten of dsUnlisteners) {
     unlisten()

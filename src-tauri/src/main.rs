@@ -3,6 +3,7 @@
 
 mod ai;
 mod app_setup;
+mod asr_dashscope_inference;
 mod asr_dashscope_realtime;
 mod backup;
 mod device;
@@ -25,6 +26,10 @@ use ai::{
 use asr_dashscope_realtime::{
     dashscope_asr_connect, dashscope_asr_disconnect, dashscope_asr_finish, dashscope_asr_send_pcm,
     DashscopeAsrManager,
+};
+use asr_dashscope_inference::{
+    dashscope_inference_connect, dashscope_inference_disconnect, dashscope_inference_finish,
+    dashscope_inference_send_pcm,
 };
 use backup::{export_app_data, import_app_data, import_app_data_from_file};
 use device::get_device_id;
@@ -103,6 +108,10 @@ fn main() {
             dashscope_asr_send_pcm,
             dashscope_asr_finish,
             dashscope_asr_disconnect,
+            dashscope_inference_connect,
+            dashscope_inference_send_pcm,
+            dashscope_inference_finish,
+            dashscope_inference_disconnect,
         ])
         // 应用设置 - 在所有插件和命令注册后
         .setup(app_setup::setup_app)

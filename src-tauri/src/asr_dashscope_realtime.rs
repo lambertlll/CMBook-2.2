@@ -42,6 +42,7 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 const FINISH_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// 全局 session 表（不跨 I/O 持锁：取出 sender/信号后即释放锁）
+/// 供新旧两套实时协议（realtime / inference）共用
 #[derive(Default)]
 pub struct DashscopeAsrManager {
     sessions: Mutex<HashMap<String, DashscopeAsrSession>>,
@@ -52,6 +53,33 @@ impl DashscopeAsrManager {
         Self {
             sessions: Mutex::new(HashMap::new()),
         }
+    }
+
+    /// 取出 session 的发送通道与结束信号（不持锁返回，避免跨 I/O 持锁）
+    pub async fn get_session(
+        &self,
+        session_id: &str,
+    ) -> Option<(mpsc::UnboundedSender<Message>, watch::Receiver<bool>)> {
+        let sessions = self.sessions.lock().await;
+        sessions.get(session_id).map(|s| (s.tx.clone(), s.done.clone()))
+    }
+
+    /// 注册会话
+    pub async fn insert_session(
+        &self,
+        session_id: String,
+        tx: mpsc::UnboundedSender<Message>,
+        done: watch::Receiver<bool>,
+    ) {
+        self.sessions
+            .lock()
+            .await
+            .insert(session_id, DashscopeAsrSession { tx, done });
+    }
+
+    /// 移除会话（连接随 writer 任务退出而关闭）
+    pub async fn remove_session(&self, session_id: &str) {
+        self.sessions.lock().await.remove(session_id);
     }
 }
 
@@ -415,10 +443,8 @@ pub async fn dashscope_asr_connect(
     }
 
     manager
-        .sessions
-        .lock()
-        .await
-        .insert(session_id.clone(), DashscopeAsrSession { tx, done: done_rx });
+        .insert_session(session_id.clone(), tx, done_rx)
+        .await;
     Ok(session_id)
 }
 
@@ -455,13 +481,10 @@ pub async fn dashscope_asr_send_pcm(
     session_id: String,
     bytes: Vec<u8>,
 ) -> Result<(), String> {
-    let (tx, done) = {
-        let sessions = manager.sessions.lock().await;
-        match sessions.get(&session_id) {
-            Some(s) => (s.tx.clone(), s.done.clone()),
-            None => return Err("DashScope ASR session 不存在或已关闭".to_string()),
-        }
-    };
+    let (tx, done) = manager
+        .get_session(&session_id)
+        .await
+        .ok_or_else(|| "DashScope ASR session 不存在或已关闭".to_string())?;
     // 连接已断（reader 收到 Close/error 退出后 done=true）：立即拒绝，
     // 避免 PCM 数据进入无界 channel 积压导致内存增长
     if *done.borrow() {
@@ -477,13 +500,10 @@ pub async fn dashscope_asr_finish(
     manager: State<'_, DashscopeAsrManager>,
     session_id: String,
 ) -> Result<(), String> {
-    let (tx, mut done) = {
-        let sessions = manager.sessions.lock().await;
-        match sessions.get(&session_id) {
-            Some(s) => (s.tx.clone(), s.done.clone()),
-            None => return Err("DashScope ASR session 不存在或已关闭".to_string()),
-        }
-    };
+    let (tx, mut done) = manager
+        .get_session(&session_id)
+        .await
+        .ok_or_else(|| "DashScope ASR session 不存在或已关闭".to_string())?;
     tx.send(Message::Text(build_session_finish().to_string().into()))
         .map_err(|_| "DashScope 连接已断开，无法发送 session.finish".to_string())?;
 
@@ -495,7 +515,7 @@ pub async fn dashscope_asr_finish(
     drop(tx);
 
     // 无论成功与否都清理 session（tx 全部释放后 writer 任务会关闭连接）
-    manager.sessions.lock().await.remove(&session_id);
+    manager.remove_session(&session_id).await;
     result
 }
 
@@ -505,7 +525,7 @@ pub async fn dashscope_asr_disconnect(
     manager: State<'_, DashscopeAsrManager>,
     session_id: String,
 ) -> Result<(), String> {
-    manager.sessions.lock().await.remove(&session_id);
+    manager.remove_session(&session_id).await;
     Ok(())
 }
 

@@ -1,4 +1,5 @@
 mod ai;
+mod asr_dashscope_inference;
 mod asr_dashscope_realtime;
 mod backup;
 mod device;
@@ -15,6 +16,10 @@ use ai::{
 use asr_dashscope_realtime::{
     dashscope_asr_connect, dashscope_asr_disconnect, dashscope_asr_finish, dashscope_asr_send_pcm,
     DashscopeAsrManager,
+};
+use asr_dashscope_inference::{
+    dashscope_inference_connect, dashscope_inference_disconnect, dashscope_inference_finish,
+    dashscope_inference_send_pcm,
 };
 use backup::{export_app_data, import_app_data, import_app_data_from_file};
 use device::get_device_id;
@@ -69,6 +74,10 @@ pub fn run() {
             dashscope_asr_send_pcm,
             dashscope_asr_finish,
             dashscope_asr_disconnect,
+            dashscope_inference_connect,
+            dashscope_inference_send_pcm,
+            dashscope_inference_finish,
+            dashscope_inference_disconnect,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
