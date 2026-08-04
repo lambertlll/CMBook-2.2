@@ -1,5 +1,5 @@
-const MAX_RETRIES = 2
-const BASE_DELAY_MS = 500
+const MAX_RETRIES = 3
+const BASE_DELAY_MS = 800
 
 function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -12,10 +12,14 @@ function shouldRetry(error: unknown) {
 
   const message = error.message.toLowerCase()
   return message.includes('429') ||
+    message.includes('503') ||
     message.includes('529') ||
+    message.includes('too busy') ||
+    message.includes('system is busy') ||
     message.includes('timeout') ||
     message.includes('temporarily') ||
-    message.includes('rate limit')
+    message.includes('rate limit') ||
+    message.includes('overloaded')
 }
 
 export class AgentRecoveryManager {
