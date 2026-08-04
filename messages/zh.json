@@ -686,6 +686,8 @@
             "fun-asr": "Fun-ASR：默认模型，支持说话人分离和热词词表。",
             "qwen3-asr-flash": "Qwen3-ASR-Flash：识别准确率更高，支持热词上下文；录音中每 30 秒出一次结果，不支持说话人分离。",
             "qwen3-asr-flash-realtime": "Qwen3-ASR-Flash-Realtime（推荐）：真流式实时转写，识别中即时出字，支持热词上下文，不支持说话人分离。",
+            "qwen-audio-3.0-asr-flash": "Qwen-Audio-3.0-ASR-Flash（新）：30 种语言、方言口音、长音频上下文记忆、内置行业词库、语音润色；30 秒切块出结果，不支持说话人分离。",
+            "qwen-audio-3.0-asr-flash-streaming": "Qwen-Audio-3.0-ASR-Flash-Streaming（新·实时）：30 种语言、长音频上下文记忆、内置行业词库、语音润色；真流式即时出字，不支持说话人分离。",
             "paraformer-v2": "Paraformer-v2：上一代稳定版。"
           },
           "hotwords": {

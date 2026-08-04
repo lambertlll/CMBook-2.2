@@ -35,10 +35,12 @@ export function Setting() {
   // 阿里云 ASR 识别模型（selector 精确订阅）
   const aliyunAsrModel = useSettingStore((s) => s.aliyunAsrModel);
   const setAliyunAsrModel = useSettingStore((s) => s.setAliyunAsrModel);
-  // Qwen3-ASR 系列（含 realtime）不支持说话人分离
+  // Qwen3/Qwen-Audio ASR 系列（含 realtime/streaming）不支持说话人分离
   const diarizationUnsupported =
     aliyunAsrModel === 'qwen3-asr-flash' ||
-    aliyunAsrModel === 'qwen3-asr-flash-realtime';
+    aliyunAsrModel === 'qwen3-asr-flash-realtime' ||
+    aliyunAsrModel === 'qwen-audio-3.0-asr-flash' ||
+    aliyunAsrModel === 'qwen-audio-3.0-asr-flash-streaming';
   const modeOptions: Array<{ value: SpeechMode; label: string }> = [
     { value: 'auto', label: t('mode.auto') },
     { value: 'local', label: t('mode.local') },
@@ -259,14 +261,16 @@ export function Setting() {
                 <ItemDescription>{t(`stt.aliyun.model.${aliyunAsrModel}`)}</ItemDescription>
               </ItemContent>
               <ItemActions>
-                <Select value={aliyunAsrModel} onValueChange={(value) => setAliyunAsrModel(value as 'fun-asr' | 'qwen3-asr-flash' | 'paraformer-v2' | 'qwen3-asr-flash-realtime')}>
-                  <SelectTrigger className="w-[180px]">
+                <Select value={aliyunAsrModel} onValueChange={(value) => setAliyunAsrModel(value as 'fun-asr' | 'qwen3-asr-flash' | 'paraformer-v2' | 'qwen3-asr-flash-realtime' | 'qwen-audio-3.0-asr-flash' | 'qwen-audio-3.0-asr-flash-streaming')}>
+                  <SelectTrigger className="w-[220px]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="fun-asr">Fun-ASR</SelectItem>
                     <SelectItem value="qwen3-asr-flash">Qwen3-ASR-Flash</SelectItem>
                     <SelectItem value="qwen3-asr-flash-realtime">Qwen3-ASR-Flash-Realtime</SelectItem>
+                    <SelectItem value="qwen-audio-3.0-asr-flash">Qwen-Audio-3.0-ASR-Flash</SelectItem>
+                    <SelectItem value="qwen-audio-3.0-asr-flash-streaming">Qwen-Audio-3.0-ASR-Flash-Streaming</SelectItem>
                     <SelectItem value="paraformer-v2">Paraformer-v2</SelectItem>
                   </SelectContent>
                 </Select>

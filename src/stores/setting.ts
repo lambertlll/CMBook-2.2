@@ -96,9 +96,9 @@ interface SettingState {
   // 阿里云 ASR：说话人分离（默认开启）
   aliyunAsrDiarization: boolean
   setAliyunAsrDiarization: (enabled: boolean) => Promise<void>
-  // 阿里云 ASR：识别模型（默认 qwen3-asr-flash-realtime 真流式 / fun-asr / qwen3-asr-flash 切块 / paraformer-v2）
-  aliyunAsrModel: 'fun-asr' | 'qwen3-asr-flash' | 'paraformer-v2' | 'qwen3-asr-flash-realtime'
-  setAliyunAsrModel: (model: 'fun-asr' | 'qwen3-asr-flash' | 'paraformer-v2' | 'qwen3-asr-flash-realtime') => Promise<void>
+  // 阿里云 ASR：识别模型（默认 qwen3-asr-flash-realtime 真流式 / fun-asr / qwen3-asr-flash 切块 / paraformer-v2 / qwen-audio-3.0-asr-flash 系列）
+  aliyunAsrModel: 'fun-asr' | 'qwen3-asr-flash' | 'paraformer-v2' | 'qwen3-asr-flash-realtime' | 'qwen-audio-3.0-asr-flash' | 'qwen-audio-3.0-asr-flash-streaming'
+  setAliyunAsrModel: (model: 'fun-asr' | 'qwen3-asr-flash' | 'paraformer-v2' | 'qwen3-asr-flash-realtime' | 'qwen-audio-3.0-asr-flash' | 'qwen-audio-3.0-asr-flash-streaming') => Promise<void>
 
   // 会议纪要：生成前用手动笔记校正转写（默认开启）
   meetingTranscriptCorrection: boolean

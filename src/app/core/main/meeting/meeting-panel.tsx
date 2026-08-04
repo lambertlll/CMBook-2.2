@@ -369,7 +369,8 @@ export function MeetingPanel() {
         if (
           meetingAutoDiarize &&
           sttEngine === 'aliyun' &&
-          aliyunAsrModel === 'qwen3-asr-flash-realtime' &&
+          (aliyunAsrModel === 'qwen3-asr-flash-realtime' ||
+            aliyunAsrModel === 'qwen-audio-3.0-asr-flash-streaming') &&
           diarizeAudioPaths.length > 0 &&
           latestForDiarize?.transcript
         ) {

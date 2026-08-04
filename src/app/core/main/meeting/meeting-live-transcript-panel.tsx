@@ -41,7 +41,9 @@ function LiveTranscriptView() {
   const supported =
     sttEngine === 'aliyun' &&
     (aliyunAsrModel === 'qwen3-asr-flash' ||
-      aliyunAsrModel === 'qwen3-asr-flash-realtime')
+      aliyunAsrModel === 'qwen3-asr-flash-realtime' ||
+      aliyunAsrModel === 'qwen-audio-3.0-asr-flash' ||
+      aliyunAsrModel === 'qwen-audio-3.0-asr-flash-streaming')
   const isRecording =
     recordingMeeting?.status === 'recording' ||
     recordingMeeting?.status === 'paused'

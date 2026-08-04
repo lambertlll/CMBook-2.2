@@ -14,6 +14,8 @@ export interface Qwen3ASRConfig {
   workspaceId: string // 百炼业务空间 ID
   language?: string // 默认 'zh'
   hotwords?: string[] // 自定义热词（作为 system 上下文注入，提升术语识别）
+  /** 同步接口模型名（默认 qwen3-asr-flash；可选 qwen-audio-3.0-asr-flash 等同步模型） */
+  model?: string
 }
 
 export interface Qwen3TranscribeResult {
@@ -216,7 +218,7 @@ async function transcribeSegment(
     : '以下是银行金融领域的会议录音，请准确转写为文字。'
 
   const body = {
-    model: 'qwen3-asr-flash',
+    model: config.model || 'qwen3-asr-flash',
     input: {
       messages: [
         { role: 'system', content: [{ text: contextText }] },

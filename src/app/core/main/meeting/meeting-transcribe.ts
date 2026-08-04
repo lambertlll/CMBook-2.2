@@ -61,15 +61,27 @@ export async function transcribeAudio(options: TranscribeOptions): Promise<Trans
       throw new Error('阿里云 ASR 未配置，请在设置中填写 API Key 和业务空间 ID')
     }
 
-    // Qwen3-ASR 走同步多模态接口（单音频 ≤5 分钟，内部分段并发），失败不降级到 fun-asr
-    // qwen3-asr-flash-realtime 是 WebSocket 实时模型，仅服务录音中的实时预览；
-    // 整段重转写时降级走 qwen3-asr-flash 同步分段通道
-    if (aliyunAsrModel === 'qwen3-asr-flash' || aliyunAsrModel === 'qwen3-asr-flash-realtime') {
+    // Qwen3/Qwen-Audio 走同步多模态接口（单音频 ≤5 分钟，内部分段并发），失败不降级到 fun-asr
+    // qwen3-asr-flash-realtime / qwen-audio-3.0-asr-flash-streaming 是 WebSocket 实时模型，
+    // 仅服务录音中的实时预览；整段重转写时降级走 qwen3-asr-flash 同步分段通道
+    if (
+      aliyunAsrModel === 'qwen3-asr-flash' ||
+      aliyunAsrModel === 'qwen3-asr-flash-realtime' ||
+      aliyunAsrModel === 'qwen-audio-3.0-asr-flash' ||
+      aliyunAsrModel === 'qwen-audio-3.0-asr-flash-streaming'
+    ) {
+      // 同步 qwen 系列模型直接传模型名；realtime/streaming（WebSocket 实时）整段重转写时
+      // 降级走 qwen3-asr-flash 同步分段通道
+      const syncModel =
+        aliyunAsrModel === 'qwen-audio-3.0-asr-flash'
+          ? aliyunAsrModel
+          : 'qwen3-asr-flash'
       const result = await transcribeWithQwen3Asr(audioBlob, {
         apiKey: aliyunAsrApiKey,
         workspaceId: aliyunAsrWorkspaceId,
         language,
         hotwords: parseHotwords(aliyunAsrHotwords),
+        model: syncModel,
       }, onProgress)
       return { text: result.text, duration: result.duration }
     }

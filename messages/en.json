@@ -736,6 +736,8 @@
             "fun-asr": "Fun-ASR: default model, supports speaker diarization and hotword vocabulary.",
             "qwen3-asr-flash": "Qwen3-ASR-Flash: higher recognition accuracy with hotword context; results appear every 30 seconds while recording; no speaker diarization.",
             "qwen3-asr-flash-realtime": "Qwen3-ASR-Flash-Realtime (recommended): true streaming recognition with instant live text and hotword context; no speaker diarization.",
+            "qwen-audio-3.0-asr-flash": "Qwen-Audio-3.0-ASR-Flash (new): 30 languages, dialect/accents, long-audio context memory, built-in industry vocabulary, speech polishing; results every 30 seconds; no speaker diarization.",
+            "qwen-audio-3.0-asr-flash-streaming": "Qwen-Audio-3.0-ASR-Flash-Streaming (new, real-time): 30 languages, long-audio context memory, built-in industry vocabulary, speech polishing; true streaming; no speaker diarization.",
             "paraformer-v2": "Paraformer-v2: previous-generation stable release."
           },
           "hotwords": {

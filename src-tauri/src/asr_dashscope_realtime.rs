@@ -72,6 +72,9 @@ pub struct DashscopeAsrConnectConfig {
     pub language: String,
     /// 热词/上下文偏置文本（session.input_audio_transcription.corpus.text，上限 10000 token）
     pub corpus_text: Option<String>,
+    /// ASR 模型名（qwen3-asr-flash-realtime / qwen-audio-3.0-asr-flash-streaming 等）；
+    /// 为空时回退默认 MODEL
+    pub model: Option<String>,
 }
 
 /// 推送前端的识别结果事件
@@ -244,10 +247,11 @@ pub async fn dashscope_asr_connect(
     config: DashscopeAsrConnectConfig,
 ) -> Result<String, String> {
     // 华北2（北京）地域的业务空间域名（与同步 qwen3 通道同一套域名规则）；
-    // model 通过查询参数指定（文档"连接端点"章节）
+    // model 通过查询参数指定（文档"连接端点"章节）；支持从配置传入以切换新一代模型
+    let model = config.model.as_deref().unwrap_or(MODEL);
     let url = format!(
         "wss://{}.cn-beijing.maas.aliyuncs.com/api-ws/v1/realtime?model={}",
-        config.workspace_id, MODEL
+        config.workspace_id, model
     );
 
     // 先用 URL 生成标准握手请求（自动带 Host/Upgrade/Sec-WebSocket-Key 等），再追加鉴权头
@@ -515,6 +519,7 @@ mod tests {
             workspace_id: "ws-test".to_string(),
             language: "zh".to_string(),
             corpus_text: corpus.map(|s| s.to_string()),
+            model: None,
         }
     }
 

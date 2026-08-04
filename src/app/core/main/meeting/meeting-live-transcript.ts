@@ -121,7 +121,7 @@ class MeetingLivePcmProcessor extends AudioWorkletProcessor {
 registerProcessor('meeting-live-pcm', MeetingLivePcmProcessor)
 `
 
-/** 当前设置是否满足实时转写条件（仅阿里云 qwen3-asr-flash 系列支持） */
+/** 当前设置是否满足实时转写条件（仅阿里云 qwen3-asr-flash / qwen-audio-3.0-asr-flash 系列支持） */
 export function isLiveTranscriptEnabled(): boolean {
   const {
     meetingLiveTranscript,
@@ -134,9 +134,19 @@ export function isLiveTranscriptEnabled(): boolean {
     meetingLiveTranscript &&
     sttEngine === 'aliyun' &&
     (aliyunAsrModel === 'qwen3-asr-flash' ||
-      aliyunAsrModel === 'qwen3-asr-flash-realtime') &&
+      aliyunAsrModel === 'qwen3-asr-flash-realtime' ||
+      aliyunAsrModel === 'qwen-audio-3.0-asr-flash' ||
+      aliyunAsrModel === 'qwen-audio-3.0-asr-flash-streaming') &&
     !!aliyunAsrApiKey &&
     !!aliyunAsrWorkspaceId
+  )
+}
+
+/** 判断模型是否为 WebSocket 真流式（realtime / 3.0 streaming），用于选择实时通道 */
+export function isRealtimeAsrModel(model: string): boolean {
+  return (
+    model === 'qwen3-asr-flash-realtime' ||
+    model === 'qwen-audio-3.0-asr-flash-streaming'
   )
 }
 
@@ -160,8 +170,9 @@ export function startLiveTranscript(meetingId: string): void {
   capturing = false
   segmentIdSeq = 0
   queue = Promise.resolve()
-  dsMode =
-    useSettingStore.getState().aliyunAsrModel === 'qwen3-asr-flash-realtime'
+  dsMode = isRealtimeAsrModel(
+    useSettingStore.getState().aliyunAsrModel
+  )
   dsPending = new Uint8Array(0)
   dsInterimId = null
   dsInterimItemId = null
@@ -477,13 +488,18 @@ function enqueueChunk(samples: Float32Array, startSec: number): void {
     segments: [...s.segments, { id, text: '', startSec, status: 'pending' }],
   }))
 
-  const { aliyunAsrApiKey, aliyunAsrWorkspaceId, aliyunAsrHotwords } =
+  const { aliyunAsrApiKey, aliyunAsrWorkspaceId, aliyunAsrHotwords, aliyunAsrModel } =
     useSettingStore.getState()
   const config: Qwen3ASRConfig = {
     apiKey: aliyunAsrApiKey,
     workspaceId: aliyunAsrWorkspaceId,
     language: 'zh',
     hotwords: parseHotwords(aliyunAsrHotwords),
+    // 同步切块模型：qwen3-asr-flash 直接传当前值；realtime/streaming 走这里时降级 qwen3 同步通道
+    model:
+      aliyunAsrModel === 'qwen3-asr-flash' || aliyunAsrModel === 'qwen-audio-3.0-asr-flash'
+        ? aliyunAsrModel
+        : 'qwen3-asr-flash',
   }
 
   queue = queue.then(async () => {
@@ -590,6 +606,8 @@ async function connectDsSession(token: number): Promise<void> {
       withCorpus && hotwords.length > 0
         ? `银行金融领域会议录音，参考术语：${hotwords.join('、')}`
         : undefined,
+    // 传给 Rust 通道的模型名（realtime 模式固定为流式模型；qwen3 兼容旧值）
+    model: useSettingStore.getState().aliyunAsrModel,
   })
   // corpus（热词上下文）在 realtime 模式下默认不发送：
   // 百炼/金融云网关对 input_audio_transcription.corpus.text 支持不完整，
