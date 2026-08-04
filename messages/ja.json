@@ -1638,7 +1638,9 @@
             "fun-asr": "Fun-ASR：既定モデル。話者分離とホットワード辞書に対応。",
             "qwen3-asr-flash": "Qwen3-ASR-Flash：認識精度がより高く、ホットワードのコンテキストに対応。録音中は30秒ごとに結果を返す。話者分離は非対応。",
             "qwen3-asr-flash-realtime": "Qwen3-ASR-Flash-Realtime（推奨）：真ストリーミング認識で発話中に即時文字起こし。ホットワードのコンテキストに対応。話者分離は非対応。",
-            "paraformer-v2": "Paraformer-v2：前世代の安定版。"
+            "paraformer-v2": "Paraformer-v2：前世代の安定版。",
+            "qwen_audio_3_0_asr_flash": "Qwen-Audio-3.0-ASR-Flash（新）：30言語・方言・長音声コンテキスト記憶・業界語彙内蔵・音声ポリッシュ対応。30秒ごとに結果出力。話者分離は非対応。",
+            "qwen_audio_3_0_asr_flash_streaming": "Qwen-Audio-3.0-ASR-Flash-Streaming（新・リアルタイム）：30言語・長音声コンテキスト記憶・業界語彙内蔵・音声ポリッシュ対応。真ストリーミングで即時文字起こし。話者分離は非対応。"
           },
           "hotwords": {
             "title": "カスタムホットワード",

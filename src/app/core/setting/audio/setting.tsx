@@ -12,6 +12,15 @@ import useSettingStore from "@/stores/setting";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { SpeechMode } from '@/lib/speech/types';
 
+/**
+ * ASR 模型名 → i18n key 映射。
+ * next-intl 的 JSON key 不允许含 "."（用作嵌套分隔符），
+ * 而模型名 qwen-audio-3.0-asr-flash 带点号，故转义为下划线。
+ */
+function modelI18nKey(model: string): string {
+  return model.replace(/\./g, '_');
+}
+
 export function Setting() {
   const t = useTranslations('settings.audio');
   const {
@@ -258,7 +267,7 @@ export function Setting() {
               <ItemMedia variant="icon"><Mic className="size-4" /></ItemMedia>
               <ItemContent>
                 <ItemTitle>{t('stt.aliyun.model.title')}</ItemTitle>
-                <ItemDescription>{t(`stt.aliyun.model.${aliyunAsrModel}`)}</ItemDescription>
+                <ItemDescription>{t(`stt.aliyun.model.${modelI18nKey(aliyunAsrModel)}`)}</ItemDescription>
               </ItemContent>
               <ItemActions>
                 <Select value={aliyunAsrModel} onValueChange={(value) => setAliyunAsrModel(value as 'fun-asr' | 'qwen3-asr-flash' | 'paraformer-v2' | 'qwen3-asr-flash-realtime' | 'qwen-audio-3.0-asr-flash' | 'qwen-audio-3.0-asr-flash-streaming')}>

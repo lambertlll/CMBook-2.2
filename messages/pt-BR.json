@@ -680,7 +680,9 @@
             "fun-asr": "Fun-ASR: modelo padrão, com separação de locutores e vocabulário de palavras-chave.",
             "qwen3-asr-flash": "Qwen3-ASR-Flash: maior precisão de reconhecimento, com contexto de palavras-chave; resultados a cada 30 segundos durante a gravação; sem separação de locutores.",
             "qwen3-asr-flash-realtime": "Qwen3-ASR-Flash-Realtime (recomendado): reconhecimento em streaming real, com texto instantâneo durante a fala e contexto de palavras-chave; sem separação de locutores.",
-            "paraformer-v2": "Paraformer-v2: versão estável da geração anterior."
+            "paraformer-v2": "Paraformer-v2: versão estável da geração anterior.",
+            "qwen_audio_3_0_asr_flash": "Qwen-Audio-3.0-ASR-Flash (novo): 30 idiomas, dialetos/sotaques, memória de contexto de áudio longo, vocabulário de setor integrado, polimento de fala; resultados a cada 30 segundos; sem separação de locutores.",
+            "qwen_audio_3_0_asr_flash_streaming": "Qwen-Audio-3.0-ASR-Flash-Streaming (novo, tempo real): 30 idiomas, memória de contexto de áudio longo, vocabulário de setor integrado, polimento de fala; streaming real; sem separação de locutores."
           },
           "hotwords": {
             "title": "Palavras-chave personalizadas",
