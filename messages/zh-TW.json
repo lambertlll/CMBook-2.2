@@ -1639,8 +1639,8 @@
             "qwen3-asr-flash": "Qwen3-ASR-Flash：識別準確率更高，支援熱詞上下文；錄音中每 30 秒出一次結果，不支援說話人分離。",
             "qwen3-asr-flash-realtime": "Qwen3-ASR-Flash-Realtime（推薦）：真流式即時轉寫，識別中即時出字，支援熱詞上下文，不支援說話人分離。",
             "paraformer-v2": "Paraformer-v2：上一代穩定版。",
-            "qwen_audio_3_0_asr_flash": "Qwen-Audio-3.0-ASR-Flash（新）：30 種語言、方言口音、長音頻上下文記憶、內建行業詞庫、語音潤色；30 秒切塊出結果，不支援說話人分離。",
-            "qwen_audio_3_0_asr_flash_streaming": "Qwen-Audio-3.0-ASR-Flash-Streaming（新·即時）：30 種語言、長音頻上下文記憶、內建行業詞庫、語音潤色；真流式即時出字，不支援說話人分離。"
+            "qwen-audio-3_0-asr-flash": "Qwen-Audio-3.0-ASR-Flash（新）：30 種語言、方言口音、長音頻上下文記憶、內建行業詞庫、語音潤色；30 秒切塊出結果，不支援說話人分離。",
+            "qwen-audio-3_0-asr-flash-streaming": "Qwen-Audio-3.0-ASR-Flash-Streaming（新·即時）：30 種語言、長音頻上下文記憶、內建行業詞庫、語音潤色；真流式即時出字，不支援說話人分離。"
           },
           "hotwords": {
             "title": "自訂熱詞",
