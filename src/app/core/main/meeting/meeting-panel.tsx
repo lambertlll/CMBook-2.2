@@ -10,7 +10,7 @@ import {
   getOrCreateRecorder,
   destroyRecorder,
 } from './meeting-recorder-manager'
-import { transcribeAudio, transcribeWithAliyunFallback, transcribeWithFunAsrDiarization } from './meeting-transcribe'
+import { transcribeAudioWithFallback, transcribeWithFunAsrDiarization } from './meeting-transcribe'
 import { loadMeetingAudio } from './meeting-load-audio'
 import useSettingStore from '@/stores/setting'
 import {
@@ -335,13 +335,21 @@ export function MeetingPanel() {
             result = { text: partial.text }
           } else {
             updateMeeting(meetingId, { transcribeProgress: 5 })
-            result = await transcribeAudio({
-              audioBlob,
+            // 统一兜底入口：主通道失败时自动降级（qwen 解码失败 → fun-asr 服务端；
+            // fun-asr/paraformer 失败 → 自动重试一次；硅基流动等有阿里云配置也降级 fun-asr）
+            const fallbackResult = await transcribeAudioWithFallback(audioBlob, {
               language: 'zh',
               onProgress: (progress) => {
                 updateMeeting(meetingId, { transcribeProgress: progress })
               },
             })
+            result = {
+              text: fallbackResult.text,
+              duration: fallbackResult.duration,
+            }
+            if (fallbackResult.usedFallback) {
+              console.warn('[Meeting] 已自动降级转写通道（fun-asr 服务端）')
+            }
           }
         }
 
@@ -465,25 +473,19 @@ export function MeetingPanel() {
         const fallbackPaths = fallbackMeeting
           ? getMeetingAudioPaths(fallbackMeeting)
           : []
-        const isDecodeFailure =
-          errorMsg.includes('音频解码失败') ||
-          errorMsg.includes('解码') ||
-          errorMsg.includes('文件可能损坏')
-        if (
-          !fallbackMeeting?.transcript &&
-          fallbackPaths.length > 0 &&
-          isDecodeFailure
-        ) {
+        // 最终保险：统一入口失败（实时转写 null + 主通道失败）且录音已落盘时，
+        // 读取保存的音频用 fun-asr 服务端异步任务通道重转（12h/2GB 无浏览器解码限制）
+        if (!fallbackMeeting?.transcript && fallbackPaths.length > 0) {
           try {
-            console.log('[Meeting] 整段转写解码失败，降级 fun-asr 服务端重转写')
+            console.log('[Meeting] 转写失败，用已保存录音降级 fun-asr 服务端重转写')
             updateMeeting(meetingId, {
               transcribeProgress: 5,
-              error: '整段转写解码失败，正在用阿里云服务端重新转写…',
+              error: '转写失败，正在用阿里云服务端重新转写…',
             })
             const texts: string[] = []
             for (let i = 0; i < fallbackPaths.length; i++) {
               const segmentBlob = await loadMeetingAudio(fallbackPaths[i])
-              const segmentResult = await transcribeWithAliyunFallback(
+              const segmentResult = await transcribeWithFunAsrDiarization(
                 segmentBlob,
                 (progress) => {
                   updateMeeting(meetingId, {

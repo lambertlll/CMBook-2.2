@@ -216,6 +216,73 @@ export async function transcribeWithAliyunFallback(
   return { text: result.text, duration: result.duration }
 }
 
+/** 判断错误是否为浏览器解码类失败（2h+ 大 webm 超容器上限等） */
+export function isDecodeFailure(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err)
+  return (
+    msg.includes('音频解码失败') ||
+    msg.includes('解码') ||
+    msg.includes('文件可能损坏') ||
+    msg.includes('decode')
+  )
+}
+
+/**
+ * 统一转写入口（带全模型兜底）：优先按用户配置走主通道；
+ * 失败时按模型类型自动降级——
+ * - qwen 系列（浏览器 decodeAudioData 解码）→ 降级 fun-asr 服务端异步任务（12h/2GB）
+ * - fun-asr / paraformer-v2（本身服务端异步任务）→ 自动重试一次（任务偶发失败/网络抖动）
+ * - OpenAI 兼容引擎（硅基流动等，浏览器解码）→ 有阿里云配置则降级 fun-asr，无则抛原错
+ * 返回 usedFallback 标记是否走了降级（调用方可用于提示用户/进度展示）。
+ */
+export interface TranscribeWithFallbackResult {
+  text: string
+  duration?: number
+  usedFallback: boolean
+}
+
+export async function transcribeAudioWithFallback(
+  audioBlob: Blob,
+  options: Omit<TranscribeOptions, 'audioBlob'> = {}
+): Promise<TranscribeWithFallbackResult> {
+  const { language = 'zh', onProgress } = options
+  const { sttEngine, aliyunAsrModel, aliyunAsrApiKey, aliyunAsrWorkspaceId } =
+    useSettingStore.getState()
+  const isAliyunAsyncModel =
+    sttEngine === 'aliyun' &&
+    (aliyunAsrModel === 'fun-asr' || aliyunAsrModel === 'paraformer-v2')
+
+  try {
+    // 主通道：按用户配置转写
+    const result = await transcribeAudio({ audioBlob, language, onProgress })
+    return { text: result.text, duration: result.duration, usedFallback: false }
+  } catch (primaryErr) {
+    const hasAliyun = !!(aliyunAsrApiKey && aliyunAsrWorkspaceId)
+
+    // fun-asr/paraformer 本身是服务端异步任务（无浏览器解码问题）：
+    // 失败多为任务偶发失败/网络抖动，自动重试一次即可
+    if (isAliyunAsyncModel && hasAliyun) {
+      console.warn('[Transcribe] 异步任务通道失败，自动重试一次:', primaryErr)
+      const retry = await transcribeWithAliyunFallback(audioBlob, onProgress)
+      return { text: retry.text, duration: retry.duration, usedFallback: true }
+    }
+
+    // 其余模型（qwen 浏览器解码 / OpenAI 兼容引擎）：有阿里云配置时降级 fun-asr 服务端
+    if (hasAliyun && isDecodeFailure(primaryErr)) {
+      console.warn('[Transcribe] 主通道解码失败，降级 fun-asr 服务端重转写:', primaryErr)
+      try {
+        const fallback = await transcribeWithAliyunFallback(audioBlob, onProgress)
+        return { text: fallback.text, duration: fallback.duration, usedFallback: true }
+      } catch (fallbackErr) {
+        console.error('[Transcribe] fun-asr 降级也失败:', fallbackErr)
+      }
+    }
+
+    // 无法降级或降级失败：抛原错误
+    throw primaryErr
+  }
+}
+
 /**
  * 分段转写：按时长切分 PCM 数据，并行提交
  */

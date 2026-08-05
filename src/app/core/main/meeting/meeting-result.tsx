@@ -64,7 +64,7 @@ import useArticleStore from '@/stores/article'
 import useSettingStore from '@/stores/setting'
 import { generateMeetingSummary, rewriteSummarySelection } from './meeting-generate-summary'
 import { SummaryBubbleMenu } from './meeting-summary-bubble'
-import { transcribeAudio, transcribeWithAliyunFallback } from './meeting-transcribe'
+import { transcribeAudioWithFallback } from './meeting-transcribe'
 import { loadMeetingAudio } from './meeting-load-audio'
 import { syncMeetingSummaryToCustomer, retryExportFailures, ensureVisitForMeeting, type CustomerSyncFailureStep } from './meeting-customer-export'
 import { deleteVisitRecord } from '@/db/visits'
@@ -1609,47 +1609,20 @@ export function MeetingResult({ meeting }: MeetingResultProps) {
       const texts: string[] = []
       for (let i = 0; i < audioPaths.length; i++) {
         const audioBlob = await loadMeetingAudio(audioPaths[i])
-        try {
-          const result = await transcribeAudio({
-            audioBlob,
-            language: 'zh',
-            onProgress: (progress) => {
-              // 多段时进度按段数折算到 0-100
-              updateMeeting(meeting.id, {
-                transcribeProgress: Math.round(
-                  (i * 100 + progress) / audioPaths.length
-                ),
-              })
-            },
-          })
-          texts.push(result.text)
-        } catch (transcribeErr) {
-          // 纠错降级：浏览器解码失败（2h+ 大 webm）时改用阿里云 fun-asr 异步任务通道，
-          // 服务端解码（支持 12h/2GB），音频已落盘可直接 base64 直传
-          const errMsg =
-            transcribeErr instanceof Error ? transcribeErr.message : String(transcribeErr)
-          const isDecodeFailure =
-            errMsg.includes('音频解码失败') ||
-            errMsg.includes('解码') ||
-            errMsg.includes('文件可能损坏')
-          if (isDecodeFailure) {
-            console.warn(
-              `[Meeting] 第 ${i + 1} 段浏览器解码失败，降级 fun-asr 服务端重转写:`,
-              transcribeErr
-            )
-            const fallback = await transcribeWithAliyunFallback(audioBlob, (progress) => {
-              updateMeeting(meeting.id, {
-                transcribeProgress: Math.round(
-                  ((i * 100 + progress) / audioPaths.length) * 0.9
-                ),
-              })
+        // 统一兜底入口：主通道失败自动降级（qwen/硅基流动解码失败 → fun-asr 服务端；
+        // fun-asr/paraformer 失败 → 自动重试一次）
+        const result = await transcribeAudioWithFallback(audioBlob, {
+          language: 'zh',
+          onProgress: (progress) => {
+            // 多段时进度按段数折算到 0-100
+            updateMeeting(meeting.id, {
+              transcribeProgress: Math.round(
+                (i * 100 + progress) / audioPaths.length
+              ),
             })
-            if (fallback.text.trim()) texts.push(fallback.text.trim())
-            else throw transcribeErr
-          } else {
-            throw transcribeErr
-          }
-        }
+          },
+        })
+        if (result.text.trim()) texts.push(result.text.trim())
       }
 
       updateMeeting(meeting.id, {
