@@ -319,6 +319,31 @@ export function getFullTranscript(meetingId: string): string | null {
   return text || null
 }
 
+/**
+ * 获取部分转写文本（忽略失败片段）。
+ * 当整段转写因浏览器解码限制（2h+ 大 webm 解析失败）无法走通时，
+ * 用本函数兜底——至少保留已识别出的片段，避免用户丢失全部实时转写结果。
+ * 返回格式：{ success: 完整可用片段; failed: 失败片段数; hasText: 是否非空 }
+ */
+export function getPartialTranscript(meetingId: string): {
+  text: string
+  failedCount: number
+} {
+  const state = useLiveTranscriptStore.getState()
+  if (state.meetingId !== meetingId || state.segments.length === 0) {
+    return { text: '', failedCount: 0 }
+  }
+  const okTexts = state.segments
+    .filter((s) => s.status === 'ok')
+    .map((s) => s.text.trim())
+    .filter(Boolean)
+  const failedCount = state.segments.filter((s) => s.status === 'failed').length
+  return {
+    text: okTexts.join('\n'),
+    failedCount,
+  }
+}
+
 // ---- 内部实现 ----
 
 async function setupCapture(stream: MediaStream, token: number): Promise<void> {

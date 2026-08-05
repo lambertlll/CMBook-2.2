@@ -19,6 +19,7 @@ import {
   resumeLiveTranscript,
   finalizeLiveTranscript,
   getFullTranscript,
+  getPartialTranscript,
 } from './meeting-live-transcript'
 import { generateMeetingTitle } from './meeting-generate-title'
 import { generateMeetingSummary } from './meeting-generate-summary'
@@ -321,14 +322,27 @@ export function MeetingPanel() {
           updateMeeting(meetingId, { transcribeProgress: 100 })
           result = { text: liveTranscript }
         } else {
-          updateMeeting(meetingId, { transcribeProgress: 5 })
-          result = await transcribeAudio({
-            audioBlob,
-            language: 'zh',
-            onProgress: (progress) => {
-              updateMeeting(meetingId, { transcribeProgress: progress })
-            },
-          })
+          // getFullTranscript 返回 null 时（实时转写有失败块/会话断开），尝试用已有
+          // 成功片段兜底——避免长录音 2h+ 单 webm Blob 在浏览器 decodeAudioData 失败时
+          // 把用户已得到的转写文字全部丢光
+          const partial = getPartialTranscript(meetingId)
+          if (partial.text && partial.failedCount > 0) {
+            console.warn(
+              `[Meeting] 实时转写有 ${partial.failedCount} 段失败，保留 ${partial.text.length} 字符`,
+              ' 兜底使用，跳过整段转写'
+            )
+            updateMeeting(meetingId, { transcribeProgress: 100 })
+            result = { text: partial.text }
+          } else {
+            updateMeeting(meetingId, { transcribeProgress: 5 })
+            result = await transcribeAudio({
+              audioBlob,
+              language: 'zh',
+              onProgress: (progress) => {
+                updateMeeting(meetingId, { transcribeProgress: progress })
+              },
+            })
+          }
         }
 
         if (isContinuation) {
@@ -440,8 +454,12 @@ export function MeetingPanel() {
         console.error('转写/生成失败:', err)
         const errorMsg =
           err instanceof Error ? err.message : '转写失败，请检查 STT 配置'
-        // 续录失败时保留已生成的纪要，只记录错误
-        if (!isContinuation) {
+        // 若已有 transcript（实时转写兜底成功），不要覆盖；仅记录错误让用户感知
+        // 这样用户至少能拿到实时转写片段继续用，不会被「❌ 转写失败」覆盖丢失
+        const latestWithErr = useMeetingStore
+          .getState()
+          .meetings.find((m) => m.id === meetingId)
+        if (!isContinuation && !latestWithErr?.transcript) {
           updateMeeting(meetingId, {
             summary: `## ❌ 转写失败\n\n${errorMsg}\n\n请检查设置中的语音识别模型配置是否正确。`,
           })
