@@ -89,9 +89,14 @@ let queue: Promise<void> = Promise.resolve()
 let dsMode = false
 // 实时通道类型：'realtime' = 旧版 qwen3-asr-flash-realtime（session.update 协议）；
 // 'inference' = 新版 qwen-audio-3.0-asr-flash-streaming（run-task/二进制帧协议）。
-// 命令前缀随通道切换（dashscope_asr_* / dashscope_inference_*）
+// Rust 侧命令：旧通道注册为 dashscope_asr_*（asr_dashscope_realtime.rs），
+// 新通道为 dashscope_inference_*（asr_dashscope_inference.rs），前缀不同需分别映射
 let dsChannel: 'realtime' | 'inference' = 'realtime'
-const dsCmd = (name: string) => `dashscope_${dsChannel}_${name}`
+const DS_CMD_PREFIX: Record<'realtime' | 'inference', string> = {
+  realtime: 'dashscope_asr',
+  inference: 'dashscope_inference',
+}
+const dsCmd = (name: string) => `${DS_CMD_PREFIX[dsChannel]}_${name}`
 let dsSessionId: string | null = null
 // 不足一帧的 PCM 字节尾包（连接就绪前也暂存于此）
 let dsPending = new Uint8Array(0)
@@ -581,13 +586,18 @@ function setLiveError(message: string): void {
 
 /** 累积 PCM 字节，攒满一帧（100ms）且会话就绪后发送 */
 function appendDsPcm(data: Float32Array, fromRate: number): void {
-  if (dsFailed) return
   const samples16k = resampleLinear(data, fromRate, TARGET_SAMPLE_RATE)
   dsAudioSeconds += samples16k.length / TARGET_SAMPLE_RATE
   const frame = float32ToPcm16Bytes(samples16k)
   const merged = new Uint8Array(dsPending.length + frame.length)
   merged.set(dsPending, 0)
   merged.set(frame, dsPending.length)
+  // 会话失败（断线/服务端错误）期间：不丢弃 PCM，累积到 dsPending，
+  // 重连成功后由 startDsSession 补发，避免转写文本缺段（此前直接 return 丢数据）
+  if (dsFailed) {
+    dsPending = merged
+    return
+  }
 
   let offset = 0
   const sessionId = dsSessionId
@@ -644,17 +654,17 @@ async function connectDsSession(token: number): Promise<void> {
     // 传给 Rust 通道的模型名（realtime 模式固定为流式模型；qwen3 兼容旧值）
     model: useSettingStore.getState().aliyunAsrModel,
   })
-  // corpus（热词上下文）在 realtime 模式下默认不发送：
-  // 百炼/金融云网关对 input_audio_transcription.corpus.text 支持不完整，
-  // 长会话中会触发 InternalError.Algo.InvalidParameter: messages 缺 user 错误，
-  // 导致实时转写中断。热词功能在非 realtime 模式（qwen3-asr-flash 同步切块）
-  // 中通过 vocabulary_id 正常工作，不受影响。
-  const wantCorpus = false
+  // corpus（热词上下文）按通道区分：
+  // - 旧 realtime 模型：默认不发送（百炼/金融云网关对 input_audio_transcription.corpus.text
+  //   支持不完整，长会话触发 InvalidParameter 导致中断；热词走 qwen3-asr-flash 同步切块时正常）
+  // - 新 inference 模型（qwen-audio-3.0-asr-flash-streaming）：Rust 侧已把 corpus_text 转为
+  //   即时热词 vocabulary（asr_dashscope_inference.rs），发送有效
+  const wantCorpus = dsChannel === 'inference'
 
   // 会话建立成功的统一处理：注册会话与事件监听
   const onConnected = async (sessionId: string): Promise<boolean> => {
-    // 等待连接期间会话已切换/清理：立即断开，避免泄漏
-    if (token !== sessionToken || !dsMode) {
+    // 等待连接期间会话已切换/清理/录音已结束：立即断开，避免幽灵会话泄漏
+    if (token !== sessionToken || !dsMode || !capturing) {
       invoke(dsCmd('disconnect'), { sessionId }).catch(() => {})
       return false
     }
@@ -669,6 +679,18 @@ async function connectDsSession(token: number): Promise<void> {
         if (event.payload.sessionId === sessionId) onDsError(event.payload)
       }),
     ]
+    // 重连后补发断线期间累积的 PCM（dsPending 在断线期间持续累积，teardownDs 不清空）
+    if (dsPending.length > 0) {
+      const buffered = dsPending
+      dsPending = new Uint8Array(0)
+      void invoke(dsCmd('send_pcm'), {
+        sessionId,
+        bytes: Array.from(buffered),
+      }).catch(() => {
+        // 补发失败：退回缓冲，等待下次机会（不置 dsFailed，避免立即再次断线）
+        dsPending = buffered
+      })
+    }
     console.log('[LiveTranscript] DashScope realtime 会话已建立:', sessionId)
     return true
   }
@@ -789,7 +811,8 @@ function scheduleDsReconnect(): void {
 function teardownDs(): void {
   const sessionId = dsSessionId
   dsSessionId = null
-  dsPending = new Uint8Array(0)
+  // 注意：不清空 dsPending——断线期间累积的 PCM 由重连后 onConnected 补发，
+  // 若这里清空会导致转写缺段（仅 startLiveTranscript 重置录音会话时才清空）
   if (sessionId) {
     invoke(dsCmd('disconnect'), { sessionId }).catch(() => {})
   }

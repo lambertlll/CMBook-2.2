@@ -1607,30 +1607,55 @@ export function MeetingResult({ meeting }: MeetingResultProps) {
       setActiveTab('transcript')
 
       const texts: string[] = []
+      let failedSegments = 0
       for (let i = 0; i < audioPaths.length; i++) {
         const audioBlob = await loadMeetingAudio(audioPaths[i])
-        // 统一兜底入口：主通道失败自动降级（qwen/硅基流动解码失败 → fun-asr 服务端；
-        // fun-asr/paraformer 失败 → 自动重试一次）
-        const result = await transcribeAudioWithFallback(audioBlob, {
-          language: 'zh',
-          onProgress: (progress) => {
-            // 多段时进度按段数折算到 0-100
-            updateMeeting(meeting.id, {
-              transcribeProgress: Math.round(
-                (i * 100 + progress) / audioPaths.length
-              ),
-            })
-          },
-        })
-        if (result.text.trim()) texts.push(result.text.trim())
+        try {
+          // 统一兜底入口：主通道失败自动降级（qwen/硅基流动解码失败 → fun-asr 服务端；
+          // fun-asr/paraformer 失败 → 自动重试一次）
+          const result = await transcribeAudioWithFallback(audioBlob, {
+            language: 'zh',
+            onProgress: (progress) => {
+              // 多段时进度按段数折算到 0-100
+              updateMeeting(meeting.id, {
+                transcribeProgress: Math.round(
+                  (i * 100 + progress) / audioPaths.length
+                ),
+              })
+            },
+          })
+          if (result.text.trim()) texts.push(result.text.trim())
+          else {
+            console.warn(`[Meeting] 第 ${i + 1} 段转写结果为空`)
+            failedSegments++
+          }
+        } catch (segmentErr) {
+          // 单段失败：不中断全部，记录后继续下一段；成功段仍写回
+          console.error(`[Meeting] 第 ${i + 1} 段转写失败:`, segmentErr)
+          failedSegments++
+        }
+      }
+
+      if (texts.length === 0) {
+        // 全部失败：抛错走 catch
+        throw new Error(failedSegments > 0 ? '所有音频段转写失败' : '转写结果为空')
       }
 
       updateMeeting(meeting.id, {
         transcript: texts.filter(Boolean).join('\n\n'),
         transcribeProgress: 100,
         status: 'completed',
+        // 部分段失败时保留已成功段，并提示用户转写不完整
+        ...(failedSegments > 0
+          ? { error: `${failedSegments} 段转写失败，已保留其余段落（结果可能不完整）` }
+          : {}),
       })
-      toast({ description: '转写完成' })
+      toast({
+        description:
+          failedSegments > 0
+            ? `转写完成（${failedSegments} 段失败，结果可能不完整）`
+            : '转写完成',
+      })
     } catch (err) {
       console.error('重新转写失败:', err)
       const errorMsg = err instanceof Error ? err.message : '转写失败'

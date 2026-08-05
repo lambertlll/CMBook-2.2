@@ -87,6 +87,10 @@ async function autoGenerateVisitSummary(meetingId: string): Promise<void> {
   } catch (err) {
     console.error('[Meeting] 自动生成纪要失败:', err)
     const errorMsg = err instanceof Error ? err.message : '生成纪要失败'
+    // 对齐手动生成路径：设置占位纪要，避免用户看到「转写成功但纪要空白」
+    updateMeeting(meetingId, {
+      summary: `## ❌ 生成失败\n\n${errorMsg}\n\n可在会议详情页点击「重新生成纪要」重试。`,
+    })
     setMeetingError(meetingId, errorMsg)
   }
 }
@@ -270,6 +274,34 @@ export function MeetingPanel() {
             console.warn('[Meeting] No audio blob but transcript exists, skipping transcribe')
             updateMeeting(meetingId, { status: 'completed' })
             processingRef.current.delete(meetingId)
+            // 续录场景：已有转写但纪要为空时仍尝试自动生成（拜访会议）
+            const noBlobMeeting = useMeetingStore
+              .getState()
+              .meetings.find((m) => m.id === meetingId)
+            if (noBlobMeeting?.visitId && !noBlobMeeting.summary) {
+              await autoGenerateVisitSummary(meetingId)
+            }
+            return
+          }
+          // 录音器异常未产出音频时，仍有实时转写片段可用（含部分失败兜底）：
+          // 直接复用，避免已识别的转写被「未录制到音频」丢弃
+          const liveFallback = getFullTranscript(meetingId)
+          const partial = liveFallback ? null : getPartialTranscript(meetingId)
+          if (liveFallback || partial?.text) {
+            const text = liveFallback || (partial as { text: string }).text
+            console.warn('[Meeting] 录音器未产出音频，复用实时转写片段:', text.length, '字符')
+            updateMeeting(meetingId, {
+              transcript: text,
+              transcribeProgress: 100,
+              status: 'completed',
+            })
+            processingRef.current.delete(meetingId)
+            const doneMeeting = useMeetingStore
+              .getState()
+              .meetings.find((m) => m.id === meetingId)
+            if (doneMeeting?.visitId && !doneMeeting.summary) {
+              await autoGenerateVisitSummary(meetingId)
+            }
             return
           }
           console.error('未录制到音频')
@@ -331,7 +363,11 @@ export function MeetingPanel() {
               `[Meeting] 实时转写有 ${partial.failedCount} 段失败，保留 ${partial.text.length} 字符`,
               ' 兜底使用，跳过整段转写'
             )
-            updateMeeting(meetingId, { transcribeProgress: 100 })
+            updateMeeting(meetingId, {
+              transcribeProgress: 100,
+              // 明确提示用户：部分片段失败，结果可能不完整
+              error: `实时转写有 ${partial.failedCount} 段失败，已保留其余片段（结果可能不完整）`,
+            })
             result = { text: partial.text }
           } else {
             updateMeeting(meetingId, { transcribeProgress: 5 })

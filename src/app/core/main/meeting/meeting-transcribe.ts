@@ -213,6 +213,9 @@ export async function transcribeWithAliyunFallback(
     hotwords: parseHotwords(aliyunAsrHotwords),
   }
   const result = await transcribeWithAliyun(base64, mimeType, config, onProgress)
+  if (!result.text || !result.text.trim()) {
+    throw new Error('阿里云转写结果为空')
+  }
   return { text: result.text, duration: result.duration }
 }
 
@@ -255,21 +258,32 @@ export async function transcribeAudioWithFallback(
   try {
     // 主通道：按用户配置转写
     const result = await transcribeAudio({ audioBlob, language, onProgress })
+    // 空文本视为失败（服务端可能返回空，导致「转写成功但无内容」的假完成）
+    if (!result.text || !result.text.trim()) {
+      throw new Error('转写结果为空，请重试或检查语音识别模型配置')
+    }
     return { text: result.text, duration: result.duration, usedFallback: false }
   } catch (primaryErr) {
     const hasAliyun = !!(aliyunAsrApiKey && aliyunAsrWorkspaceId)
 
     // fun-asr/paraformer 本身是服务端异步任务（无浏览器解码问题）：
-    // 失败多为任务偶发失败/网络抖动，自动重试一次即可
+    // 失败多为任务偶发失败/网络抖动，自动重试一次（transcribeWithAliyunFallback 同为
+    // fun-asr 异步任务，任务级失败重试通常可恢复；若仍失败会抛错走 catch 最终保险）
     if (isAliyunAsyncModel && hasAliyun) {
       console.warn('[Transcribe] 异步任务通道失败，自动重试一次:', primaryErr)
-      const retry = await transcribeWithAliyunFallback(audioBlob, onProgress)
-      return { text: retry.text, duration: retry.duration, usedFallback: true }
+      try {
+        const retry = await transcribeWithAliyunFallback(audioBlob, onProgress)
+        return { text: retry.text, duration: retry.duration, usedFallback: true }
+      } catch (retryErr) {
+        console.error('[Transcribe] fun-asr 重试仍失败:', retryErr)
+        throw retryErr
+      }
     }
 
-    // 其余模型（qwen 浏览器解码 / OpenAI 兼容引擎）：有阿里云配置时降级 fun-asr 服务端
-    if (hasAliyun && isDecodeFailure(primaryErr)) {
-      console.warn('[Transcribe] 主通道解码失败，降级 fun-asr 服务端重转写:', primaryErr)
+    // 其余模型（qwen 浏览器解码 / OpenAI 兼容引擎）：有阿里云配置时降级 fun-asr 服务端。
+    // 不限于解码失败——qwen 400 片段超限/网络错误等主通道失败都值得用服务端通道重试
+    if (hasAliyun && !isAliyunAsyncModel) {
+      console.warn('[Transcribe] 主通道失败，降级 fun-asr 服务端重转写:', primaryErr)
       try {
         const fallback = await transcribeWithAliyunFallback(audioBlob, onProgress)
         return { text: fallback.text, duration: fallback.duration, usedFallback: true }
