@@ -181,6 +181,42 @@ export async function transcribeWithFunAsrDiarization(
 }
 
 /**
+ * 纠错降级转写：整段转写失败（如浏览器 decodeAudioData 无法解析 2h+ 大 webm）时，
+ * 用已保存的音频文件走阿里云 fun-asr「异步任务」通道重转写——
+ * 服务端解码（支持 12h / 2GB 音频，无浏览器解码限制），说话人分离按用户设置。
+ * 音频经 base64 直传，不依赖浏览器 AudioContext。
+ */
+export async function transcribeWithAliyunFallback(
+  audioBlob: Blob,
+  onProgress?: (progress: number) => void
+): Promise<TranscribeResult> {
+  const {
+    aliyunAsrApiKey,
+    aliyunAsrWorkspaceId,
+    aliyunAsrHotwords,
+    aliyunAsrDiarization,
+  } = useSettingStore.getState()
+  if (!aliyunAsrApiKey || !aliyunAsrWorkspaceId) {
+    throw new Error('阿里云 ASR 未配置，无法降级转写')
+  }
+
+  onProgress?.(2)
+  const base64 = await encodeBlobToBase64(audioBlob)
+  const mimeType = audioBlob.type || 'audio/wav'
+
+  const config: AliyunASRConfig = {
+    apiKey: aliyunAsrApiKey,
+    workspaceId: aliyunAsrWorkspaceId,
+    model: 'fun-asr',
+    languageHints: ['zh', 'en'],
+    enableDiarization: aliyunAsrDiarization,
+    hotwords: parseHotwords(aliyunAsrHotwords),
+  }
+  const result = await transcribeWithAliyun(base64, mimeType, config, onProgress)
+  return { text: result.text, duration: result.duration }
+}
+
+/**
  * 分段转写：按时长切分 PCM 数据，并行提交
  */
 async function transcribeSegmented(

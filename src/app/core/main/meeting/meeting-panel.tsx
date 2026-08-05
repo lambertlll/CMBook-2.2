@@ -10,7 +10,7 @@ import {
   getOrCreateRecorder,
   destroyRecorder,
 } from './meeting-recorder-manager'
-import { transcribeAudio, transcribeWithFunAsrDiarization } from './meeting-transcribe'
+import { transcribeAudio, transcribeWithAliyunFallback, transcribeWithFunAsrDiarization } from './meeting-transcribe'
 import { loadMeetingAudio } from './meeting-load-audio'
 import useSettingStore from '@/stores/setting'
 import {
@@ -454,6 +454,71 @@ export function MeetingPanel() {
         console.error('转写/生成失败:', err)
         const errorMsg =
           err instanceof Error ? err.message : '转写失败，请检查 STT 配置'
+
+        // —— 纠错机制：录音已落盘时，用 fun-asr 异步任务通道重转写 ——
+        // 浏览器 decodeAudioData 对 2h+ 大 webm 有容器体积上限（约 1-2GB），
+        // 整段转写可能失败；阿里云 fun-asr 异步任务接口服务端解码（支持 12h/2GB），
+        // 且音频已保存到磁盘，读取后 base64 直传即可，不依赖浏览器解码。
+        const fallbackMeeting = useMeetingStore
+          .getState()
+          .meetings.find((m) => m.id === meetingId)
+        const fallbackPaths = fallbackMeeting
+          ? getMeetingAudioPaths(fallbackMeeting)
+          : []
+        const isDecodeFailure =
+          errorMsg.includes('音频解码失败') ||
+          errorMsg.includes('解码') ||
+          errorMsg.includes('文件可能损坏')
+        if (
+          !fallbackMeeting?.transcript &&
+          fallbackPaths.length > 0 &&
+          isDecodeFailure
+        ) {
+          try {
+            console.log('[Meeting] 整段转写解码失败，降级 fun-asr 服务端重转写')
+            updateMeeting(meetingId, {
+              transcribeProgress: 5,
+              error: '整段转写解码失败，正在用阿里云服务端重新转写…',
+            })
+            const texts: string[] = []
+            for (let i = 0; i < fallbackPaths.length; i++) {
+              const segmentBlob = await loadMeetingAudio(fallbackPaths[i])
+              const segmentResult = await transcribeWithAliyunFallback(
+                segmentBlob,
+                (progress) => {
+                  updateMeeting(meetingId, {
+                    transcribeProgress: Math.round(
+                      ((i * 100 + progress) / fallbackPaths.length) * 0.9
+                    ),
+                  })
+                }
+              )
+              if (segmentResult.text.trim()) {
+                texts.push(segmentResult.text.trim())
+              }
+            }
+            if (texts.length > 0) {
+              updateMeeting(meetingId, {
+                transcript: texts.join('\n'),
+                transcribeProgress: 100,
+                error: '',
+                status: 'completed',
+              })
+              console.log('[Meeting] fun-asr 降级转写成功，共', texts.length, '段')
+              // 降级成功后继续后续流程（标题/拜访纪要），不再走下方失败分支
+              const fallbackDone = useMeetingStore
+                .getState()
+                .meetings.find((m) => m.id === meetingId)
+              if (fallbackDone?.visitId && !fallbackDone.summary) {
+                await autoGenerateVisitSummary(meetingId)
+              }
+              return
+            }
+          } catch (fallbackErr) {
+            console.error('[Meeting] fun-asr 降级转写也失败:', fallbackErr)
+          }
+        }
+
         // 若已有 transcript（实时转写兜底成功），不要覆盖；仅记录错误让用户感知
         // 这样用户至少能拿到实时转写片段继续用，不会被「❌ 转写失败」覆盖丢失
         const latestWithErr = useMeetingStore
