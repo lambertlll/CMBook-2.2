@@ -1632,6 +1632,7 @@ export function MeetingResult({ meeting }: MeetingResultProps) {
           // fun-asr/paraformer 失败 → 自动重试一次）
           const result = await transcribeAudioWithFallback(audioBlob, {
             language: 'zh',
+            customerId: meeting.customerId || undefined,
             onProgress: (progress) => {
               // 多段时进度按段数折算到 0-100
               updateMeeting(meeting.id, {

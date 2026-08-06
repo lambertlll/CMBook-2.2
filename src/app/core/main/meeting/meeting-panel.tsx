@@ -477,6 +477,7 @@ export function MeetingPanel() {
             // fun-asr/paraformer 失败 → 自动重试一次；硅基流动等有阿里云配置也降级 fun-asr）
             const fallbackResult = await transcribeAudioWithFallback(audioBlob, {
               language: 'zh',
+              customerId: meeting?.customerId || undefined,
               onProgress: (progress) => {
                 updateMeeting(meetingId, { transcribeProgress: progress })
               },

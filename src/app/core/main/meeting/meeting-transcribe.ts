@@ -8,6 +8,7 @@ interface TranscribeOptions {
   audioBlob: Blob
   language?: string // 默认 'zh'
   onProgress?: (progress: number) => void // 0-100
+  customerId?: string // 关联客户 ID：转写时合并客户档案专名进热词表（一期-3）
 }
 
 interface TranscribeResult {
@@ -29,6 +30,41 @@ const MAX_SEGMENT_DURATION = 10 * 60
 export function parseHotwords(raw: string): string[] {
   if (!raw) return []
   return [...new Set(raw.split(/[\n,，、;；]+/).map((w) => w.trim()).filter(Boolean))]
+}
+
+/**
+ * 合并热词：用户手工热词 + 关联客户档案专名（一期-3，转写源头少错）。
+ * 客户档案的 name/industry/profile 是现成的专有名词资产，喂给 ASR 可显著减少
+ * 人名/金额/行业术语的误识别；失败静默降级为仅手工热词。
+ */
+export async function buildHotwordsWithCustomer(
+  manualHotwords: string[],
+  customerId?: string
+): Promise<string[]> {
+  const words = new Set(manualHotwords)
+  if (!customerId) return [...words]
+
+  try {
+    const { getCustomer } = await import('@/db/customers')
+    const customer = await getCustomer(customerId)
+    if (!customer) return [...words]
+
+    // 客户名/行业/画像中提取专名：按分隔符切分 + 整体作为词组
+    const segments = [customer.name, customer.industry, customer.profile]
+      .filter(Boolean)
+      .join('\n')
+    for (const piece of segments.split(/[\n,，、;；\s]+/)) {
+      const w = piece.trim()
+      if (w && w.length >= 2 && w.length <= 20) words.add(w)
+    }
+    // 客户全名作为独立词组（如「华兴集团」整体识别，防止拆成「华兴」+「集团」）
+    if (customer.name.trim()) words.add(customer.name.trim())
+  } catch (err) {
+    // 客户档案查询失败不影响转写主流程
+    console.warn('[Transcribe] 合并客户档案热词失败，仅用手工热词:', err)
+  }
+
+  return [...words]
 }
 
 /**
@@ -66,8 +102,14 @@ async function encodeBlobToBase64(audioBlob: Blob): Promise<string> {
  * 根据用户选择的 STT 引擎分发到对应服务
  */
 export async function transcribeAudio(options: TranscribeOptions): Promise<TranscribeResult> {
-  const { audioBlob, language = 'zh', onProgress } = options
+  const { audioBlob, language = 'zh', onProgress, customerId } = options
   const { sttEngine, aliyunAsrApiKey, aliyunAsrWorkspaceId, aliyunAsrHotwords, aliyunAsrDiarization, aliyunAsrModel } = useSettingStore.getState()
+
+  // 热词 = 用户手工热词 + 关联客户档案专名（一期-3，转写源头少错）
+  const hotwords = await buildHotwordsWithCustomer(
+    parseHotwords(aliyunAsrHotwords),
+    customerId
+  )
 
   // 阿里云百炼引擎
   if (sttEngine === 'aliyun') {
@@ -94,7 +136,7 @@ export async function transcribeAudio(options: TranscribeOptions): Promise<Trans
         apiKey: aliyunAsrApiKey,
         workspaceId: aliyunAsrWorkspaceId,
         language,
-        hotwords: parseHotwords(aliyunAsrHotwords),
+        hotwords,
         model: syncModel,
       }, onProgress)
       return { text: result.text, duration: result.duration }
@@ -111,7 +153,7 @@ export async function transcribeAudio(options: TranscribeOptions): Promise<Trans
       model: aliyunAsrModel || 'fun-asr',
       languageHints: [language, 'en'],
       enableDiarization: aliyunAsrDiarization,
-      hotwords: parseHotwords(aliyunAsrHotwords),
+      hotwords,
     }
     const result = await transcribeWithAliyun(base64, mimeType, config, onProgress)
     return { text: result.text, duration: result.duration }
@@ -262,7 +304,7 @@ export async function transcribeAudioWithFallback(
   audioBlob: Blob,
   options: Omit<TranscribeOptions, 'audioBlob'> = {}
 ): Promise<TranscribeWithFallbackResult> {
-  const { language = 'zh', onProgress } = options
+  const { language = 'zh', onProgress, customerId } = options
   const { sttEngine, aliyunAsrModel, aliyunAsrApiKey, aliyunAsrWorkspaceId } =
     useSettingStore.getState()
   const isAliyunAsyncModel =
@@ -271,7 +313,7 @@ export async function transcribeAudioWithFallback(
 
   try {
     // 主通道：按用户配置转写
-    const result = await transcribeAudio({ audioBlob, language, onProgress })
+    const result = await transcribeAudio({ audioBlob, language, onProgress, customerId })
     // HTTP 响应成功即证明网络可达：先复位离线标记（P2-2：判定网络可达性，
     // 不应被下方"空文本"业务校验挡住——请求成功但返回空文本时同样证明网络已恢复）
     useNetworkStore.getState().markOnline()

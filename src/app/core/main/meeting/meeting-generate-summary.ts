@@ -85,7 +85,12 @@ export async function generateMeetingSummary(
   }
 
   const { meetingTranscriptCorrection, meetingCoverageCheck } = useSettingStore.getState()
-  const plainNotes = manualNotes ? htmlToPlainText(manualNotes) : ''
+  // 一期：结构化提取笔记——保留高亮/加粗/待办三级锚点，不再用 textContent 拍平
+  const structuredNotes = manualNotes
+    ? extractStructuredNotes(manualNotes)
+    : { plainText: '', anchors: { highlights: [], bolds: [], todos: [] } }
+  const plainNotes = structuredNotes.plainText
+  const notesPrompt = formatStructuredNotes(structuredNotes)
 
   // 笔记反向校正转写：仅用于纪要生成（不写回 meetings.transcript），失败静默回退原始转写。
   // 转写超过分段阈值时跳过校正，直接进入分段流程，避免校正调用超 context。
@@ -96,17 +101,17 @@ export async function generateMeetingSummary(
     plainNotes &&
     transcript.length <= CHUNK_TRANSCRIPT_THRESHOLD
   ) {
-    const corrected = await correctTranscriptWithNotes(aiConfig, transcript, plainNotes, title)
+    const corrected = await correctTranscriptWithNotes(aiConfig, transcript, notesPrompt, title)
     if (corrected) effectiveTranscript = corrected
   }
 
   // 构建 user message：长会议走 map-reduce 分段要点，短会议保持原有单段流程
   let userMessage: string
   if (effectiveTranscript.length > CHUNK_TRANSCRIPT_THRESHOLD) {
-    const chunkPoints = await extractLongTranscriptPoints(aiConfig, effectiveTranscript, plainNotes, title)
-    userMessage = buildChunkedUserMessage(title, chunkPoints, plainNotes, duration)
+    const chunkPoints = await extractLongTranscriptPoints(aiConfig, effectiveTranscript, notesPrompt, title)
+    userMessage = buildChunkedUserMessage(title, chunkPoints, notesPrompt, duration, createdAt)
   } else {
-    userMessage = buildUserMessage(title, effectiveTranscript, manualNotes, duration)
+    userMessage = buildUserMessage(title, effectiveTranscript, notesPrompt, duration, createdAt)
   }
 
   // 创建 OpenAI 客户端并调用流式接口
@@ -136,8 +141,8 @@ export async function generateMeetingSummary(
   }
 
   // 覆盖度自检（默认关闭）：对照手动笔记检查遗漏要点，遗漏内容流式追加到纪要末尾
-  if (meetingCoverageCheck && plainNotes && fullContent) {
-    fullContent = await appendCoverageSupplement(aiConfig, fullContent, plainNotes, title, onStream, options.signal)
+  if (meetingCoverageCheck && notesPrompt && fullContent) {
+    fullContent = await appendCoverageSupplement(aiConfig, fullContent, notesPrompt, title, onStream, options.signal)
   }
 
   // AI 请求成功完成 → 复位离线标记（P2-1：纪要生成成功证明网络可用，
@@ -188,7 +193,9 @@ async function correctTranscriptWithNotes(
   try {
     const userMessage = [
       title ? `会议标题：${title}` : '',
-      `## 手动笔记（权威参照）\n${plainNotes}`,
+      // plainNotes 此时已是含三级锚点（高亮/加粗/待办）的结构化笔记——
+      // 锚点术语是校正的最高依据，转写与此冲突时以笔记为准
+      `## 手动笔记（权威参照，含锚点标注）\n${plainNotes}`,
       `## 录音转写文本（待校正）\n${transcript}`,
       '请输出校正后的转写全文。',
     ].filter(Boolean).join('\n\n')
@@ -307,7 +314,8 @@ async function appendCoverageSupplement(
     const openai = await createOpenAIClient(aiConfig)
     const userMessage = [
       title ? `会议标题：${title}` : '',
-      `## 手动笔记\n${plainNotes}`,
+      // plainNotes 此时为含三级锚点的结构化笔记：逐条核对锚点是否落入纪要
+      `## 手动笔记（含锚点标注，请逐项核对是否覆盖）\n${plainNotes}`,
       `## 已生成纪要\n${summary}`,
     ].filter(Boolean).join('\n\n')
 
@@ -377,27 +385,27 @@ async function callNonStreaming(
 
 /**
  * 构建发送给 AI 的用户消息（转写未超分段阈值时的单段流程）
+ * manualNotes 已是格式化好的笔记锚点文本（extractStructuredNotes + formatStructuredNotes），
+ * 避免在此重复解析 DOM（一期建议 6）
  */
 function buildUserMessage(
   title: string | undefined,
   transcript: string,
   manualNotes: string,
-  duration?: number
+  duration?: number,
+  createdAt?: number
 ): string {
   const parts: string[] = []
 
-  parts.push(buildMeetingMeta(title, duration))
+  parts.push(buildMeetingMeta(title, createdAt, duration))
 
   if (transcript) {
     parts.push(`## 录音转写文本\n${transcript}`)
   }
 
   if (manualNotes) {
-    // 去除 HTML 标签并解码实体，保留纯文本
-    const plainNotes = htmlToPlainText(manualNotes)
-    if (plainNotes) {
-      parts.push(`## 手动笔记（重点标注，优先参考）\n${plainNotes}`)
-    }
+    // 已含三级锚点（高亮/加粗/待办）与笔记正文，无需再解析 HTML
+    parts.push(`## 手动笔记（重点标注，优先参考）\n${manualNotes}`)
   }
 
   parts.push('\n---\n请根据以上内容，严格按照系统提示要求的格式生成会议纪要。')
@@ -412,11 +420,12 @@ function buildChunkedUserMessage(
   title: string | undefined,
   chunkPoints: string,
   plainNotes: string,
-  duration?: number
+  duration?: number,
+  createdAt?: number
 ): string {
   const parts: string[] = []
 
-  parts.push(buildMeetingMeta(title, duration))
+  parts.push(buildMeetingMeta(title, createdAt, duration))
 
   if (plainNotes) {
     parts.push(`## 手动笔记（重点标注，优先参考）\n${plainNotes}`)
@@ -431,13 +440,18 @@ function buildChunkedUserMessage(
 
 /**
  * 会议元信息（标题/日期/时长）
+ * createdAt：会议创建时间戳，用于「会议日期」——隔天重新生成纪要时日期不能串到今天（一期建议 6）
  */
-function buildMeetingMeta(title: string | undefined, duration?: number): string {
+function buildMeetingMeta(title: string | undefined, createdAt?: number, duration?: number): string {
   const metaLines: string[] = []
   if (title) {
     metaLines.push(`- **会议标题**：${title}`)
   }
-  metaLines.push(`- **会议日期**：${new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}`)
+  if (createdAt && createdAt > 0) {
+    metaLines.push(`- **会议日期**：${new Date(createdAt).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}`)
+  } else {
+    metaLines.push(`- **会议日期**：${new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}`)
+  }
   if (duration && duration > 0) {
     const h = Math.floor(duration / 3600)
     const m = Math.floor((duration % 3600) / 60)
@@ -503,9 +517,84 @@ export async function rewriteSummarySelection(
 }
 
 /**
- * 将 HTML 转为纯文本（同时解码 &nbsp; &amp; 等实体）
+ * 笔记的结构化提取结果（一期：保留客户经理的标注层级，让锚点权威性真正生效）
  */
-function htmlToPlainText(html: string): string {
+interface StructuredNotes {
+  /** 纯文本全文（无标注，供 L1/L4 兜底与低版本兼容） */
+  plainText: string
+  /** 三级锚点：高亮（mark）> 加粗（strong）> 待办（taskList） */
+  anchors: {
+    highlights: string[]
+    bolds: string[]
+    todos: string[]
+  }
+}
+
+/**
+ * 从笔记 HTML 中提取三级锚点（一期核心）：
+ * - <mark> 高亮：客户经理显式标注，最高权威
+ * - <strong> 加粗：次权威
+ * - <li data-checked> 待办：行动项
+ * 输出格式化锚点文本，注入校正/生成 prompt，让模型知道哪些内容必须出现且以笔记为准。
+ */
+function extractStructuredNotes(html: string): StructuredNotes {
   const doc = new DOMParser().parseFromString(html, 'text/html')
-  return (doc.body.textContent || '').trim()
+  const plainText = (doc.body.textContent || '').trim()
+
+  const highlights: string[] = []
+  const bolds: string[] = []
+  const todos: string[] = []
+
+  // 高亮：<mark>（multicolor 的 5 色高亮均为 mark 元素）
+  doc.querySelectorAll('mark').forEach((el) => {
+    const text = (el.textContent || '').trim()
+    if (text) highlights.push(text)
+  })
+
+  // 加粗：<strong>（避开待办清单里的加粗，避免重复）
+  doc.querySelectorAll('strong').forEach((el) => {
+    const text = (el.textContent || '').trim()
+    if (text && !el.closest('li[data-type="taskItem"]')) bolds.push(text)
+  })
+
+  // 待办：TaskItem 序列化为 <li data-checked="true/false">
+  doc.querySelectorAll('li[data-checked]').forEach((el) => {
+    const text = (el.textContent || '').trim()
+    if (!text) return
+    const checked = el.getAttribute('data-checked') === 'true'
+    todos.push(`${checked ? '[x]' : '[ ]'} ${text}`)
+  })
+
+  return { plainText, anchors: { highlights, bolds, todos } }
+}
+
+/**
+ * 把结构化笔记格式化为注入 prompt 的分层锚点文本
+ */
+function formatStructuredNotes(notes: StructuredNotes): string {
+  const { highlights, bolds, todos } = notes.anchors
+  const blocks: string[] = []
+
+  if (highlights.length > 0) {
+    blocks.push(
+      `## 锚点术语（客户经理高亮标注，最高权威 — 转写与此冲突时以此为准）\n${highlights
+        .map((h) => `- ${h}`)
+        .join('\n')}`
+    )
+  }
+  if (bolds.length > 0) {
+    blocks.push(
+      `## 重点内容（客户经理加粗标注）\n${bolds.map((b) => `- ${b}`).join('\n')}`
+    )
+  }
+  if (todos.length > 0) {
+    blocks.push(
+      `## 笔记待办（客户经理勾选记录）\n${todos.map((t) => `- ${t}`).join('\n')}`
+    )
+  }
+  if (notes.plainText) {
+    blocks.push(`## 笔记正文\n${notes.plainText}`)
+  }
+
+  return blocks.join('\n\n')
 }
