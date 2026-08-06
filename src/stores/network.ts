@@ -66,20 +66,31 @@ export function initNetworkListeners(): () => void {
  * - 无 HTTP 状态码的请求失败（Rust 端网络错误）
  * - 超时/连接拒绝/网络错误关键字
  * 返回 true 时调用方可据此标记离线或快速失败。
+ *
+ * 注意：HTTP 状态码类错误（4xx/5xx，含业务文案带"连接/超时"字样如"连接数超限"）
+ * 一律不算网络类——避免服务端业务错误误判为断网导致永久离线（P0-3）。
  */
 export function isNetworkError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err)
   const lower = msg.toLowerCase()
+  // Rust 端错误格式 "Request failed: {status} {body}"：有状态码的是 HTTP 类错误，非断网
+  const statusMatch = msg.match(/Request failed: (\d{3})\b/)
+  if (statusMatch) {
+    return false
+  }
+  // 无状态码时才按关键字判定（连接失败/超时/网络错误）
   return (
     lower.includes('network') ||
     lower.includes('net::') ||
     lower.includes('failed to connect') ||
-    lower.includes('connection') ||
+    lower.includes('connection refused') ||
+    lower.includes('connect error') ||
+    lower.includes('socket') ||
     lower.includes('timeout') ||
     lower.includes('超时') ||
     lower.includes('网络') ||
     lower.includes('offline') ||
-    // Rust 端网络错误通常无状态码（如 "Request failed: connect error" 之类）
-    (lower.includes('request failed') && !/request failed: \d{3}/.test(lower))
+    lower.includes('dns') ||
+    lower.includes('无网络')
   )
 }

@@ -933,10 +933,13 @@ function teardownCapture(): void {
     } catch {
       // ignore
     }
-    if (captureNode instanceof AudioWorkletNode) {
+    // P1-3：用能力检测替代 instanceof AudioWorkletNode——旧 WebKit 无该全局标识符，
+    // instanceof 会抛 ReferenceError 中断清理（audioContext.close() 执行不到、麦克风不释放）
+    if (typeof AudioWorkletNode !== 'undefined' && captureNode instanceof AudioWorkletNode) {
       captureNode.port.onmessage = null
     } else {
-      captureNode.onaudioprocess = null
+      // 非 Worklet 路径为 ScriptProcessorNode（此分支运行时类型已知）
+      ;(captureNode as ScriptProcessorNode).onaudioprocess = null
     }
     captureNode = null
   }

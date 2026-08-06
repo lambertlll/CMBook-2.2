@@ -449,9 +449,9 @@ export function MeetingList() {
                         {meeting.title || t('untitledMeeting')}
                       </span>
                       <StatusBadge status={meeting.status} />
-                      {/* 离线结束的会议：待联网补转写角标 */}
+                      {/* 离线结束的会议：待联网补转写角标（独立 pendingTranscribe 标记，P1-2） */}
                       {meeting.status === 'completed' &&
-                        meeting.error?.includes('离线') &&
+                        meeting.pendingTranscribe &&
                         !meeting.transcript && (
                           <Badge
                             variant="outline"

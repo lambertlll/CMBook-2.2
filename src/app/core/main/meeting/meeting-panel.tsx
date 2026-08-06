@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useCallback } from 'react'
 import { useToast } from '@/hooks/use-toast'
-import { useMeetingStore, getMeetingAudioPaths } from './meeting-store'
+import { useMeetingStore, getMeetingAudioPaths, type MeetingStatus } from './meeting-store'
 import { MeetingControls } from './meeting-controls'
 import { MeetingNotesEditor } from './meeting-notes-editor'
 import { MeetingResult } from './meeting-result'
@@ -203,7 +203,27 @@ export function MeetingPanel() {
       destroyRecorder()
       const errorMsg =
         err instanceof Error ? err.message : '录音启动失败，请检查麦克风权限'
-      updateMeeting(recordingMeeting.id, { status: 'idle', error: errorMsg })
+      // P0-1：改为 completed + 错误信息，让 MeetingResult 渲染错误态（idle 无渲染分支
+      // 会回落到初始页，用户看不到错误提示）；同时清空 recordingMeetingId，
+      // 否则该会议仍占全局录音槽位导致后续状态判断误判
+      useMeetingStore.setState((state) => ({
+        recordingMeetingId:
+          state.recordingMeetingId === recordingMeeting.id
+            ? null
+            : state.recordingMeetingId,
+        meetings: state.meetings.map((m) =>
+          m.id === recordingMeeting.id
+            ? { ...m, status: 'completed' as MeetingStatus, error: errorMsg }
+            : m
+        ),
+      }))
+      // 同步落库
+      useMeetingStore
+        .getState()
+        .updateMeeting(recordingMeeting.id, {
+          status: 'completed',
+          error: errorMsg,
+        })
     })
   }, [recordingMeeting?.status, recordingMeeting?.id, updateMeeting])
 
@@ -251,12 +271,10 @@ export function MeetingPanel() {
     const wasOffline = prevNetworkStatus.current === 'offline'
     prevNetworkStatus.current = current
     if (!wasOffline || current !== 'online') return
-    // 网络恢复：检查是否有待补转写的会议
+    // 网络恢复：检查是否有待补转写的会议（独立 pendingTranscribe 标记，P1-2）
     const pendingMeeting = useMeetingStore
       .getState()
-      .meetings.find(
-        (m) => m.status === 'completed' && (m.error || '').includes('离线')
-      )
+      .meetings.find((m) => m.status === 'completed' && m.pendingTranscribe)
     if (!pendingMeeting) return
     setActiveMeeting(pendingMeeting.id)
     toast({
@@ -310,7 +328,8 @@ export function MeetingPanel() {
         // 结束录音：收尾实时转写（送出尾块并等待队列清空），供下方复用
         await finalizeLiveTranscript(meetingId)
 
-        // 离线：只保存录音，跳过转写与纪要生成（联网后补）
+        // 离线：只保存录音，跳过联网转写与纪要生成（联网后补）。
+        // 但断网前实时转写已识别的文字要保留（P0-2：此前直接丢弃，联网后只能整段重转）
         if (offlineAtEnd && audioBlob && audioBlob.size > 0) {
           try {
             const offlinePath = await saveMeetingAudio(
@@ -318,14 +337,31 @@ export function MeetingPanel() {
               audioBlob,
               previousSegments.length + 1
             )
+            const liveText = getFullTranscript(meetingId)
+            const partialText = liveText ? '' : getPartialTranscript(meetingId)?.text || ''
+            const preservedTranscript = liveText || partialText
+            const offlineError = preservedTranscript
+              ? '当前离线，已保存录音并保留实时转写片段（断网前内容）。联网后可点击「重新转写」补全并生成纪要。'
+              : '当前离线，已保存录音。联网后可点击「重新转写」补转录并生成纪要。'
             updateMeeting(meetingId, {
               audioSegments: [...previousSegments, offlinePath],
               ...(meeting.audioPath ? {} : { audioPath: offlinePath }),
+              // 保留断网前实时转写已识别的文字，避免白丢
+              ...(preservedTranscript
+                ? { transcript: preservedTranscript, transcribeProgress: 100 }
+                : {}),
               status: 'completed',
-              // error 字段承载「待补转写」提示（详情页可见，结果页底部提示）
-              error: '当前离线，已保存录音。联网后可点击「重新转写」补转录并生成纪要。',
+              // 独立待补转写标记（P1-2：不靠 error 文案匹配）
+              pendingTranscribe: true,
+              error: offlineError,
             })
-            console.warn('[Meeting] 离线结束会议：已保存录音，待联网补转写')
+            console.warn(
+              '[Meeting] 离线结束会议：已保存录音',
+              preservedTranscript
+                ? `，保留实时转写 ${preservedTranscript.length} 字符`
+                : '（无实时转写片段）',
+              '待联网补转写'
+            )
             processingRef.current.delete(meetingId)
             return
           } catch (saveErr) {
@@ -475,6 +511,8 @@ export function MeetingPanel() {
             transcribeProgress: 100,
           })
         }
+        // 转写成功：清除离线「待补转写」标记（P1-2）
+        updateMeeting(meetingId, { pendingTranscribe: false })
 
         // 3.5 自动补充说话人标注：qwen3-asr-flash-realtime 不支持说话人分离，
         // 用户开启开关后，用 fun-asr + diarization 对全部音频段重转写并替换转写文本；

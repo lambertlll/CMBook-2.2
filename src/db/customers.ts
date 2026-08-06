@@ -188,7 +188,9 @@ export async function getCustomerCascadeStats(
       [customerId]
     ),
     db.select<{ count: number }[]>(
-      'SELECT COUNT(*) AS count FROM visit_todos WHERE customerId = $1',
+      // P1-4：统计口径对齐 UI 可见性——软删除（deleted=1）待办在待办中心已不可见，
+      // 确认框不应把它们计入「将被删除 N 条待办」（物理删除口径无需过滤）
+      'SELECT COUNT(*) AS count FROM visit_todos WHERE customerId = $1 AND deleted = 0',
       [customerId]
     ),
     db.select<{ count: number }[]>(

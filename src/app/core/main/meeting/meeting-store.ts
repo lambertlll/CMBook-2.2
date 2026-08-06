@@ -38,6 +38,7 @@ export interface Meeting {
   customerId: string // 关联客户 ID（2.0 新增，空串表示未关联）
   visitId: string // 关联拜访 ID（2.0 新增，空串表示未关联）
   exportedFilePath: string // 纪要导出到客户知识库的文件相对路径（空串表示未导出）
+  pendingTranscribe: boolean // true=离线结束待联网补转写（P1-2：独立字段，替代 error 文案匹配）
   hasSummary: number // 是否已有纪要（列表查询的轻量标记 0/1，不读 summary 大字段；不持久化）
   createdAt: number // timestamp
   transcribeProgress: number // 仅运行时使用，不持久化
@@ -104,6 +105,7 @@ const PERSIST_FIELDS: (keyof Meeting)[] = [
   'customerId',
   'visitId',
   'exportedFilePath',
+  'pendingTranscribe',
 ]
 
 /**
@@ -152,6 +154,7 @@ function recordToMeeting(record: MeetingRecord): Meeting {
     customerId: record.customerId || '',
     visitId: record.visitId || '',
     exportedFilePath: record.exportedFilePath || '',
+    pendingTranscribe: record.pendingTranscribe === 1,
     hasSummary: record.summary && record.summary.trim() ? 1 : 0,
     createdAt: record.createdAt,
     transcribeProgress: 0,
@@ -181,6 +184,7 @@ function listRecordToMeeting(record: MeetingListRecord): Meeting {
     customerId: record.customerId || '',
     visitId: record.visitId || '',
     exportedFilePath: record.exportedFilePath || '',
+    pendingTranscribe: record.pendingTranscribe === 1,
     hasSummary: record.hasSummary ?? 0,
     createdAt: record.createdAt,
     transcribeProgress: 0,
@@ -213,6 +217,9 @@ function flushSave(id: string, fields: Partial<Meeting>) {
       // error 传 undefined 表示清除错误，落库为空串；数组字段（audioSegments）序列化为 JSON
       if (key === 'error' && value === undefined) {
         dbFields[key] = ''
+      } else if (key === 'pendingTranscribe') {
+        // 布尔字段落库为 0/1（P1-2 独立待补转写标记）
+        dbFields[key] = value ? 1 : 0
       } else if (Array.isArray(value)) {
         dbFields[key] = JSON.stringify(value)
       } else {
@@ -343,6 +350,7 @@ export const useMeetingStore = create<MeetingStoreState>((set, get) => ({
       customerId: options?.customerId || '',
       visitId: options?.visitId || '',
       exportedFilePath: '',
+      pendingTranscribe: false,
       hasSummary: 0,
       createdAt: now,
       transcribeProgress: 0,
@@ -374,6 +382,7 @@ export const useMeetingStore = create<MeetingStoreState>((set, get) => ({
       customerId: newMeeting.customerId,
       visitId: newMeeting.visitId,
       exportedFilePath: '',
+      pendingTranscribe: 0,
       createdAt: now,
       updatedAt: now,
     }).catch((err) => {

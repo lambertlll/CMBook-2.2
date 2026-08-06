@@ -995,6 +995,8 @@ export function MeetingResult({ meeting }: MeetingResultProps) {
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // AI 纪要生成的 AbortController：支持中途停止
   const abortControllerRef = useRef<AbortController | null>(null)
+  // 生成中守卫：防止双击「重新生成」两个流并发写 summary（P1-1）
+  const generatingRef = useRef(false)
   // 待办确认：纪要生成后不自动弹窗，等用户确认纪要内容后再弹出
   const [pendingTodoSummary, setPendingTodoSummary] = useState<string | null>(null)
 
@@ -1484,6 +1486,13 @@ export function MeetingResult({ meeting }: MeetingResultProps) {
   )
 
   const handleRegenerate = useCallback(async () => {
+    // P1-1：生成中守卫——双击/连点「重新生成」时第二次直接忽略，
+    // 否则两个流并发写 summary 且 abortControllerRef 被覆盖，「停止生成」只能停后一个
+    if (generatingRef.current) {
+      console.warn('[Meeting] 纪要生成中，忽略重复的「重新生成」请求')
+      toast({ description: '纪要生成中，请稍候' })
+      return
+    }
     if (!meeting.transcript && !meeting.manualNotes) {
       toast({
         description: '没有可用的转录内容或笔记，请先录音或添加笔记',
@@ -1492,6 +1501,7 @@ export function MeetingResult({ meeting }: MeetingResultProps) {
       return
     }
     // 先设置状态，清空旧纪要和错误信息
+    generatingRef.current = true
     updateMeeting(meeting.id, { status: 'generating', summary: '', error: '' })
     setActiveTab('summary')
     // 清除上次待办确认状态
@@ -1566,6 +1576,7 @@ export function MeetingResult({ meeting }: MeetingResultProps) {
       }
     } finally {
       abortControllerRef.current = null
+      generatingRef.current = false
     }
   }, [meeting.id, meeting.transcript, meeting.manualNotes, linkedCustomerName, updateMeeting, setMeetingError, autoClassifyMeeting])
 

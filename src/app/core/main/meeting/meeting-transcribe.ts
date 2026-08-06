@@ -276,6 +276,8 @@ export async function transcribeAudioWithFallback(
     if (!result.text || !result.text.trim()) {
       throw new Error('转写结果为空，请重试或检查语音识别模型配置')
     }
+    // 转写成功证明网络可用：复位离线标记（P0-3：误标后必须能自愈）
+    useNetworkStore.getState().markOnline()
     return { text: result.text, duration: result.duration, usedFallback: false }
   } catch (primaryErr) {
     // 网络类错误（断网/超时/连接失败）→ 标记离线，联动离线模式（录音继续、跳过联网功能）
@@ -291,6 +293,8 @@ export async function transcribeAudioWithFallback(
       console.warn('[Transcribe] 异步任务通道失败，自动重试一次:', primaryErr)
       try {
         const retry = await transcribeWithAliyunFallback(audioBlob, onProgress)
+        // 重试成功证明网络可用：复位离线标记
+        useNetworkStore.getState().markOnline()
         return { text: retry.text, duration: retry.duration, usedFallback: true }
       } catch (retryErr) {
         console.error('[Transcribe] fun-asr 重试仍失败:', retryErr)
@@ -304,6 +308,8 @@ export async function transcribeAudioWithFallback(
       console.warn('[Transcribe] 主通道失败，降级 fun-asr 服务端重转写:', primaryErr)
       try {
         const fallback = await transcribeWithAliyunFallback(audioBlob, onProgress)
+        // 降级成功证明网络可用：复位离线标记
+        useNetworkStore.getState().markOnline()
         return { text: fallback.text, duration: fallback.duration, usedFallback: true }
       } catch (fallbackErr) {
         console.error('[Transcribe] fun-asr 降级也失败:', fallbackErr)

@@ -17,6 +17,7 @@ export interface MeetingRecord {
   customerId?: string // 关联客户 ID（2.0 新增，空串表示未关联）
   visitId?: string // 关联拜访 ID（2.0 新增，空串表示未关联）
   exportedFilePath?: string // 纪要导出到客户知识库的文件相对路径（空串表示未导出）
+  pendingTranscribe?: number // 1=离线结束待联网补转写（P1-2：独立布尔字段替代 error 文案匹配）
   createdAt: number
   updatedAt: number
 }
@@ -61,6 +62,8 @@ export async function initMeetingsDb() {
   await ensureColumn(db, 'visitId', `visitId TEXT DEFAULT ''`)
   // 2.0 新增：纪要导出到客户知识库的文件路径（重新导出时据此清理旧文件，删除会议时级联清理）
   await ensureColumn(db, 'exportedFilePath', `exportedFilePath TEXT DEFAULT ''`)
+  // 2.8.3 新增：离线结束待补转写标记（独立布尔字段，替代 error 文案匹配的脆弱方案）
+  await ensureColumn(db, 'pendingTranscribe', `pendingTranscribe INTEGER DEFAULT 0`)
 }
 
 /**
@@ -150,8 +153,8 @@ export async function getMeeting(id: string): Promise<MeetingRecord | null> {
 export async function insertMeeting(meeting: MeetingRecord) {
   const db = await getDb()
   await db.execute(
-    `INSERT INTO meetings (id, title, status, manualNotes, transcript, summary, selectedTemplate, selectedModel, duration, audioPath, audioSegments, error, customerId, visitId, exportedFilePath, createdAt, updatedAt)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
+    `INSERT INTO meetings (id, title, status, manualNotes, transcript, summary, selectedTemplate, selectedModel, duration, audioPath, audioSegments, error, customerId, visitId, exportedFilePath, pendingTranscribe, createdAt, updatedAt)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
     [
       meeting.id,
       meeting.title,
@@ -168,6 +171,7 @@ export async function insertMeeting(meeting: MeetingRecord) {
       meeting.customerId || '',
       meeting.visitId || '',
       meeting.exportedFilePath || '',
+      meeting.pendingTranscribe ? 1 : 0,
       meeting.createdAt,
       meeting.updatedAt,
     ]
@@ -204,6 +208,7 @@ export async function updateMeetingRecord(
     'customerId',
     'visitId',
     'exportedFilePath',
+    'pendingTranscribe',
   ] as const
 
   for (const field of allowedFields) {
