@@ -25,7 +25,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
-import { Plus, Mic, Search, Users, AlertTriangle, AlertCircle, RefreshCw, FolderInput, Trash2, FileDown, X, CheckSquare } from 'lucide-react'
+import { Plus, Mic, Search, Users, AlertTriangle, AlertCircle, RefreshCw, FolderInput, Trash2, FileDown, X, CheckSquare, CloudOff } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import { toast } from '@/hooks/use-toast'
@@ -449,6 +449,18 @@ export function MeetingList() {
                         {meeting.title || t('untitledMeeting')}
                       </span>
                       <StatusBadge status={meeting.status} />
+                      {/* 离线结束的会议：待联网补转写角标 */}
+                      {meeting.status === 'completed' &&
+                        meeting.error?.includes('离线') &&
+                        !meeting.transcript && (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] px-1.5 py-0 gap-0.5 text-warning border-warning/40"
+                          >
+                            <CloudOff className="w-2.5 h-2.5" />
+                            待转写
+                          </Badge>
+                        )}
                     </div>
                     <div className={cn('flex items-center gap-1.5 mt-1', isSelected && 'ml-4')}>
                       <span className="text-xs text-muted-foreground">

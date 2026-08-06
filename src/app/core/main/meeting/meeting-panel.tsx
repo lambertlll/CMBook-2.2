@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useCallback } from 'react'
+import { useToast } from '@/hooks/use-toast'
 import { useMeetingStore, getMeetingAudioPaths } from './meeting-store'
 import { MeetingControls } from './meeting-controls'
 import { MeetingNotesEditor } from './meeting-notes-editor'
@@ -13,6 +14,7 @@ import {
 import { transcribeAudioWithFallback, transcribeWithFunAsrDiarization } from './meeting-transcribe'
 import { loadMeetingAudio } from './meeting-load-audio'
 import useSettingStore from '@/stores/setting'
+import { useNetworkStore } from '@/stores/network'
 import {
   startLiveTranscript,
   pauseLiveTranscript,
@@ -158,6 +160,10 @@ export function MeetingPanel() {
       .map((m) => m.id)
       .join(',')
   )
+  // 网络状态（联网恢复提示补转写用）
+  const networkStatus = useNetworkStore((s) => s.status)
+  const setActiveMeeting = useMeetingStore((s) => s.setActiveMeeting)
+  const { toast } = useToast()
 
   const processingRef = useRef<Set<string>>(new Set())
   // Panel 自己发起转写（录音停止后）的会议 id 集合；
@@ -236,6 +242,29 @@ export function MeetingPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transcribingIds])
 
+  // 联网恢复自动提示：offline → online 时，若存在「待补转写」会议（离线结束标记），
+  // 弹提示引导用户补转写。只提示一次，避免多次触发。
+  const prevNetworkStatus = useRef(useNetworkStore.getState().status)
+  useEffect(() => {
+    const current = useNetworkStore.getState().status
+    const wasOffline = prevNetworkStatus.current === 'offline'
+    prevNetworkStatus.current = current
+    if (!wasOffline || current !== 'online') return
+    // 网络恢复：检查是否有待补转写的会议
+    const pendingMeeting = useMeetingStore
+      .getState()
+      .meetings.find(
+        (m) => m.status === 'completed' && (m.error || '').includes('离线')
+      )
+    if (!pendingMeeting) return
+    setActiveMeeting(pendingMeeting.id)
+    toast({
+      title: '网络已恢复',
+      description: `「${pendingMeeting.title || '会议'}」已保存录音但未转写，点击「重新转写」即可补转录并生成纪要。`,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [networkStatus])
+
   // Handle regeneration
   // Handle generating - triggered directly from MeetingResult's handleRegenerate
   // No useEffect needed here; generation is called inline from the result view.
@@ -252,6 +281,10 @@ export function MeetingPanel() {
       const previousSegments = getMeetingAudioPaths(meeting)
       const isContinuation = previousSegments.length > 0
 
+      // 离线检测：结束会议时若断网，跳过实时转写/整段转写/AI 纪要，
+      // 仅保存录音并标记「待补转写」，联网后由用户一键补转写（音频已落盘）
+      const offlineAtEnd = useNetworkStore.getState().status === 'offline'
+
       try {
         // 1. Stop recording and get audioBlob
         let audioBlob: Blob | null = null
@@ -267,6 +300,30 @@ export function MeetingPanel() {
 
         // 结束录音：收尾实时转写（送出尾块并等待队列清空），供下方复用
         await finalizeLiveTranscript(meetingId)
+
+        // 离线：只保存录音，跳过转写与纪要生成（联网后补）
+        if (offlineAtEnd && audioBlob && audioBlob.size > 0) {
+          try {
+            const offlinePath = await saveMeetingAudio(
+              meetingId,
+              audioBlob,
+              previousSegments.length + 1
+            )
+            updateMeeting(meetingId, {
+              audioSegments: [...previousSegments, offlinePath],
+              ...(meeting.audioPath ? {} : { audioPath: offlinePath }),
+              status: 'completed',
+              // error 字段承载「待补转写」提示（详情页可见，结果页底部提示）
+              error: '当前离线，已保存录音。联网后可点击「重新转写」补转录并生成纪要。',
+            })
+            console.warn('[Meeting] 离线结束会议：已保存录音，待联网补转写')
+            processingRef.current.delete(meetingId)
+            return
+          } catch (saveErr) {
+            // 录音保存失败：降级继续走正常流程（可能最终失败，但至少尝试）
+            console.error('[Meeting] 离线保存录音失败，继续正常流程:', saveErr)
+          }
+        }
 
         if (!audioBlob || audioBlob.size === 0) {
           // 如果已经有 transcript（之前转写成功过），直接跳到完成

@@ -4,9 +4,10 @@ import { useEffect, useState, useCallback } from 'react'
 import { useMeetingStore } from './meeting-store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { MicOff, Pause, Play, Square, Pencil } from 'lucide-react'
+import { MicOff, Pause, Play, Square, Pencil, WifiOff } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { MeetingAudioLevel } from './meeting-audio-level'
+import { useNetworkStore } from '@/stores/network'
 
 function formatDuration(seconds: number): string {
   const h = Math.floor(seconds / 3600)
@@ -32,6 +33,8 @@ export function MeetingControls({ meetingId }: MeetingControlsProps) {
   const [displayDuration, setDisplayDuration] = useState(0)
   // 标题默认纯文本展示，点击进入编辑态
   const [editingTitle, setEditingTitle] = useState(false)
+  // 网络状态（离线时显示徽标）
+  const networkStatus = useNetworkStore((s) => s.status)
 
   // 实时计算录音时长（基于时间戳，不依赖组件挂载状态）
   useEffect(() => {
@@ -104,6 +107,14 @@ export function MeetingControls({ meetingId }: MeetingControlsProps) {
           </button>
         )}
       </div>
+
+      {/* 离线徽标：断网时提示实时转写/纪要等联网功能不可用，录音仍正常进行 */}
+      {networkStatus === 'offline' && (
+        <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground">
+          <WifiOff className="h-3 w-3" />
+          离线模式（录音正常，联网后可补转写）
+        </span>
+      )}
 
       {/* 中间：录音状态 + 大号计时 + 实时电平动画（视觉中心） */}
       <div className="flex shrink-0 items-center gap-3">

@@ -1,4 +1,5 @@
 import useSettingStore from '@/stores/setting'
+import { useNetworkStore, isNetworkError } from '@/stores/network'
 import { blobToBytes, invokeAiMultipart } from '@/lib/ai/tauri-client'
 import { transcribeWithAliyun, type AliyunASRConfig } from './meeting-transcribe-aliyun'
 import { transcribeWithQwen3Asr } from './meeting-transcribe-qwen3'
@@ -277,6 +278,10 @@ export async function transcribeAudioWithFallback(
     }
     return { text: result.text, duration: result.duration, usedFallback: false }
   } catch (primaryErr) {
+    // 网络类错误（断网/超时/连接失败）→ 标记离线，联动离线模式（录音继续、跳过联网功能）
+    if (isNetworkError(primaryErr)) {
+      useNetworkStore.getState().markOffline()
+    }
     const hasAliyun = !!(aliyunAsrApiKey && aliyunAsrWorkspaceId)
 
     // fun-asr/paraformer 本身是服务端异步任务（无浏览器解码问题）：

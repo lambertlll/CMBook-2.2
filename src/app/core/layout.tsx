@@ -2,6 +2,7 @@
 
 import { ThemeProvider } from "@/components/theme-provider"
 import useSettingStore from "@/stores/setting"
+import { initNetworkListeners } from "@/stores/network"
 import { useEffect, useState } from "react";
 import { initAllDatabases } from "@/db"
 import dayjs from "dayjs"
@@ -57,6 +58,11 @@ export default function RootLayout({
   const { toast } = useToast()
   const [searchOpen, setSearchOpen] = useState(false)
   const [activityOpen, setActivityOpen] = useState(false)
+
+  // 全局网络状态监听（online/offline 事件 → network store），离线会议模式依赖
+  useEffect(() => {
+    return initNetworkListeners()
+  }, [])
 
   useEffect(() => {
     let cancelled = false
