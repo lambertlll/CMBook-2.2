@@ -12,6 +12,7 @@ target/*
 .claude/*
 .superpowers/*
 .agents/*
+/docs/           # 内部文档（评审/分析/报告等），仅供本地使用，不上传 GitHub
 /docs/*/*
 skills-lock.json
 src-tauri/resources/ocr/*
