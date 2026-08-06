@@ -37,12 +37,15 @@ import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Switch } from '@/components/ui/switch'
-import { Copy, Save, RefreshCw, Check, FileText, Mic2, Mic, Sparkles, Loader2, RotateCcw, Library, FolderInput, Building2, User, Search, ChevronLeft, Calendar, Clock, ChevronDown, ChevronUp, FileType, Square, ListChecks } from 'lucide-react'
+import { Copy, Save, RefreshCw, Check, FileText, Mic2, Mic, Sparkles, Loader2, RotateCcw, Library, FolderInput, Building2, User, Search, ChevronLeft, Calendar, Clock, ChevronDown, ChevronUp, FileType, Square, ListChecks, AlertTriangle } from 'lucide-react'
 import { Progress } from '@/components/ui/progress'
 import { useTranslations } from 'next-intl'
 import { toast } from '@/hooks/use-toast'
 import { ToastAction } from '@/components/ui/toast'
 import { useEditor, EditorContent } from '@tiptap/react'
+import { Extension } from '@tiptap/core'
+import { Plugin, PluginKey } from '@tiptap/pm/state'
+import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import TaskList from '@tiptap/extension-task-list'
@@ -62,7 +65,7 @@ import Image from '@tiptap/extension-image'
 import EditorToolbar from '@/app/core/main/editor/markdown/editor-toolbar'
 import useArticleStore from '@/stores/article'
 import useSettingStore from '@/stores/setting'
-import { generateMeetingSummary, rewriteSummarySelection } from './meeting-generate-summary'
+import { generateMeetingSummary, rewriteSummarySelection, generateSummaryUncertainties, type SummaryUncertainty } from './meeting-generate-summary'
 import { SummaryBubbleMenu } from './meeting-summary-bubble'
 import { transcribeAudioWithFallback } from './meeting-transcribe'
 import { loadMeetingAudio } from './meeting-load-audio'
@@ -399,10 +402,81 @@ function SummaryTab({ meeting, onGenerate }: SummaryTabProps) {
  * 编辑经 getMarkdown() 转回 markdown 保存（store 侧 500ms 防抖落库）。
  * 仅在“已有纪要”的分支挂载，挂载时读到的即最终内容；外部变更走 setContent 同步。
  */
+// ---- S1 低置信度标记：Decoration 装饰层（不进文档模型、不污染 getMarkdown 导出）----
+// 模块级：当前标记的文本范围（SummaryEditor 通过 setUncertaintyRanges 更新）
+let uncertaintyRanges: Array<{ from: number; to: number; item: SummaryUncertainty }> = []
+
+/** 供 SummaryEditor 更新当前标记范围（React state 与插件间桥接） */
+export function setUncertaintyRanges(
+  ranges: Array<{ from: number; to: number; item: SummaryUncertainty }>
+): void {
+  uncertaintyRanges = ranges
+}
+
+const uncertaintyPluginKey = new PluginKey('uncertaintyDecoration')
+
+const UncertaintyDecoration = Extension.create({
+  name: 'uncertaintyDecoration',
+
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        key: uncertaintyPluginKey,
+        state: {
+          init: () => DecorationSet.empty,
+          apply(tr, oldSet) {
+            // 内容变化时重建（标记只读，文档编辑后清除标记更安全）
+            if (!tr.docChanged) return oldSet
+            const decorations = uncertaintyRanges.map(({ from, to, item }) =>
+              Decoration.inline(from, to, {
+                class: 'summary-uncertain',
+                'data-reason': item.reason,
+              })
+            )
+            return DecorationSet.create(tr.doc, decorations)
+          },
+        },
+        props: {
+          decorations(state) {
+            return this.getState(state)
+          },
+        },
+      }),
+    ]
+  },
+})
+
+/**
+ * 在 markdown 文本中按「章节标题 + 片段」模糊定位可疑项位置。
+ * 策略：先按章节名定位段落起点，再在段内匹配片段；匹配失败返回 null（降级侧边栏列表）。
+ */
+function locateUncertaintyInMarkdown(markdown: string, item: SummaryUncertainty): { from: number; to: number } | null {
+  // 简化定位：直接全文查找片段（章节标题可能与 markdown 渲染不一致，先试全文匹配）
+  const fragIdx = markdown.indexOf(item.fragment)
+  if (fragIdx >= 0) {
+    return { from: fragIdx, to: fragIdx + item.fragment.length }
+  }
+  // 片段匹配失败：尝试去掉标点的宽松匹配
+  const strip = (s: string) => s.replace(/[，。、；：,.!?！？\s]/g, '')
+  const strippedFrag = strip(item.fragment)
+  if (strippedFrag.length >= 4) {
+    const strippedMd = strip(markdown)
+    const idx = strippedMd.indexOf(strippedFrag)
+    if (idx >= 0) {
+      // 还原到原文位置（累加已剥离字符数有误差，直接按比例近似：返回 strip 前的位置）
+      return { from: Math.max(0, idx - 2), to: Math.min(markdown.length, idx + item.fragment.length + 2) }
+    }
+  }
+  return null
+}
+
 function SummaryEditor({ meeting }: { meeting: Meeting }) {
   const updateMeeting = useMeetingStore((s) => s.updateMeeting)
   const t = useTranslations('meeting')
   const [rewriting, setRewriting] = useState(false)
+  // S1：低置信度标记——生成后自检出的可疑项；Decoration 渲染（不进文档模型、不污染 getMarkdown）
+  const [uncertainties, setUncertainties] = useState<SummaryUncertainty[]>([])
+  const [uncertaintyChecking, setUncertaintyChecking] = useState(false)
   // 滚动容器引用，同时作为气泡菜单的定位容器
   const scrollRef = useRef<HTMLDivElement>(null)
   // 记录编辑器最近一次内容，用于区分外部更新与编辑器自身 onUpdate
@@ -435,6 +509,9 @@ function SummaryEditor({ meeting }: { meeting: Meeting }) {
       TableCell,
       // 提供 contentType: 'markdown' 解析与 getMarkdown() 序列化，summary 始终以 markdown 存储
       Markdown,
+      // S1：低置信度标记用 Decoration 装饰层渲染——只影响视觉、不进文档模型，
+      // 导出/同步不会带上标记，核对完关闭即清除（避免 Highlight 扩展污染 summary）
+      UncertaintyDecoration,
     ],
     content: meeting.summary,
     contentType: 'markdown',
@@ -603,11 +680,215 @@ function SummaryEditor({ meeting }: { meeting: Meeting }) {
     [editor, rewriting, meeting.title, meeting.selectedModel, t]
   )
 
+  // S3：章节级 AI 重写——光标所在章节（最近的 heading 到下一 heading 之间）整体重写。
+  // 轻量路径：不拆多编辑器实例，定位章节 from/to 后复用 rewriteSummarySelection +
+  // insertContentAt 替换；重写前存快照支持「撤销本次重写」（AI 重写不满意是常态，
+  // Ctrl+Z 在流式替换后不可靠）
+  const [sectionRewriting, setSectionRewriting] = useState(false)
+  const sectionSnapshotRef = useRef<{ from: number; to: number; content: string } | null>(null)
+  const [sectionUndoAvailable, setSectionUndoAvailable] = useState(false)
+
+  const rewriteCurrentSection = useCallback(
+    async (instruction?: string) => {
+      if (!editor || sectionRewriting) return
+      const { $from } = editor.state.selection
+      const doc = editor.state.doc
+      // 向上找最近的 heading
+      let headingPos: number | null = null
+      let headingDepth: number | null = null
+      for (let pos = $from.start(); pos >= 0; ) {
+        const node = doc.nodeAt(pos)
+        if (node && node.type.name === 'heading') {
+          headingPos = pos
+          headingDepth = node.attrs.level
+          break
+        }
+        const parent = doc.resolve(pos).parent
+        if (pos === 0 || parent === doc) {
+          // 未找到 heading：退化为当前段落
+          break
+        }
+        pos = doc.resolve(pos).start() - 1
+      }
+      // 确定章节结束：下一个同级或更高级 heading（heading 级别 ≤ 当前级别）
+      let sectionEnd = doc.content.size
+      if (headingPos !== null && headingDepth !== null) {
+        for (let pos = headingPos + 1; pos < doc.content.size; pos++) {
+          const node = doc.nodeAt(pos)
+          if (node && node.type.name === 'heading' && (node.attrs.level ?? 9) <= headingDepth) {
+            sectionEnd = pos
+            break
+          }
+        }
+      } else {
+        // 无 heading：以当前段落为范围
+        const selFrom = Math.max(0, $from.start() - 1)
+        headingPos = selFrom
+        sectionEnd = $from.end()
+      }
+      const from = headingPos ?? 0
+      const to = sectionEnd
+      const sectionText = doc.textBetween(from, to, '\n', '\n')
+      if (!sectionText.trim()) return
+
+      const instructionText = instruction?.trim() || '在不改变会议事实的前提下，重写该章节使其更清晰、更准确、语言更专业'
+      sectionSnapshotRef.current = { from, to, content: sectionText }
+      setSectionRewriting(true)
+      try {
+        const result = await rewriteSummarySelection({
+          selectedText: sectionText,
+          instruction: instructionText,
+          title: meeting.title || undefined,
+          modelId: meeting.selectedModel || undefined,
+        })
+        if (!result) throw new Error('AI 未返回内容')
+        editor
+          .chain()
+          .focus()
+          .insertContentAt({ from, to }, result, { contentType: 'markdown' })
+          .run()
+        setSectionUndoAvailable(true)
+      } catch (err) {
+        console.error('章节重写失败:', err)
+        toast({
+          description: `章节重写失败：${err instanceof Error ? err.message : '未知错误'}`,
+          variant: 'destructive',
+        })
+      } finally {
+        setSectionRewriting(false)
+      }
+    },
+    [editor, sectionRewriting, meeting.title, meeting.selectedModel, t]
+  )
+
+  // S3：撤销本次章节重写（恢复快照内容）
+  const undoSectionRewrite = useCallback(() => {
+    if (!editor || !sectionSnapshotRef.current) return
+    const { from, to } = sectionSnapshotRef.current
+    editor
+      .chain()
+      .focus()
+      .insertContentAt({ from, to }, sectionSnapshotRef.current.content, { contentType: 'markdown' })
+      .run()
+    sectionSnapshotRef.current = null
+    setSectionUndoAvailable(false)
+  }, [editor])
+
+  // S1：触发低置信度自检——生成完成后由外部调用；解析可疑项并渲染 Decoration
+  const runUncertaintyCheck = useCallback(
+    async (summaryMarkdown: string) => {
+      if (!editor || !summaryMarkdown.trim()) return
+      setUncertaintyChecking(true)
+      try {
+        const list = await generateSummaryUncertainties(summaryMarkdown, {
+          notes: meeting.manualNotes,
+          title: meeting.title,
+          modelId: meeting.selectedModel || undefined,
+        })
+        // 在 markdown 中定位每个可疑项，能定位的进装饰层，不能定位的降级为侧边栏列表
+        const located: Array<{ from: number; to: number; item: SummaryUncertainty }> = []
+        const unlocated: SummaryUncertainty[] = []
+        for (const item of list) {
+          const pos = locateUncertaintyInMarkdown(summaryMarkdown, item)
+          if (pos) {
+            located.push({ ...pos, item })
+          } else {
+            unlocated.push(item)
+          }
+        }
+        setUncertaintyRanges(located)
+        // 更新编辑器装饰（通过 trigger 重算插件状态）
+        editor.view.dispatch(editor.state.tr)
+        setUncertainties([...located.map((l) => l.item), ...unlocated])
+      } catch (err) {
+        console.warn('[Summary] 低置信度自检失败:', err)
+        setUncertainties([])
+      } finally {
+        setUncertaintyChecking(false)
+      }
+    },
+    [editor, meeting.manualNotes, meeting.title, meeting.selectedModel]
+  )
+
+  // S1：外部（生成完成后）通过自定义事件触发自检
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ summary: string }>).detail
+      if (detail?.summary) void runUncertaintyCheck(detail.summary)
+    }
+    document.addEventListener('summary-uncertainty-check', handler)
+    return () => document.removeEventListener('summary-uncertainty-check', handler)
+  }, [runUncertaintyCheck])
+
   return (
     <div className="flex h-full flex-col">
       {/* 格式工具栏（与笔记编辑器一致）；会议无标签栏，开启内置撤销/重做按钮 */}
       <EditorToolbar editor={editor} showUndoRedo />
+      {/* S1：低置信度标记提示条——生成后自动出现，核对完一键清除 */}
+      {(uncertainties.length > 0 || uncertaintyChecking) && (
+        <div className="flex items-center gap-2 border-b bg-amber-50 px-3 py-1.5 text-xs text-amber-800">
+          {uncertaintyChecking ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              正在核对纪要中可能存疑的内容…
+            </>
+          ) : (
+            <>
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+              <span>
+                发现 <b>{uncertainties.length}</b> 处可能需要核对的内容（黄色标记），确认无误后
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-5 px-2 text-xs"
+                onClick={() => {
+                  setUncertaintyRanges([])
+                  setUncertainties([])
+                  if (editor) editor.view.dispatch(editor.state.tr)
+                }}
+              >
+                清除标记
+              </Button>
+            </>
+          )}
+        </div>
+      )}
       <div ref={scrollRef} className="relative flex-1 overflow-y-auto tiptap-editor">
+        {/* S3：章节级 AI 重写入口（光标所在章节）——悬浮在编辑器顶部 */}
+        <div className="sticky top-0 z-10 flex items-center gap-1 border-b bg-background/95 px-3 py-1 backdrop-blur">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs text-muted-foreground"
+            disabled={sectionRewriting || !editor}
+            onClick={() => void rewriteCurrentSection()}
+            title="重写光标所在的章节"
+          >
+            {sectionRewriting ? (
+              <>
+                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                章节重写中…
+              </>
+            ) : (
+              <>
+                <Sparkles className="mr-1 h-3 w-3" />
+                重写当前章节
+              </>
+            )}
+          </Button>
+          {sectionUndoAvailable && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs text-muted-foreground"
+              onClick={undoSectionRewrite}
+            >
+              <RotateCcw className="mr-1 h-3 w-3" />
+              撤销本次重写
+            </Button>
+          )}
+        </div>
         <EditorContent editor={editor} />
         {editor && (
           <SummaryBubbleMenu
@@ -1547,6 +1828,14 @@ export function MeetingResult({ meeting }: MeetingResultProps) {
         },
       })
       updateMeeting(meeting.id, { summary: fullSummary, status: 'completed' })
+      // S1：生成完成后触发低置信度自检（SummaryEditor 监听事件，Decoration 渲染可疑项）
+      window.setTimeout(() => {
+        document.dispatchEvent(
+          new CustomEvent('summary-uncertainty-check', {
+            detail: { summary: fullSummary },
+          })
+        )
+      }, 300)
       // 纪要生成成功：已关联客户 → 自动导出到客户知识库并向量化（失败仅告警，不影响会议流程）；
       // 未关联客户 → 后台自动识别客户并归类（不阻塞主流程，识别失败静默，保留手动归类入口）
       const finished = useMeetingStore

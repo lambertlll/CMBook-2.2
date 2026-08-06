@@ -538,6 +538,79 @@ export async function rewriteSummarySelection(
   return completion.choices[0]?.message?.content?.trim() || ''
 }
 
+// ---- S1 低置信度标记（二期 B）----
+
+/** 生成后自检输出的可疑项（S1：让用户只审可疑处，而非逐字审） */
+export interface SummaryUncertainty {
+  section: string // 所在章节标题
+  fragment: string // 可疑原文片段（前端在该章节内模糊匹配定位）
+  reason: string // 可疑原因（如"转写与笔记口径冲突"）
+}
+
+/** 可疑项自检的系统提示：只输出 JSON，不解释 */
+const UNCERTAINTY_SYSTEM_PROMPT = `你是会议纪要质检员。用户会给你一份已生成的会议纪要（可能附有手动笔记作为对照）。
+请找出纪要中**可能存在错误或需要人工核对**的内容，重点关注：
+1. 数字/金额/日期（转写易错、口径存疑）
+2. 人名/公司名/职务（同音字错误高发）
+3. 术语与笔记锚点冲突（笔记高亮/加粗内容与纪要表述不一致）
+4. 明显不符合常理或上下文矛盾的表述
+不要输出格式问题或可自行判断的措辞优化；只输出真正需要人工核对的可疑项。
+最多 5 项，没有可疑项时输出空数组。
+只输出 JSON：{"uncertain": [{"section": "章节标题", "fragment": "纪要原文片段（10-30字，用于定位）", "reason": "一句话原因"}]}
+禁止输出任何其他内容。`
+
+/**
+ * S1：纪要生成完成后调用一次，让模型输出可疑项清单。
+ * 失败/超时/解析失败时返回空数组（不阻塞主流程，静默降级）。
+ */
+export async function generateSummaryUncertainties(
+  summary: string,
+  options: { notes?: string; title?: string; modelId?: string; signal?: AbortSignal } = {}
+): Promise<SummaryUncertainty[]> {
+  try {
+    if (!summary.trim()) return []
+    const { notes, title, modelId, signal } = options
+    const aiConfig = resolveModelConfig(modelId)
+    if (!aiConfig || !aiConfig.baseURL || !aiConfig.apiKey) return []
+
+    const userMessage = [
+      title ? `会议纪要标题：${title}` : '',
+      notes ? `## 手动笔记（对照）\n${notes}` : '',
+      `## 会议纪要（质检对象）\n${summary}`,
+    ].filter(Boolean).join('\n\n')
+
+    const openai = await createOpenAIClient(aiConfig)
+    const completion = await openai.chat.completions.create({
+      model: aiConfig.model || '',
+      messages: [
+        { role: 'system', content: UNCERTAINTY_SYSTEM_PROMPT },
+        { role: 'user', content: userMessage },
+      ],
+      temperature: 0.1,
+      top_p: 1,
+      stream: false,
+    }, { signal: signal ?? AbortSignal.timeout(60 * 1000) })
+
+    const raw = completion.choices[0]?.message?.content?.trim() || ''
+    // 容错解析：模型偶尔输出 markdown 代码块包裹，剥掉 ```json ```
+    const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
+    const parsed = JSON.parse(cleaned)
+    const list = parsed?.uncertain
+    if (!Array.isArray(list)) return []
+    return list
+      .filter((u: unknown): u is SummaryUncertainty => {
+        if (!u || typeof u !== 'object') return false
+        const x = u as Record<string, unknown>
+        return typeof x.section === 'string' && typeof x.fragment === 'string'
+      })
+      .slice(0, 5)
+  } catch (err) {
+    // 自检是增强功能：失败静默，不打扰用户
+    console.warn('[Summary] 低置信度自检失败，跳过:', err)
+    return []
+  }
+}
+
 /**
  * 笔记的结构化提取结果（一期：保留客户经理的标注层级，让锚点权威性真正生效）
  */

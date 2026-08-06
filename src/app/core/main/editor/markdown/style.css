@@ -27,6 +27,14 @@
   text-decoration-thickness: 1.5px;
 }
 
+/* S1 低置信度标记：黄色背景 + 边框，仅装饰层渲染（不污染 getMarkdown 序列化） */
+.tiptap-editor .ProseMirror .summary-uncertain {
+  border-radius: 0.15rem;
+  background: color-mix(in srgb, hsl(45 100% 50%) 25%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, hsl(45 100% 40%) 60%, transparent);
+  cursor: help;
+}
+
 .tiptap-editor .ProseMirror .agent-diff-preview-inserted {
   display: block;
   width: fit-content;
