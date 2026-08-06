@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { parseDueDate, parseVisitTodosFromSummary, type ParsedVisitTodo } from '@/lib/visit-todos'
+import { parseDueDate, parseVisitTodosFromSummary, extractTodosFromNotes, mergeVisitTodos, type ParsedVisitTodo } from '@/lib/visit-todos'
 import { replaceMeetingTodos } from '@/db/visit-todos'
 import { useVisitTodosStore } from '@/stores/visit-todos'
 import { useMeetingStore } from '@/app/core/main/meeting/meeting-store'
@@ -23,13 +23,14 @@ interface TodoConfirmState {
   todos: ParsedVisitTodo[]
   selected: boolean[]
 
-  /** 解析纪要中的待办并弹窗展示（无待办时不弹窗，返回 false） */
+  /** 解析纪要中的待办并弹窗展示（无待办时不弹窗，返回 false）；notes 为笔记 HTML（S8：合并勾选待办） */
   showFromSummary: (params: {
     meetingId: string
     meetingTitle: string
     customerId: string
     visitId: string
     summary: string
+    notes?: string
   }) => boolean
   toggle: (index: number) => void
   toggleAll: (selected: boolean) => void
@@ -54,7 +55,10 @@ export const useTodoConfirmStore = create<TodoConfirmState>((set, get) => ({
   selected: [],
 
   showFromSummary: (params) => {
-    const todos = parseVisitTodosFromSummary(params.summary)
+    // S8：合并纪要解析 + 笔记勾选待办（笔记为确定性数据，100% 不丢；按内容去重）
+    const summaryTodos = parseVisitTodosFromSummary(params.summary)
+    const noteTodos = params.notes ? extractTodosFromNotes(params.notes) : []
+    const todos = mergeVisitTodos(summaryTodos, noteTodos)
     if (todos.length === 0) return false
     set({
       open: true,

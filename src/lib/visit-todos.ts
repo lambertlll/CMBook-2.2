@@ -9,6 +9,50 @@ export interface ParsedVisitTodo {
   dueText: string // 完成时限原文（由 parseDueDate 转时间戳，无法解析时记 0）
 }
 
+/**
+ * S8：从笔记 HTML（TipTap 序列化）中提取客户经理亲手勾选的待办。
+ * TaskItem 序列化为 <li data-checked="true/false">，是确定性数据（无需 AI），
+ * 与纪要解析结果合并可 100% 不丢用户勾选的行动项。
+ * 纯 DOM 解析（DOMParser），不依赖 Tauri API。
+ */
+export function extractTodosFromNotes(notesHtml: string | undefined | null): ParsedVisitTodo[] {
+  if (!notesHtml || !notesHtml.includes('data-checked')) return []
+  try {
+    const doc = new DOMParser().parseFromString(notesHtml, 'text/html')
+    const todos: ParsedVisitTodo[] = []
+    doc.querySelectorAll('li[data-checked]').forEach((el) => {
+      const text = (el.textContent || '').trim()
+      if (!text) return
+      // 去掉行首勾选标记（TipTap 序列化通常不含 [ ] 前缀，但稳妥起见清理）
+      const clean = text.replace(/^\[[ xX]\]\s*/, '').trim()
+      if (clean) {
+        todos.push({ content: clean, owner: '', dueText: '' })
+      }
+    })
+    return todos
+  } catch {
+    return []
+  }
+}
+
+/**
+ * S8：合并两个待办来源（纪要解析 + 笔记勾选），按内容去重（纪要解析优先保留 owner/dueText）
+ */
+export function mergeVisitTodos(
+  summaryTodos: ParsedVisitTodo[],
+  noteTodos: ParsedVisitTodo[]
+): ParsedVisitTodo[] {
+  const merged = [...summaryTodos]
+  const seen = new Set(summaryTodos.map((t) => t.content.trim()))
+  for (const t of noteTodos) {
+    const key = t.content.trim()
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    merged.push(t)
+  }
+  return merged
+}
+
 // Markdown 标题行（允许行首最多 3 个空格，# 后必须有空格）
 const HEADING_RE = /^\s{0,3}#{1,6}\s+/
 // 待办章节标题：兼容「待办事项与后续跟进」「后续待跟进事项」等写法

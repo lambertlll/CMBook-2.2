@@ -49,11 +49,15 @@ async function autoGenerateVisitSummary(meetingId: string): Promise<void> {
 
   updateMeeting(meetingId, { status: 'generating', error: '' })
   try {
-    // 客户拜访模板 {客户名称} 占位符来源；未关联客户时为 undefined（模板侧替换为"未填写"）
+    // 客户拜访模板 {客户名称} 占位符来源 + S5 客户背景注入（行业/画像）
     let customerName: string | undefined
+    let customerIndustry: string | undefined
+    let customerProfile: string | undefined
     if (meeting.customerId) {
       const customer = await getCustomer(meeting.customerId).catch(() => null)
       customerName = customer?.name
+      customerIndustry = customer?.industry || undefined
+      customerProfile = customer?.profile || undefined
     }
     const fullSummary = await generateMeetingSummary({
       transcript: meeting.transcript,
@@ -62,6 +66,8 @@ async function autoGenerateVisitSummary(meetingId: string): Promise<void> {
       title: meeting.title || undefined,
       duration: meeting.duration || undefined,
       customerName,
+      customerIndustry,
+      customerProfile,
       createdAt: meeting.createdAt,
       modelId: meeting.selectedModel || undefined,
       onStream: (chunk) => {
@@ -78,13 +84,14 @@ async function autoGenerateVisitSummary(meetingId: string): Promise<void> {
         ...finished,
         summary: fullSummary,
       })
-      // 待办确认弹窗
+      // 待办确认弹窗（S8：合并笔记勾选待办）
       useTodoConfirmStore.getState().showFromSummary({
         meetingId: meetingId,
         meetingTitle: finished.title,
         customerId: finished.customerId || '',
         visitId: finished.visitId || '',
         summary: fullSummary,
+        notes: finished.manualNotes,
       })
     }
   } catch (err) {

@@ -15,7 +15,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import useSettingStore from '@/stores/setting'
 import { getRecorder } from './meeting-recorder-manager'
-import { encodeWav, isRetryableError, parseHotwords } from './meeting-transcribe'
+import { encodeWav, isRetryableError, parseHotwords, buildHotwordsWithCustomer } from './meeting-transcribe'
 import { transcribeQwen3Segment, type Qwen3ASRConfig } from './meeting-transcribe-qwen3'
 
 export interface LiveTranscriptSegment {
@@ -74,6 +74,9 @@ let sourceNode: MediaStreamAudioSourceNode | null = null
 let captureNode: AudioWorkletNode | ScriptProcessorNode | null = null
 // AudioWorklet → 零增益 GainNode → destination：WebKit 需此路径驱动音频图处理
 let silentGainNode: GainNode | null = null
+// S7：实时转写热词缓存——startLiveTranscript 时按客户预计算一次，
+// 避免每个切块/每块 WebSocket 都查一次客户库（一场会议几十次切块）
+let liveHotwords: string[] = []
 let streamPollTimer: ReturnType<typeof setInterval> | null = null
 // 会话令牌：异步初始化完成前会话已切换时丢弃结果
 let sessionToken = 0
@@ -213,6 +216,23 @@ export function startLiveTranscript(meetingId: string): void {
   teardownCapture()
   teardownDs()
   sessionToken++
+  // S7：按会议关联客户预计算热词（手工热词 ∪ 客户档案专名），缓存供切块/建连复用。
+  // 动态 import meeting-store：避免与 meeting-store → 本文件的静态引用形成循环依赖
+  const hotwordToken = sessionToken
+  liveHotwords = []
+  const currentHotwords = parseHotwords(useSettingStore.getState().aliyunAsrHotwords)
+  void (async () => {
+    try {
+      const { useMeetingStore } = await import('./meeting-store')
+      const customerId = useMeetingStore.getState().meetings.find((m) => m.id === meetingId)?.customerId
+      const words = await buildHotwordsWithCustomer(currentHotwords, customerId)
+      // 会话已切换则丢弃旧结果，避免热词串到新会议
+      if (hotwordToken === sessionToken) liveHotwords = words
+    } catch {
+      // 失败静默：保持手工热词兜底
+      if (hotwordToken === sessionToken) liveHotwords = currentHotwords
+    }
+  })()
   pcmBuffers = []
   bufferedSamples = 0
   processedSeconds = 0
@@ -578,13 +598,16 @@ function enqueueChunk(samples: Float32Array, startSec: number): void {
     segments: [...s.segments, { id, text: '', startSec, status: 'pending' }],
   }))
 
-  const { aliyunAsrApiKey, aliyunAsrWorkspaceId, aliyunAsrHotwords, aliyunAsrModel } =
+  const { aliyunAsrApiKey, aliyunAsrWorkspaceId, aliyunAsrModel } =
     useSettingStore.getState()
   const config: Qwen3ASRConfig = {
     apiKey: aliyunAsrApiKey,
     workspaceId: aliyunAsrWorkspaceId,
     language: 'zh',
-    hotwords: parseHotwords(aliyunAsrHotwords),
+    // S7：用会话级缓存热词（含客户档案专名）；缓存为空时回退手工热词
+    hotwords: liveHotwords.length > 0
+      ? liveHotwords
+      : parseHotwords(useSettingStore.getState().aliyunAsrHotwords),
     // 同步切块模型：qwen3-asr-flash 直接传当前值；realtime/streaming 走这里时降级 qwen3 同步通道
     model:
       aliyunAsrModel === 'qwen3-asr-flash' || aliyunAsrModel === 'qwen-audio-3.0-asr-flash'
@@ -702,10 +725,15 @@ function isInvalidParameterError(err: unknown): boolean {
 
 /** 建立 WebSocket 会话并订阅结果/错误事件；热词被网关拒绝时自动降级为无热词重连 */
 async function connectDsSession(token: number): Promise<void> {
-  const { aliyunAsrApiKey, aliyunAsrWorkspaceId, aliyunAsrHotwords } =
+  const { aliyunAsrApiKey, aliyunAsrWorkspaceId } =
     useSettingStore.getState()
   // 热词/上下文偏置：session.update 的 input_audio_transcription.corpus.text（参考文本）
-  const hotwords = parseHotwords(aliyunAsrHotwords)
+  // S7：用会话级缓存（含客户档案专名）；corpus 拼接上限 12 词——
+  // 专有云/金融云网关对 corpus.text 兼容性差，词过多会 InvalidParameter（已有降级重连兜底）
+  const cached = liveHotwords.length > 0
+    ? liveHotwords
+    : parseHotwords(useSettingStore.getState().aliyunAsrHotwords)
+  const hotwords = cached.slice(0, 12)
   const buildConfig = (withCorpus: boolean) => ({
     apiKey: aliyunAsrApiKey,
     workspaceId: aliyunAsrWorkspaceId,

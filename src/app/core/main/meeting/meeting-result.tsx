@@ -729,13 +729,14 @@ export function ClassifyToCustomerDialog({
     if (result.ok) {
       onExported()
       toast({ description: t('classifySuccess', { name: customerName }) })
-      // 待办确认弹窗
+      // 待办确认弹窗（S8：合并笔记勾选待办）
       useTodoConfirmStore.getState().showFromSummary({
         meetingId: meeting.id,
         meetingTitle: meeting.title,
         customerId: latest?.customerId || '',
         visitId: latest?.visitId || '',
         summary: meeting.summary,
+        notes: meeting.manualNotes,
       })
     } else {
       toast({
@@ -1086,6 +1087,17 @@ export function MeetingResult({ meeting }: MeetingResultProps) {
       ? s.customers.find((c) => c.id === meeting.customerId)?.name
       : undefined
   )
+  // S5：客户背景（行业/画像）注入纪要生成 prompt
+  const linkedCustomerIndustry = useCustomerStore((s) =>
+    meeting.customerId
+      ? s.customers.find((c) => c.id === meeting.customerId)?.industry
+      : undefined
+  )
+  const linkedCustomerProfile = useCustomerStore((s) =>
+    meeting.customerId
+      ? s.customers.find((c) => c.id === meeting.customerId)?.profile
+      : undefined
+  )
 
   // 有关联客户时确保客户列表已加载（用于显示客户名；未加载完成前静默不显示）
   useEffect(() => {
@@ -1202,13 +1214,14 @@ export function MeetingResult({ meeting }: MeetingResultProps) {
         // 归档成功：刷新基线，清除"编辑后未同步"提示（附属步骤失败不影响归档事实）
         lastSyncedSummaryRef.current = meeting.summary
         setSummaryDirtySinceSync(false)
-        // 待办确认弹窗
+        // 待办确认弹窗（S8：合并笔记勾选待办）
         useTodoConfirmStore.getState().showFromSummary({
           meetingId: meeting.id,
           meetingTitle: meeting.title,
           customerId: meeting.customerId || '',
           visitId: meeting.visitId || '',
           summary: meeting.summary,
+          notes: meeting.manualNotes,
         })
         if (result.failures.length === 0) {
           toast({ description: t('syncKnowledgeSuccess') })
@@ -1524,6 +1537,8 @@ export function MeetingResult({ meeting }: MeetingResultProps) {
         duration: latest.duration || undefined,
         // 客户拜访模板占位符来源：关联客户名 + 会议创建时间（未关联时为 undefined，模板侧替换为"未填写"）
         customerName: linkedCustomerName,
+        customerIndustry: linkedCustomerIndustry,
+        customerProfile: linkedCustomerProfile,
         createdAt: latest.createdAt,
         modelId: latest.selectedModel || undefined,
         signal: controller.signal,
@@ -1595,6 +1610,7 @@ export function MeetingResult({ meeting }: MeetingResultProps) {
       customerId: current?.customerId || '',
       visitId: current?.visitId || '',
       summary: pendingTodoSummary,
+      notes: current?.manualNotes,
     })
     setPendingTodoSummary(null)
   }, [pendingTodoSummary, meeting.id, meeting.title])

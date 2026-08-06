@@ -12,6 +12,8 @@ interface GenerateSummaryOptions {
   title?: string
   duration?: number // 会议时长（秒）
   customerName?: string // 关联客户名称（客户拜访模板 {客户名称} 占位符来源）
+  customerIndustry?: string // 关联客户行业（S5：作为会议背景注入 prompt，勿写入纪要正文）
+  customerProfile?: string // 关联客户画像备注（S5：背景参考，注入前截断防超长）
   createdAt?: number // 会议创建时间戳（客户拜访模板 {日期时间} 占位符来源）
   modelId?: string // 指定模型 ID，空则用 primaryModel
   signal?: AbortSignal // 中止信号，未传时默认 5 分钟超时
@@ -66,7 +68,7 @@ const COVERAGE_CHECK_SYSTEM_PROMPT = `你是会议纪要审校助手。用户会
 export async function generateMeetingSummary(
   options: GenerateSummaryOptions
 ): Promise<string> {
-  const { transcript, manualNotes, templateId, title, duration, customerName, createdAt, modelId, onStream } = options
+  const { transcript, manualNotes, templateId, title, duration, customerName, customerIndustry, customerProfile, createdAt, modelId, onStream } = options
 
   // 解析模板（内置 + 自定义；自定义模板被删除等未命中场景回退默认模板，不报错）
   const template = resolveTemplate(templateId)
@@ -106,12 +108,13 @@ export async function generateMeetingSummary(
   }
 
   // 构建 user message：长会议走 map-reduce 分段要点，短会议保持原有单段流程
+  // S5：注入客户行业/画像作为会议背景（buildMeetingMeta 内处理）
   let userMessage: string
   if (effectiveTranscript.length > CHUNK_TRANSCRIPT_THRESHOLD) {
     const chunkPoints = await extractLongTranscriptPoints(aiConfig, effectiveTranscript, notesPrompt, title)
-    userMessage = buildChunkedUserMessage(title, chunkPoints, notesPrompt, duration, createdAt)
+    userMessage = buildChunkedUserMessage(title, chunkPoints, notesPrompt, duration, createdAt, customerIndustry, customerProfile)
   } else {
-    userMessage = buildUserMessage(title, effectiveTranscript, notesPrompt, duration, createdAt)
+    userMessage = buildUserMessage(title, effectiveTranscript, notesPrompt, duration, createdAt, customerIndustry, customerProfile)
   }
 
   // 创建 OpenAI 客户端并调用流式接口
@@ -393,11 +396,13 @@ function buildUserMessage(
   transcript: string,
   manualNotes: string,
   duration?: number,
-  createdAt?: number
+  createdAt?: number,
+  customerIndustry?: string,
+  customerProfile?: string
 ): string {
   const parts: string[] = []
 
-  parts.push(buildMeetingMeta(title, createdAt, duration))
+  parts.push(buildMeetingMeta(title, createdAt, duration, customerIndustry, customerProfile))
 
   if (transcript) {
     parts.push(`## 录音转写文本\n${transcript}`)
@@ -421,11 +426,13 @@ function buildChunkedUserMessage(
   chunkPoints: string,
   plainNotes: string,
   duration?: number,
-  createdAt?: number
+  createdAt?: number,
+  customerIndustry?: string,
+  customerProfile?: string
 ): string {
   const parts: string[] = []
 
-  parts.push(buildMeetingMeta(title, createdAt, duration))
+  parts.push(buildMeetingMeta(title, createdAt, duration, customerIndustry, customerProfile))
 
   if (plainNotes) {
     parts.push(`## 手动笔记（重点标注，优先参考）\n${plainNotes}`)
@@ -439,10 +446,18 @@ function buildChunkedUserMessage(
 }
 
 /**
- * 会议元信息（标题/日期/时长）
+ * 会议元信息（标题/日期/时长/客户背景）
  * createdAt：会议创建时间戳，用于「会议日期」——隔天重新生成纪要时日期不能串到今天（一期建议 6）
+ * customerIndustry/customerProfile（S5）：注入作为会议背景，帮助模型理解语境；
+ * 截断 profile 至 500 字防超长，并明确"背景参考，勿写入纪要正文"
  */
-function buildMeetingMeta(title: string | undefined, createdAt?: number, duration?: number): string {
+function buildMeetingMeta(
+  title: string | undefined,
+  createdAt?: number,
+  duration?: number,
+  customerIndustry?: string,
+  customerProfile?: string
+): string {
   const metaLines: string[] = []
   if (title) {
     metaLines.push(`- **会议标题**：${title}`)
@@ -458,6 +473,13 @@ function buildMeetingMeta(title: string | undefined, createdAt?: number, duratio
     const s = duration % 60
     const durationStr = h > 0 ? `${h}小时${m}分钟` : m > 0 ? `${m}分钟${s}秒` : `${s}秒`
     metaLines.push(`- **会议时长**：${durationStr}`)
+  }
+  // S5：客户背景（行业 + 画像）——仅作理解语境的背景，不写入纪要正文
+  const bgParts: string[] = []
+  if (customerIndustry?.trim()) bgParts.push(`行业：${customerIndustry.trim()}`)
+  if (customerProfile?.trim()) bgParts.push(`客户画像：${customerProfile.trim().slice(0, 500)}`)
+  if (bgParts.length > 0) {
+    metaLines.push(`- **客户背景（参考，勿写入纪要正文）**：${bgParts.join('；')}`)
   }
   return `## 会议信息\n${metaLines.join('\n')}`
 }

@@ -330,13 +330,14 @@ export function CustomerWorkbench() {
       .then((result) => {
         if (result.ok) {
           toast({ description: t('classifySuccess', { name: customerName }) })
-          // 待办确认弹窗
+          // 待办确认弹窗（S8：合并笔记勾选待办）
           useTodoConfirmStore.getState().showFromSummary({
             meetingId: meeting.id,
             meetingTitle: meeting.title,
             customerId,
             visitId: meeting.visitId || '',
             summary: meeting.summary,
+            notes: meeting.manualNotes,
           })
         }
       })
