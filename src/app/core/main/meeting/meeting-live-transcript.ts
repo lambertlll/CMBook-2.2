@@ -15,7 +15,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import useSettingStore from '@/stores/setting'
 import { getRecorder } from './meeting-recorder-manager'
-import { encodeWav, parseHotwords } from './meeting-transcribe'
+import { encodeWav, isRetryableError, parseHotwords } from './meeting-transcribe'
 import { transcribeQwen3Segment, type Qwen3ASRConfig } from './meeting-transcribe-qwen3'
 
 export interface LiveTranscriptSegment {
@@ -47,6 +47,9 @@ const TARGET_SAMPLE_RATE = 16000
 const MIN_TAIL_SECONDS = 0.5
 // realtime 发送帧：100ms（16kHz 16bit 单声道 = 3200 字节）
 const DS_FRAME_BYTES = (TARGET_SAMPLE_RATE * 100 * 2) / 1000
+// 结束会议时等待串行切块队列清空的最大时长（毫秒）：断网/异常时避免 finalize 被
+// 失败请求拖住（每块可能等满超时），超时后强制返回（录音已落盘可后续补转写）
+const FINALIZE_QUEUE_TIMEOUT = 30 * 1000
 
 // DashScope realtime 结果事件（Rust asr_dashscope_realtime.rs 推送）
 interface DashscopeAsrResultEvent {
@@ -98,8 +101,45 @@ const DS_CMD_PREFIX: Record<'realtime' | 'inference', string> = {
 }
 const dsCmd = (name: string) => `${DS_CMD_PREFIX[dsChannel]}_${name}`
 let dsSessionId: string | null = null
-// 不足一帧的 PCM 字节尾包（连接就绪前也暂存于此）
-let dsPending = new Uint8Array(0)
+// 断线/未连接期间的 PCM 缓冲：用分段队列避免单大缓冲的 O(n²) 全量拷贝（断线时
+// 375 次/秒高频 append，单 Uint8Array 每次 new+set 会饿死主线程导致录音计时卡顿）。
+// 只累积最近 DS_PENDING_WINDOW_SEC 秒（超限丢最旧），保证内存有界。
+let dsPendingChunks: Uint8Array[] = []
+/** 断线缓冲窗口（秒）：30 秒 ≈ 30×3200 字节 ≈ 96KB，足够重连补发又不失控 */
+const DS_PENDING_WINDOW_SEC = 30
+const DS_PENDING_MAX_BYTES = DS_PENDING_WINDOW_SEC * DS_FRAME_BYTES * 10
+/** 断线缓冲总字节数 */
+function dsPendingBytes(): number {
+  let total = 0
+  for (const c of dsPendingChunks) total += c.length
+  return total
+}
+/** 追加 PCM 到断线缓冲（O(1) push；超限时从头部丢弃最旧数据） */
+function dsPendingPush(bytes: Uint8Array): void {
+  dsPendingChunks.push(bytes)
+  let total = dsPendingBytes()
+  while (total > DS_PENDING_MAX_BYTES && dsPendingChunks.length > 1) {
+    const dropped = dsPendingChunks.shift()!
+    total -= dropped.length
+  }
+}
+/** 取出并清空断线缓冲（重连补发/结束会话时调用） */
+function dsPendingFlush(): Uint8Array {
+  if (dsPendingChunks.length === 0) return new Uint8Array(0)
+  const total = dsPendingBytes()
+  const merged = new Uint8Array(total)
+  let offset = 0
+  for (const c of dsPendingChunks) {
+    merged.set(c, offset)
+    offset += c.length
+  }
+  dsPendingChunks = []
+  return merged
+}
+/** 清空断线缓冲（重置录音会话时调用） */
+function dsPendingClear(): void {
+  dsPendingChunks = []
+}
 // 当前 interim 句对应的 pending 片段 id 与所属 item（无 interim 时为 null）
 let dsInterimId: number | null = null
 let dsInterimItemId: string | null = null
@@ -188,7 +228,8 @@ export function startLiveTranscript(meetingId: string): void {
     useSettingStore.getState().aliyunAsrModel === 'qwen-audio-3.0-asr-flash-streaming'
       ? 'inference'
       : 'realtime'
-  dsPending = new Uint8Array(0)
+  dsPendingClear()
+  chunkQueueFailed = false
   dsInterimId = null
   dsInterimItemId = null
   dsAudioSeconds = 0
@@ -265,12 +306,12 @@ export async function finalizeLiveTranscript(meetingId: string): Promise<void> {
       }
     } else if (sessionId) {
       try {
-        if (dsPending.length > 0) {
+        const tailBytes = dsPendingFlush()
+        if (tailBytes.length > 0) {
           await invoke(dsCmd('send_pcm'), {
             sessionId,
-            bytes: Array.from(dsPending),
+            bytes: Array.from(tailBytes),
           })
-          dsPending = new Uint8Array(0)
         }
         await invoke(dsCmd('finish'), { sessionId })
       } catch (err) {
@@ -291,7 +332,12 @@ export async function finalizeLiveTranscript(meetingId: string): Promise<void> {
   }
   cutChunk(true)
   teardownCapture()
-  await queue
+  // 等待串行转写队列清空，但加超时上限：断网/异常时 queue 可能被失败的请求拖住
+  // （每块最多等满超时），这里最多等 30 秒就强制返回——录音已落盘，可后续补转写
+  await Promise.race([
+    queue,
+    new Promise<void>((resolve) => setTimeout(resolve, FINALIZE_QUEUE_TIMEOUT)),
+  ])
   useLiveTranscriptStore.setState({ active: false })
 }
 
@@ -521,7 +567,11 @@ function cutChunk(isTail: boolean): void {
   enqueueChunk(samples16k, Math.round(startSec))
 }
 
-/** 串行队列：追加一个待转写块，单块失败不阻断后续块 */
+/** 串行队列：追加一个待转写块，单块失败不阻断后续块。
+ *  网络类失败（断网）时快速短路：标记 chunkQueueFailed，后续块直接置 failed
+ *  不再发请求，避免断网时每块等满超时（Rust 10s）导致 finalize 挂死数十分钟。 */
+let chunkQueueFailed = false
+
 function enqueueChunk(samples: Float32Array, startSec: number): void {
   const id = ++segmentIdSeq
   useLiveTranscriptStore.setState((s) => ({
@@ -543,6 +593,11 @@ function enqueueChunk(samples: Float32Array, startSec: number): void {
   }
 
   queue = queue.then(async () => {
+    // 前序块网络失败后快速短路：本块直接失败，不再发请求
+    if (chunkQueueFailed) {
+      updateSegment(id, { status: 'failed' })
+      return
+    }
     try {
       const wavBlob = encodeFloat32ToWavBlob(samples)
       const text = await transcribeQwen3Segment(wavBlob, config, 'zh')
@@ -550,6 +605,11 @@ function enqueueChunk(samples: Float32Array, startSec: number): void {
     } catch (err) {
       console.error(`[LiveTranscript] 第 ${id} 块转写失败:`, err)
       updateSegment(id, { status: 'failed' })
+      // 网络类错误（无状态码/5xx/429）→ 快速短路，后续块不再尝试
+      if (isRetryableError(err)) {
+        chunkQueueFailed = true
+        setLiveError('网络异常，已暂停实时转写（录音不受影响）')
+      }
     }
   })
 }
@@ -589,42 +649,45 @@ function appendDsPcm(data: Float32Array, fromRate: number): void {
   const samples16k = resampleLinear(data, fromRate, TARGET_SAMPLE_RATE)
   dsAudioSeconds += samples16k.length / TARGET_SAMPLE_RATE
   const frame = float32ToPcm16Bytes(samples16k)
-  const merged = new Uint8Array(dsPending.length + frame.length)
-  merged.set(dsPending, 0)
-  merged.set(frame, dsPending.length)
-  // 会话失败（断线/服务端错误）期间：不丢弃 PCM，累积到 dsPending，
-  // 重连成功后由 startDsSession 补发，避免转写文本缺段（此前直接 return 丢数据）
-  if (dsFailed) {
-    dsPending = merged
+  // 断线/未连接（dsFailed 或 dsSessionId 为空）期间：帧压入分段队列（O(1) push，
+  // 上限 30 秒窗口），重连后由 onConnected 补发。此前单大缓冲每帧全量拷贝是
+  // 主线程卡死（录音计时卡顿/无法打字）的根因，这里不再合并大缓冲。
+  if (dsFailed || !dsSessionId) {
+    dsPendingPush(frame)
     return
   }
 
-  let offset = 0
   const sessionId = dsSessionId
-  if (sessionId) {
-    while (merged.length - offset >= DS_FRAME_BYTES) {
-      const bytes = merged.slice(offset, offset + DS_FRAME_BYTES)
-      const sid = sessionId
-      // 串行化发送：前一个 invoke resolve/reject 后才发下一个，
-      // 避免 Promise 积压与 Array.from(bytes) 的 number[] 闭包内存膨胀
-      dsSendQueue = dsSendQueue.then(async () => {
-        if (dsFailed) return
-        try {
-          await invoke(dsCmd('send_pcm'), {
-            sessionId: sid,
-            bytes: Array.from(bytes),
-          })
-        } catch (err) {
-          console.error('[LiveTranscript] DashScope realtime 发送失败:', err)
-          dsFailed = true
-          setLiveError(`音频发送失败: ${err}`)
-          if (capturing) scheduleDsReconnect()
-        }
-      })
-      offset += DS_FRAME_BYTES
-    }
+  // 每帧独立压入队列；发送时从队列取整帧（DS_FRAME_BYTES 倍数）：
+  // 用 chunk 引用避免 Array.from 大数组闭包膨胀
+  dsPendingPush(frame)
+  const chunk = dsPendingFlush()
+  let offset = 0
+  while (chunk.length - offset >= DS_FRAME_BYTES) {
+    const bytes = chunk.slice(offset, offset + DS_FRAME_BYTES)
+    const sid = sessionId
+    // 串行化发送：前一个 invoke resolve/reject 后才发下一个，
+    // 避免 Promise 积压与 Array.from(bytes) 的 number[] 闭包内存膨胀
+    dsSendQueue = dsSendQueue.then(async () => {
+      if (dsFailed) return
+      try {
+        await invoke(dsCmd('send_pcm'), {
+          sessionId: sid,
+          bytes: Array.from(bytes),
+        })
+      } catch (err) {
+        console.error('[LiveTranscript] DashScope realtime 发送失败:', err)
+        dsFailed = true
+        setLiveError(`音频发送失败: ${err}`)
+        if (capturing) scheduleDsReconnect()
+      }
+    })
+    offset += DS_FRAME_BYTES
   }
-  dsPending = merged.slice(offset)
+  // 不足一帧的尾包回压队列，下次合并发送
+  if (offset < chunk.length) {
+    dsPendingChunks.unshift(chunk.slice(offset))
+  }
 }
 
 /** 判断是否为网关参数类拒绝（热词 corpus 不兼容的典型报错） */
@@ -679,16 +742,15 @@ async function connectDsSession(token: number): Promise<void> {
         if (event.payload.sessionId === sessionId) onDsError(event.payload)
       }),
     ]
-    // 重连后补发断线期间累积的 PCM（dsPending 在断线期间持续累积，teardownDs 不清空）
-    if (dsPending.length > 0) {
-      const buffered = dsPending
-      dsPending = new Uint8Array(0)
+    // 重连后补发断线期间累积的 PCM（分段队列在断线期间持续累积，teardownDs 不清空）
+    const buffered = dsPendingFlush()
+    if (buffered.length > 0) {
       void invoke(dsCmd('send_pcm'), {
         sessionId,
         bytes: Array.from(buffered),
       }).catch(() => {
         // 补发失败：退回缓冲，等待下次机会（不置 dsFailed，避免立即再次断线）
-        dsPending = buffered
+        dsPendingChunks.unshift(buffered)
       })
     }
     console.log('[LiveTranscript] DashScope realtime 会话已建立:', sessionId)
@@ -778,7 +840,7 @@ function onDsError(payload: DashscopeAsrErrorEvent): void {
     dsInterimId = null
     dsInterimItemId = null
   }
-  // 录音仍在进行： teardown 死会话并尝试自动重连（断点音频已在 dsPending 缓冲）
+  // 录音仍在进行： teardown 死会话并尝试自动重连（断点音频已在分段队列缓冲）
   if (capturing) {
     scheduleDsReconnect()
   }
@@ -811,8 +873,8 @@ function scheduleDsReconnect(): void {
 function teardownDs(): void {
   const sessionId = dsSessionId
   dsSessionId = null
-  // 注意：不清空 dsPending——断线期间累积的 PCM 由重连后 onConnected 补发，
-  // 若这里清空会导致转写缺段（仅 startLiveTranscript 重置录音会话时才清空）
+  // 注意：不清空 dsPendingChunks——断线期间累积的 PCM 由重连后 onConnected 补发，
+  // 若这里清空会导致转写缺段（仅 startLiveTranscript 重置录音会话时 dsPendingClear 才清空）
   if (sessionId) {
     invoke(dsCmd('disconnect'), { sessionId }).catch(() => {})
   }

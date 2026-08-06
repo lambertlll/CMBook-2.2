@@ -31,20 +31,33 @@ export function parseHotwords(raw: string): string[] {
 }
 
 /**
- * 将音频 Blob 编码为 base64（分块编码，避免逐字符拼接在大文件时卡死主线程）
+ * 将音频 Blob 编码为 base64。
+ * 分块编码 + 每块让出事件循环（await nextTick），避免大文件（如 2h 录音数百 MB）
+ * 的 base64 化同步阻塞主线程导致 UI 冻结（录音计时/笔记输入/按钮响应）。
  */
 async function encodeBlobToBase64(audioBlob: Blob): Promise<string> {
   const arrayBuffer = await audioBlob.arrayBuffer()
   const uint8Array = new Uint8Array(arrayBuffer)
-  let binary = ''
+  // 预分配输出数组，避免字符串拼接的反复 realloc
+  const chunks: string[] = []
   const CHUNK_SIZE = 0x8000
-  for (let i = 0; i < uint8Array.length; i += CHUNK_SIZE) {
-    binary += String.fromCharCode.apply(
-      null,
-      uint8Array.subarray(i, i + CHUNK_SIZE) as unknown as number[]
-    )
+  const blockSize = 1024 * 1024 // 每处理 1MB 让出一次事件循环
+  let processed = 0
+  while (processed < uint8Array.length) {
+    const blockEnd = Math.min(processed + blockSize, uint8Array.length)
+    let binary = ''
+    for (let i = processed; i < blockEnd; i += CHUNK_SIZE) {
+      binary += String.fromCharCode.apply(
+        null,
+        uint8Array.subarray(i, i + CHUNK_SIZE) as unknown as number[]
+      )
+    }
+    chunks.push(btoa(binary))
+    processed = blockEnd
+    // 让出主线程：使 UI（计时/输入/按钮）在编码间隙可响应
+    await new Promise<void>((resolve) => setTimeout(resolve, 0))
   }
-  return btoa(binary)
+  return chunks.join('')
 }
 
 /**
