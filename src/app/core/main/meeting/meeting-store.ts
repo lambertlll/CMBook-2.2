@@ -643,9 +643,26 @@ async function ensureMeetingLoaded(id: string) {
     const record = await getMeeting(id)
     if (!record) return
     useMeetingStore.setState((state) => ({
-      meetings: state.meetings.map((m) =>
-        m.id === id ? recordToMeeting(record) : m
-      ),
+      meetings: state.meetings.map((m) => {
+        if (m.id !== id) return m
+        const fromDb = recordToMeeting(record)
+        // 防抖窗口内有挂起编辑的字段：保留内存值（更新），避免 DB 旧值覆盖新输入（D1）
+        const pending = pendingFields.get(id)
+        if (!pending) return fromDb
+        return {
+          ...fromDb,
+          ...Object.fromEntries(
+            Object.entries(pending).filter(([k, v]) => {
+              // 只保护用户可编辑的大字段；error/status 等状态字段以 DB 为准
+              return (
+                (k === 'manualNotes' || k === 'summary') &&
+                v !== undefined &&
+                v !== null
+              )
+            })
+          ),
+        }
+      }),
     }))
   } catch (err) {
     loadedDetails.delete(id)

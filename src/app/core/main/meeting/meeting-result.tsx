@@ -1541,7 +1541,13 @@ export function MeetingResult({ meeting }: MeetingResultProps) {
       }
     } catch (err) {
       // 用户主动停止：保留已生成内容，状态回到已完成
-      if (err instanceof DOMException && err.name === 'AbortError') {
+      // 用 name 判断而非 instanceof DOMException——自定义 AbortError（tauri-client.ts）
+      // 不是 DOMException 实例，原判断会误走失败分支覆盖部分纪要
+      if (
+        err &&
+        typeof err === 'object' &&
+        (err as { name?: string }).name === 'AbortError'
+      ) {
         const partial = useMeetingStore.getState().meetings.find((m) => m.id === meeting.id)?.summary || ''
         updateMeeting(meeting.id, {
           summary: partial,

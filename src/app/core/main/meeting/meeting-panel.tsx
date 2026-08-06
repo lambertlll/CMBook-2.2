@@ -8,6 +8,7 @@ import { MeetingNotesEditor } from './meeting-notes-editor'
 import { MeetingResult } from './meeting-result'
 import {
   getRecorder,
+  getRecorderMeetingId,
   getOrCreateRecorder,
   destroyRecorder,
 } from './meeting-recorder-manager'
@@ -288,7 +289,11 @@ export function MeetingPanel() {
       try {
         // 1. Stop recording and get audioBlob
         let audioBlob: Blob | null = null
-        if (recorder) {
+        // 归属校验：仅当录音器仍归属本会议时才 stop——若用户已快速结束本会议并新建了
+        // 其他会议（录音器归属已切换），停掉它会误杀新会议的麦克风（M1 竞态）
+        const recorderBelongsToMeeting =
+          getRecorderMeetingId() === meetingId
+        if (recorder && recorderBelongsToMeeting) {
           // 无论 recordingMeetingId 状态，只要录音器活着就停止并获取音频
           try {
             audioBlob = await recorder.stop()
@@ -296,6 +301,10 @@ export function MeetingPanel() {
             console.error('[Meeting] recorder.stop() failed:', e)
           }
           destroyRecorder()
+        } else if (recorder) {
+          console.warn(
+            `[Meeting] 录音器归属 ${getRecorderMeetingId()}，本会议 ${meetingId} 不停止（防误杀新会议录音）`
+          )
         }
 
         // 结束录音：收尾实时转写（送出尾块并等待队列清空），供下方复用

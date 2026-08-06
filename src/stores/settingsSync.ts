@@ -1,6 +1,6 @@
 import { Store } from '@tauri-apps/plugin-store'
 import { create } from 'zustand'
-import { filterSyncData, mergeSyncData } from '@/config/sync-exclusions'
+import { filterSyncData, mergeSyncData, shouldExcludeFromSync } from '@/config/sync-exclusions'
 import { uploadFile as uploadGithubFile, getFiles as githubGetFiles, decodeBase64ToString } from '@/lib/sync/github'
 import { uploadFile as uploadGiteeFile, getFiles as giteeGetFiles } from '@/lib/sync/gitee'
 import { uploadFile as uploadGitlabFile, getFiles as gitlabGetFiles, getFileContent as gitlabGetFileContent } from '@/lib/sync/gitlab'
@@ -325,7 +325,16 @@ const useSettingsSyncStore = create<SettingsSyncState>((set) => ({
       setAutoDataSyncApplyingRemote(true)
       try {
         for (const [key, value] of Object.entries(mergedSettings)) {
-          await store.set(key, value)
+          // 敏感字段（含 apikey/secret/token 等模式）落盘前强制加密——
+          // 远端 settings.json 可能是明文（旧版本上传），mergeSyncData 按
+          // excludeSensitiveConfig 过滤后仍可能带敏感值，绕过 credential-crypto 会明文落盘
+          if (shouldExcludeFromSync(key, { excludeSensitiveConfig: true })) {
+            const { encryptSecret } = await import('@/stores/credential-crypto')
+            const encrypted = await encryptSecret(String(value))
+            await store.set(key, encrypted)
+          } else {
+            await store.set(key, value)
+          }
         }
         await store.save()
       } finally {

@@ -656,7 +656,12 @@ const useSettingStore = create<SettingState>((set, get) => ({
           set({ [key]: res })
         }
       } else {
-        await store.set(key, value)
+        // store 缺键：用内存默认值回写。敏感键跳过回写（默认值多为占位空值，
+        // 落盘也无意义且可能引入明文路径）；真正有值的敏感配置由用户显式设置后经
+        // credential-crypto 加密落盘
+        if (!shouldExcludeFromSync(key)) {
+          await store.set(key, value)
+        }
       }
     }))
 

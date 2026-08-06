@@ -18,6 +18,11 @@ export function getRecorder(): MeetingAudioRecorder | null {
   return currentRecorder
 }
 
+/** 获取当前录音器归属的会议 ID（可能为 null） */
+export function getRecorderMeetingId(): string | null {
+  return currentMeetingId
+}
+
 /**
  * 获取归属指定会议的录音器。
  * 若当前实例归属其他会议（开始新会议），先销毁旧实例再新建。

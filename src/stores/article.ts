@@ -500,6 +500,28 @@ const useArticleStore = create<NoteState>((set, get) => ({
 
   activeFilePath: '',
   setActiveFilePath: async (path: string) => {
+    // 切换前强制 flush 未保存内容（防抖 timer 未到期时内容还在 pendingSaveContent，
+    // 若直接切换会被 2186 的路径校验取消保存 → 最后改动丢失）
+    const pendingTimer = get().debounceSaveTimer
+    const pendingContent = get().pendingSaveContent
+    if (pendingTimer && pendingContent !== null) {
+      clearTimeout(pendingTimer)
+      const pendingPath = get().activeFilePath
+      if (pendingPath) {
+        // 直接落盘（不经过防抖路径校验）
+        const pathOptions = await getFilePathOptions(pendingPath)
+        try {
+          if (!pathOptions.baseDir) {
+            await writeTextFile(pathOptions.path, pendingContent)
+          } else {
+            await writeTextFile(pathOptions.path, pendingContent, { baseDir: pathOptions.baseDir })
+          }
+        } catch (flushErr) {
+          console.error('[Article] 切换文件前保存失败:', flushErr)
+        }
+      }
+      set({ debounceSaveTimer: null, pendingSaveContent: null })
+    }
     const nextPath = isRecordOpenTabPath(path) ? '' : path
     // 切换文件时，先清空 currentArticle，避免内容覆盖
     set({ currentArticle: '', activeFilePath: nextPath, selectedFilePaths: [] })
