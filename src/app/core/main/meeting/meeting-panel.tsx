@@ -75,6 +75,15 @@ async function autoGenerateVisitSummary(meetingId: string): Promise<void> {
       },
     })
     updateMeeting(meetingId, { summary: fullSummary, status: 'completed' })
+    // S1：首次转写完成后自动生成的纪要也触发低置信度自检（SummaryEditor 监听事件；
+    // 延迟等结果页编辑器挂载，与 result 派发逻辑一致）
+    window.setTimeout(() => {
+      document.dispatchEvent(
+        new CustomEvent('summary-uncertainty-check', {
+          detail: { summary: fullSummary },
+        })
+      )
+    }, 300)
     // 生成成功后自动导出到客户知识库并向量化（失败仅告警，不影响会议流程）
     const finished = useMeetingStore
       .getState()

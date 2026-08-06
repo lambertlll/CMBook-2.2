@@ -403,42 +403,75 @@ function SummaryTab({ meeting, onGenerate }: SummaryTabProps) {
  * 仅在“已有纪要”的分支挂载，挂载时读到的即最终内容；外部变更走 setContent 同步。
  */
 // ---- S1 低置信度标记：Decoration 装饰层（不进文档模型、不污染 getMarkdown 导出）----
-// 模块级：当前标记的文本范围（SummaryEditor 通过 setUncertaintyRanges 更新）
-let uncertaintyRanges: Array<{ from: number; to: number; item: SummaryUncertainty }> = []
+// 采用 ai-suggestion-highlight.ts 的成熟范式：tr.getMeta(pluginKey) 传 set/clear 指令，
+// apply 里用 tr.mapping.map 跟随文档变化，props.decorations 里现算 DecorationSet。
 
-/** 供 SummaryEditor 更新当前标记范围（React state 与插件间桥接） */
-export function setUncertaintyRanges(
-  ranges: Array<{ from: number; to: number; item: SummaryUncertainty }>
-): void {
-  uncertaintyRanges = ranges
+interface UncertaintyRange {
+  from: number // doc position（ProseMirror 坐标系，非 markdown 下标）
+  to: number
+  item: SummaryUncertainty
 }
 
-const uncertaintyPluginKey = new PluginKey('uncertaintyDecoration')
+type UncertaintyMeta =
+  | { type: 'set'; ranges: Array<{ from: number; to: number; item: SummaryUncertainty }> }
+  | { type: 'clear' }
+
+const uncertaintyPluginKey = new PluginKey<UncertaintyRange[]>('uncertaintyDecoration')
+
+function normalizeUncertaintyRanges(
+  ranges: Array<{ from: number; to: number; item: SummaryUncertainty }>,
+  docSize: number
+): UncertaintyRange[] {
+  return ranges
+    .map((r) => ({
+      from: Math.max(0, Math.min(r.from, docSize)),
+      to: Math.max(0, Math.min(r.to, docSize)),
+      item: r.item,
+    }))
+    .filter((r) => r.from < r.to)
+}
 
 const UncertaintyDecoration = Extension.create({
   name: 'uncertaintyDecoration',
 
   addProseMirrorPlugins() {
     return [
-      new Plugin({
+      new Plugin<UncertaintyRange[]>({
         key: uncertaintyPluginKey,
         state: {
-          init: () => DecorationSet.empty,
-          apply(tr, oldSet) {
-            // 内容变化时重建（标记只读，文档编辑后清除标记更安全）
-            if (!tr.docChanged) return oldSet
-            const decorations = uncertaintyRanges.map(({ from, to, item }) =>
-              Decoration.inline(from, to, {
-                class: 'summary-uncertain',
-                'data-reason': item.reason,
-              })
-            )
-            return DecorationSet.create(tr.doc, decorations)
+          init: () => [],
+          apply(tr, value) {
+            const meta = tr.getMeta(uncertaintyPluginKey) as UncertaintyMeta | undefined
+            // 显式 set/clear 指令优先（空事务也能生效——修复问题 2）
+            if (meta?.type === 'clear') return []
+            if (meta?.type === 'set') {
+              return normalizeUncertaintyRanges(meta.ranges, tr.doc.content.size)
+            }
+            // 无指令时：文档变化跟随映射（编辑后标记跟随内容移动），无变化保持
+            if (!tr.docChanged) return value
+            if (value.length === 0) return value
+            return value
+              .map((r) => ({
+                from: tr.mapping.map(r.from, -1),
+                to: tr.mapping.map(r.to, 1),
+                item: r.item,
+              }))
+              .filter((r) => r.from < r.to)
           },
         },
         props: {
           decorations(state) {
-            return this.getState(state)
+            const ranges = uncertaintyPluginKey.getState(state)
+            if (!ranges || ranges.length === 0) return DecorationSet.empty
+            return DecorationSet.create(
+              state.doc,
+              ranges.map((r) =>
+                Decoration.inline(r.from, r.to, {
+                  class: 'summary-uncertain',
+                  'data-reason': r.item.reason,
+                })
+              )
+            )
           },
         },
       }),
@@ -446,28 +479,46 @@ const UncertaintyDecoration = Extension.create({
   },
 })
 
+/** 供 SummaryEditor 设置/清除标记（通过事务 meta 驱动，空事务也能生效） */
+function setUncertaintyDecorations(
+  editor: import('@tiptap/react').Editor,
+  ranges: Array<{ from: number; to: number; item: SummaryUncertainty }>
+): void {
+  if (editor.isDestroyed) return
+  if (ranges.length === 0) {
+    editor.view.dispatch(editor.state.tr.setMeta(uncertaintyPluginKey, { type: 'clear' }))
+    return
+  }
+  editor.view.dispatch(
+    editor.state.tr.setMeta(uncertaintyPluginKey, {
+      type: 'set',
+      ranges,
+    })
+  )
+}
+
 /**
- * 在 markdown 文本中按「章节标题 + 片段」模糊定位可疑项位置。
- * 策略：先按章节名定位段落起点，再在段内匹配片段；匹配失败返回 null（降级侧边栏列表）。
+ * 在 ProseMirror doc 上定位可疑项片段（修复问题 1：坐标系必须用 doc position）。
+ * 遍历文本节点做子串匹配，返回 doc position；找不到返回 null（降级为提示条计数，不高亮）。
+ * 不做去标点宽松匹配（±2 硬编码补偿不可靠，删掉）。
  */
-function locateUncertaintyInMarkdown(markdown: string, item: SummaryUncertainty): { from: number; to: number } | null {
-  // 简化定位：直接全文查找片段（章节标题可能与 markdown 渲染不一致，先试全文匹配）
-  const fragIdx = markdown.indexOf(item.fragment)
-  if (fragIdx >= 0) {
-    return { from: fragIdx, to: fragIdx + item.fragment.length }
-  }
-  // 片段匹配失败：尝试去掉标点的宽松匹配
-  const strip = (s: string) => s.replace(/[，。、；：,.!?！？\s]/g, '')
-  const strippedFrag = strip(item.fragment)
-  if (strippedFrag.length >= 4) {
-    const strippedMd = strip(markdown)
-    const idx = strippedMd.indexOf(strippedFrag)
+function locateUncertaintyInDoc(
+  doc: import('@tiptap/pm/model').Node,
+  fragment: string
+): { from: number; to: number } | null {
+  if (!fragment.trim()) return null
+  // 逐文本节点查找：doc position = 文本节点起点 + 节点内偏移
+  let found: { from: number; to: number } | null = null
+  doc.descendants((node, pos) => {
+    if (found || !node.isText || !node.text) return false
+    const idx = node.text.indexOf(fragment)
     if (idx >= 0) {
-      // 还原到原文位置（累加已剥离字符数有误差，直接按比例近似：返回 strip 前的位置）
-      return { from: Math.max(0, idx - 2), to: Math.min(markdown.length, idx + item.fragment.length + 2) }
+      found = { from: pos + idx, to: pos + idx + fragment.length }
+      return false
     }
-  }
-  return null
+    return true
+  })
+  return found
 }
 
 function SummaryEditor({ meeting }: { meeting: Meeting }) {
@@ -785,24 +836,23 @@ function SummaryEditor({ meeting }: { meeting: Meeting }) {
           title: meeting.title,
           modelId: meeting.selectedModel || undefined,
         })
-        // 在 markdown 中定位每个可疑项，能定位的进装饰层，不能定位的降级为侧边栏列表
+        // 在 ProseMirror doc 上定位每个可疑项（修复问题 1：坐标系必须 doc position）。
+        // 注意：editor 的 doc 是 markdown 解析后的节点，定位基于 doc 文本内容
         const located: Array<{ from: number; to: number; item: SummaryUncertainty }> = []
-        const unlocated: SummaryUncertainty[] = []
         for (const item of list) {
-          const pos = locateUncertaintyInMarkdown(summaryMarkdown, item)
+          const pos = locateUncertaintyInDoc(editor.state.doc, item.fragment)
           if (pos) {
             located.push({ ...pos, item })
-          } else {
-            unlocated.push(item)
           }
         }
-        setUncertaintyRanges(located)
-        // 更新编辑器装饰（通过 trigger 重算插件状态）
-        editor.view.dispatch(editor.state.tr)
-        setUncertainties([...located.map((l) => l.item), ...unlocated])
+        // 用事务 meta 指令驱动装饰层（修复问题 2：空事务 docChanged=false 也能生效）
+        setUncertaintyDecorations(editor, located)
+        // 展示状态：能定位的进装饰层 + 计数提示；未能定位的也计入总数（提示条可见）
+        setUncertainties(list)
       } catch (err) {
         console.warn('[Summary] 低置信度自检失败:', err)
         setUncertainties([])
+        setUncertaintyDecorations(editor, [])
       } finally {
         setUncertaintyChecking(false)
       }
@@ -843,9 +893,8 @@ function SummaryEditor({ meeting }: { meeting: Meeting }) {
                 size="sm"
                 className="h-5 px-2 text-xs"
                 onClick={() => {
-                  setUncertaintyRanges([])
                   setUncertainties([])
-                  if (editor) editor.view.dispatch(editor.state.tr)
+                  if (editor) setUncertaintyDecorations(editor, [])
                 }}
               >
                 清除标记
