@@ -105,6 +105,22 @@ export const ChatSend = forwardRef<{ sendChat: (content?: string) => void }, Cha
     wasLoadingRef.current = loading
   }, [loading, maybeCondense])
 
+  // O2：切换会话时中断在跑的 run——否则新会话发消息会被当成对旧 run 的 steering，
+  // 回复写进旧会话、新会话输入消失
+  const currentConvId = useChatStore((s) => s.currentConversationId)
+  const prevConvIdRef = useRef(currentConvId)
+  useEffect(() => {
+    const prev = prevConvIdRef.current
+    prevConvIdRef.current = currentConvId
+    if (prev !== undefined && prev !== currentConvId && activeRunRef.current) {
+      console.warn('[ChatSend] 会话切换，中断进行中的 AI 生成')
+      // 复用停止逻辑（abort + agent stop + 清 pending）
+      void handleStop()
+    }
+    // handleStop 为稳定引用，不列入依赖
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentConvId])
+
   // RAG 关键词停用词过滤
   // 过滤掉没有实际检索意义的虚词
   const filterRAGKeywords = (keywords: {text: string, weight: number}[]) => {
@@ -899,6 +915,25 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
     if (agentHandlerRef.current) {
       agentHandlerRef.current.stop()
       // 不立即清空 ref，等待 Agent 的错误处理完成并调用 onComplete
+    }
+
+    // O1：Agent 等待工具审批时点停止——清除 pendingConfirmation，
+    // 使 requestConfirmation 的轮询 resolve denied，避免 run 永久挂起 + interval 泄漏
+    const chatState = useChatStore.getState()
+    const pendingConf = chatState.agentState.pendingConfirmation
+    if (pendingConf) {
+      setAgentState({
+        pendingConfirmation: undefined,
+        confirmationHistory: [
+          ...chatState.agentState.confirmationHistory,
+          {
+            toolName: pendingConf.toolName,
+            params: pendingConf.params,
+            status: 'cancelled' as const,
+            timestamp: Date.now(),
+          },
+        ],
+      })
     }
 
     // 重置 loading 状态

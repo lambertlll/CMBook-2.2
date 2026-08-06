@@ -833,12 +833,22 @@ export async function hasNetworkConnection(): Promise<boolean> {
           proxy = { all: giteaProxyUrl }
         }
         break
+      case 's3':
+        // S3：探测其 API 端点（默认 AWS 全局端点；自建/兼容服务仍可反映连通性）
+        url = 'https://s3.amazonaws.com'
+        break
+      case 'webdav':
+        // WebDAV：探测用户配置的服务端点；未配置时回退通用域名
+        token = ''
+        const webdavConfig = await store.get<{ url?: string }>('webdavSyncConfig')
+        url = webdavConfig?.url || 'https://dav.jianguoyun.com/dav/'
+        break
       default:
         clearTimeout(timeoutId)
         return false
     }
 
-    if (!token) {
+    if (!token && url === '') {
       clearTimeout(timeoutId)
       return false
     }
@@ -846,9 +856,9 @@ export async function hasNetworkConnection(): Promise<boolean> {
     const fetchOptions: any = {
       method: 'GET',
       signal: controller.signal,
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
+      headers: token
+        ? { 'Authorization': `Bearer ${token}` }
+        : undefined,
     }
 
     // Gitea 自建实例使用代理
@@ -856,10 +866,14 @@ export async function hasNetworkConnection(): Promise<boolean> {
       fetchOptions.proxy = proxy
     }
 
-    const response = await fetch(url, fetchOptions)
-
-    clearTimeout(timeoutId)
-    return response.ok
+    let response: Response | undefined
+    try {
+      response = await fetch(url, fetchOptions)
+      return response.ok
+    } finally {
+      // 所有路径（成功/失败/超时）都清理定时器，避免 10s 悬挂
+      clearTimeout(timeoutId)
+    }
   } catch (error) {
     // 网络错误、超时等
     console.error('Network connection check failed:', error)

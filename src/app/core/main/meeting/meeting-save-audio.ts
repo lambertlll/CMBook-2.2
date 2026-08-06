@@ -61,6 +61,9 @@ export async function removeMeetingAudio(
   const candidates = new Set(
     KNOWN_AUDIO_EXTS.map((ext) => `meetings/${meetingId}.${ext}`)
   )
+  // 崩溃遗留的分片临时文件（录音恢复机制 .part）：不在已知扩展名内，必须显式补充，
+  // 否则永远清不掉（D5）
+  candidates.add(`meetings/recording-${meetingId}.part`)
   if (audioPath) {
     candidates.add(audioPath)
   }

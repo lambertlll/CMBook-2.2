@@ -559,6 +559,13 @@ export function MeetingPanel() {
           .meetings.find((m) => m.id === meetingId)
         if (finishedMeeting?.visitId && !finishedMeeting.summary) {
           await autoGenerateVisitSummary(meetingId)
+        } else if (finishedMeeting?.visitId && isContinuation && finishedMeeting.summary) {
+          // 续录完成但已有旧纪要（第一段生成的）：新转写追加后纪要已过期。
+          // 不自动覆盖（可能含用户手动编辑），仅提示用户手动重新生成
+          console.warn('[Meeting] 续录完成，旧纪要可能不包含新录音内容，提示重新生成')
+          updateMeeting(meetingId, {
+            error: '续录完成，旧纪要可能不完整，建议点击「重新生成纪要」更新。',
+          })
         }
       } catch (err) {
         console.error('转写/生成失败:', err)

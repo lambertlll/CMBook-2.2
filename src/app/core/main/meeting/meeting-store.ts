@@ -11,7 +11,8 @@ import {
 import { removeMeetingAudio } from './meeting-save-audio'
 import { deleteVisitTodosByMeeting } from '@/db/visit-todos'
 import { clearVisitMeetingLink } from '@/db/visits'
-import { destroyRecorder } from './meeting-recorder-manager'
+import { destroyRecorder, getRecorder } from './meeting-recorder-manager'
+import { clearLiveTranscript, pauseLiveTranscript, resumeLiveTranscript } from './meeting-live-transcript'
 
 export type MeetingStatus =
   | 'idle'
@@ -96,6 +97,7 @@ const PERSIST_FIELDS: (keyof Meeting)[] = [
   'selectedTemplate',
   'selectedModel',
   'duration',
+  'pausedDuration',
   'audioPath',
   'audioSegments',
   'error',
@@ -226,6 +228,13 @@ function flushSave(id: string, fields: Partial<Meeting>) {
     .then(() => updateMeetingRecord(id, dbFields))
     .catch((err) => {
       console.error('[MeetingStore] 保存失败:', err)
+      // D6：写失败时保留待保存字段，5 秒后重试一次，避免静默丢数据（内存比 DB 新）
+      setTimeout(() => {
+        if (!pendingFields.has(id)) {
+          pendingFields.set(id, fields)
+          flushSave(id, fields)
+        }
+      }, 5000)
     })
 }
 
@@ -419,49 +428,65 @@ export const useMeetingStore = create<MeetingStoreState>((set, get) => ({
       }
     })
 
-    // 删除正在录音的会议：销毁录音器，停止麦克风采集与 .part 分片落盘
-    // （record 状态或暂停状态都属于活跃录音）
-    const wasRecording = meeting?.status === 'recording' || meeting?.status === 'paused'
-    if (wasRecording) {
-      destroyRecorder()
+    // D2：等待新建插入完成后再执行删除——创建后立即删除时，
+    // deleteMeetingRecord 若先于 insertMeeting 执行，行会被 INSERT 重建（幽灵行复活）
+    const insertPromise = insertPromises.get(id)
+    const cleanup = () => {
+      // 删除正在录音的会议：销毁录音器，停止麦克风采集与 .part 分片落盘
+      // （record 状态或暂停状态都属于活跃录音）
+      const wasRecording = meeting?.status === 'recording' || meeting?.status === 'paused'
+      if (wasRecording) {
+        destroyRecorder()
+      }
+
+      // 清理实时转写采集与会话（AudioContext/WebSocket/重连定时器），
+      // 避免残留会话反复重建、segments 串到新会议（M4）
+      clearLiveTranscript()
+
+      // 清理挂起的保存任务与缓存条目
+      const timer = saveTimers.get(id)
+      if (timer) clearTimeout(timer)
+      saveTimers.delete(id)
+      pendingFields.delete(id)
+      insertPromises.delete(id)
+      loadedDetails.delete(id)
+
+      // 级联删除该会议产生的待办（避免待办面板残留"幽灵待办"）
+      deleteVisitTodosByMeeting(id).catch((err) => {
+        console.error('[MeetingStore] 删除会议待办失败:', err)
+      })
+      // 清空拜访记录中对该会议的悬空引用
+      clearVisitMeetingLink(id).catch((err) => {
+        console.error('[MeetingStore] 清理拜访会议关联失败:', err)
+      })
+
+      // 删除本地音频文件（含续录的多段，兼容多种扩展名及旧版 .wav）
+      removeMeetingAudio(id, meeting?.audioPath || undefined, meeting?.audioSegments).catch((err) => {
+        console.error('[MeetingStore] 删除音频文件失败:', err)
+      })
+
+      // 级联删除客户知识库的导出文件及其向量索引
+      // （动态引入避免与 meeting-customer-export 形成静态循环依赖）
+      if (meeting?.exportedFilePath) {
+        const exportedPath = meeting.exportedFilePath
+        import('./meeting-customer-export')
+          .then((m) => m.removeMeetingCustomerExport(exportedPath))
+          .catch((err) => {
+            console.error('[MeetingStore] 删除导出文件失败:', err)
+          })
+      }
+
+      deleteMeetingRecord(id).catch((err) => {
+        console.error('[MeetingStore] 删除会议失败:', err)
+      })
     }
 
-    // 清理挂起的保存任务与缓存条目
-    const timer = saveTimers.get(id)
-    if (timer) clearTimeout(timer)
-    saveTimers.delete(id)
-    pendingFields.delete(id)
-    insertPromises.delete(id)
-    loadedDetails.delete(id)
-
-    // 级联删除该会议产生的待办（避免待办面板残留"幽灵待办"）
-    deleteVisitTodosByMeeting(id).catch((err) => {
-      console.error('[MeetingStore] 删除会议待办失败:', err)
-    })
-    // 清空拜访记录中对该会议的悬空引用
-    clearVisitMeetingLink(id).catch((err) => {
-      console.error('[MeetingStore] 清理拜访会议关联失败:', err)
-    })
-
-    // 删除本地音频文件（含续录的多段，兼容多种扩展名及旧版 .wav）
-    removeMeetingAudio(id, meeting?.audioPath || undefined, meeting?.audioSegments).catch((err) => {
-      console.error('[MeetingStore] 删除音频文件失败:', err)
-    })
-
-    // 级联删除客户知识库的导出文件及其向量索引
-    // （动态引入避免与 meeting-customer-export 形成静态循环依赖）
-    if (meeting?.exportedFilePath) {
-      const exportedPath = meeting.exportedFilePath
-      import('./meeting-customer-export')
-        .then((m) => m.removeMeetingCustomerExport(exportedPath))
-        .catch((err) => {
-          console.error('[MeetingStore] 删除导出文件失败:', err)
-        })
+    // 等待新建插入完成后执行清理（防幽灵行复活）；无挂起插入则立即执行
+    if (insertPromise) {
+      void insertPromise.finally(() => cleanup())
+    } else {
+      cleanup()
     }
-
-    deleteMeetingRecord(id).catch((err) => {
-      console.error('[MeetingStore] 删除会议失败:', err)
-    })
   },
 
   deleteMeetings: (ids) => {
@@ -568,6 +593,12 @@ export const useMeetingStore = create<MeetingStoreState>((set, get) => ({
         }
       }),
     }))
+    // 同步驱动录音器与实时转写暂停（M5：不依赖 UI effect 时序，快速 暂停→恢复 不丢帧）
+    const recorder = getRecorder()
+    if (recorder && recorder.getState() === 'recording') {
+      recorder.pause()
+    }
+    pauseLiveTranscript()
     immediateSave(id, { status: 'paused' })
   },
 
@@ -580,6 +611,12 @@ export const useMeetingStore = create<MeetingStoreState>((set, get) => ({
           : m
       ),
     }))
+    // 同步驱动恢复
+    const recorder = getRecorder()
+    if (recorder && recorder.getState() === 'paused') {
+      recorder.resume()
+    }
+    resumeLiveTranscript()
     immediateSave(id, { status: 'recording' })
   },
 
