@@ -6,9 +6,10 @@ import { getDb } from './index'
 // v4（2.4 拜访形态）：visits 新增 noteDocPath 归档型拜访的访中笔记文档列
 // v5（2.5 待办增强）：visit_todos 新增 deleted 软删除列，删除改为标记可恢复
 // v6（2.6 周报）：新增 weekly_reports 表（周报正文 + AI 生成标记）
-// （迁移均在 db/visit-todos.ts / db/visits.ts / db/weekly-reports.ts 的 init 中完成）
+// v7（2.8.3 离线待补转写）：meetings 新增 pendingTranscribe 离线待补转写标记列（ensureColumn 幂等加列）
+// （迁移均在 db/visit-todos.ts / db/visits.ts / db/weekly-reports.ts / db/meetings.ts 的 init 中完成）
 export const CMBOOK2_SCHEMA_KEY = 'cmbook2'
-export const CMBOOK2_SCHEMA_VERSION = 6
+export const CMBOOK2_SCHEMA_VERSION = 7
 
 export interface SchemaMetaRecord {
   key: string

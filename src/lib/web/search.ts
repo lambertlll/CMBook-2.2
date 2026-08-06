@@ -19,6 +19,7 @@ import {
   type WebSearchResultItem,
 } from './types'
 import { getWebSearchConfig, normalizeMaxResults, type ResolvedWebSearchConfig } from './config'
+import { useNetworkStore } from '@/stores/network'
 
 export interface SearchOptions {
   apiKey: string
@@ -180,6 +181,9 @@ export async function searchWeb(query: string, maxResults?: number): Promise<{
     timeoutMs: config.timeoutMs,
     maxResults: normalizeMaxResults(maxResults ?? config.maxResults),
   })
+
+  // P2-1：联网搜索成功证明网络可达 → 复位离线标记（误标离线的自愈链）
+  useNetworkStore.getState().markOnline()
 
   return { provider: config.provider, results }
 }

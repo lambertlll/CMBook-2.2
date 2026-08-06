@@ -272,12 +272,13 @@ export async function transcribeAudioWithFallback(
   try {
     // 主通道：按用户配置转写
     const result = await transcribeAudio({ audioBlob, language, onProgress })
+    // HTTP 响应成功即证明网络可达：先复位离线标记（P2-2：判定网络可达性，
+    // 不应被下方"空文本"业务校验挡住——请求成功但返回空文本时同样证明网络已恢复）
+    useNetworkStore.getState().markOnline()
     // 空文本视为失败（服务端可能返回空，导致「转写成功但无内容」的假完成）
     if (!result.text || !result.text.trim()) {
       throw new Error('转写结果为空，请重试或检查语音识别模型配置')
     }
-    // 转写成功证明网络可用：复位离线标记（P0-3：误标后必须能自愈）
-    useNetworkStore.getState().markOnline()
     return { text: result.text, duration: result.duration, usedFallback: false }
   } catch (primaryErr) {
     // 网络类错误（断网/超时/连接失败）→ 标记离线，联动离线模式（录音继续、跳过联网功能）

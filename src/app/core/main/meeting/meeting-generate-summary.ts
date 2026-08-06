@@ -3,6 +3,7 @@ import type { AiConfig } from '@/app/core/setting/config'
 import { resolveTemplate } from './meeting-templates'
 import { resolveModelConfig } from './meeting-model-config'
 import useSettingStore from '@/stores/setting'
+import { useNetworkStore } from '@/stores/network'
 
 interface GenerateSummaryOptions {
   transcript: string
@@ -138,6 +139,10 @@ export async function generateMeetingSummary(
   if (meetingCoverageCheck && plainNotes && fullContent) {
     fullContent = await appendCoverageSupplement(aiConfig, fullContent, plainNotes, title, onStream, options.signal)
   }
+
+  // AI 请求成功完成 → 复位离线标记（P2-1：纪要生成成功证明网络可用，
+  // 任何一条真实请求成功都能让误标离线的状态自愈）
+  useNetworkStore.getState().markOnline()
 
   return fullContent
 }

@@ -2,6 +2,7 @@
 import { Send, Square } from "lucide-react"
 import useSettingStore from "@/stores/setting"
 import useChatStore from "@/stores/chat"
+import { useNetworkStore } from "@/stores/network"
 import useTagStore from "@/stores/tag"
 import { TooltipButton } from "@/components/tooltip-button"
 import { useImperativeHandle, forwardRef, useRef, useEffect } from "react"
@@ -412,6 +413,10 @@ export const ChatSend = forwardRef<{ sendChat: (content?: string) => void }, Cha
         const effectivelyStopped = Boolean(stopped)
           || manualStopRequestedRef.current
           || isRequestAbortError(result)
+        // P2-1：Agent 正常完成（非用户停止/未中断）证明网络链路可用 → 复位离线标记
+        if (!effectivelyStopped) {
+          useNetworkStore.getState().markOnline()
+        }
         const completedAt = Date.now()
         const traceEvents = (agentState.traceEvents || []).map(event => {
           if (event.status !== 'running') {

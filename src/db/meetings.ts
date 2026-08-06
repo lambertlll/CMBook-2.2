@@ -81,7 +81,7 @@ async function ensureColumn(db: Database, column: string, definition: string) {
 // 列表查询的元数据列（排除 transcript/summary/manualNotes 大字段；
 // hasSummary 为计算列：不读 summary 内容即可获得"是否已有纪要"标记，供工作台待归类卡片等场景使用）
 const LIST_COLUMNS =
-  'id, title, status, selectedTemplate, selectedModel, duration, audioPath, audioSegments, error, customerId, visitId, exportedFilePath, createdAt, updatedAt, (CASE WHEN summary IS NULL OR summary = \'\' THEN 0 ELSE 1 END) AS hasSummary'
+  'id, title, status, selectedTemplate, selectedModel, duration, audioPath, audioSegments, error, customerId, visitId, exportedFilePath, pendingTranscribe, createdAt, updatedAt, (CASE WHEN summary IS NULL OR summary = \'\' THEN 0 ELSE 1 END) AS hasSummary'
 
 /**
  * 获取所有会议的元数据（按创建时间倒序，不含大字段，列表展示用）
