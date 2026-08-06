@@ -83,7 +83,6 @@ export const ChatSend = forwardRef<{ sendChat: (content?: string) => void }, Cha
     linkedResourcePreview,
   } = useChatStore()
   const { isRagEnabled } = useVectorStore()
-  const abortControllerRef = useRef<AbortController | null>(null)
   const agentHandlerRef = useRef<AgentHandler | null>(null)
   const manualStopRequestedRef = useRef(false)
   const steeringSequenceRef = useRef(0)
@@ -491,8 +490,14 @@ export const ChatSend = forwardRef<{ sendChat: (content?: string) => void }, Cha
           finalAnswerContent: undefined
         })
 
-        // 清空 ref
-        agentHandlerRef.current = null
+        // 清空 ref（仅当 ref 仍指向本 run 的 handler——旧 run 晚到的 onComplete
+        // 不应清掉新 run 的 handler，O4）
+        if (
+          agentHandlerRef.current === agentHandler &&
+          useChatStore.getState().agentState.activeChatId === placeholderMessage.id
+        ) {
+          agentHandlerRef.current = null
+        }
       },
       onError: async (error) => {
         // 获取当前消息状态，保留 ragSources 和 ragSourceDetails
@@ -555,8 +560,13 @@ export const ChatSend = forwardRef<{ sendChat: (content?: string) => void }, Cha
           isThinking: false,
         })
 
-        // 清空 ref
-        agentHandlerRef.current = null
+        // 清空 ref（校验归属，防旧 run 晚到回调清掉新 handler，O4）
+        if (
+          agentHandlerRef.current === agentHandler &&
+          useChatStore.getState().agentState.activeChatId === placeholderMessage.id
+        ) {
+          agentHandlerRef.current = null
+        }
       },
     })
 
@@ -904,12 +914,6 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
     manualStopRequestedRef.current = true
     activeRunRef.current = false
     pendingSteeringRef.current = []
-
-    // 停止普通对话的流式输出
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort()
-      abortControllerRef.current = null
-    }
 
     // 停止 Agent 执行
     if (agentHandlerRef.current) {

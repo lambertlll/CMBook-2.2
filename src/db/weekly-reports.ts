@@ -215,6 +215,9 @@ export async function getWeekData(
     }
     if (todo.done === 0 && todo.dueDate >= weekStart && todo.dueDate < weekEnd) {
       pending.push(todo)
+    } else if (todo.done === 0 && todo.dueDate === 0) {
+      // 无截止日期且未完成：计入 pending（此前只进 newThisWeek，完成率分母少算，O14）
+      pending.push(todo)
     }
     if (todo.createdAt >= weekStart && todo.createdAt < weekEnd) {
       newThisWeek.push(todo)
@@ -283,7 +286,11 @@ export function getWeekStartOffset(
   weekStart: number,
   offsetWeeks: number
 ): number {
-  return weekStart + offsetWeeks * 7 * 24 * 60 * 60 * 1000
+  // 用本地时区加 7 天而非固定毫秒偏移：跨夏令时切换的周（国际版）不会漂移（O8）
+  if (offsetWeeks === 0) return weekStart
+  const d = new Date(weekStart)
+  d.setDate(d.getDate() + offsetWeeks * 7)
+  return d.getTime()
 }
 
 /**
@@ -297,14 +304,20 @@ export function formatWeekRange(weekStart: number): string {
 
 /**
  * 格式化周标识（如 "2026年第31周"）
+ * 严格 ISO 8601 周数（ISO 周从周一开始，第 1 周是含当年第一个周四的那周）——
+ * 旧的近似算法在 12 月底/1 月初会错标成"53 周"（实为下一年第 1 周）
  */
 export function formatWeekLabel(weekStart: number): string {
   const start = new Date(weekStart)
-  const year = start.getFullYear()
-  // ISO 周数计算
-  const onejan = new Date(year, 0, 1)
-  const weekNum = Math.ceil(
-    ((start.getTime() - onejan.getTime()) / 86400000 + onejan.getDay() + 1) / 7
-  )
-  return `${year}年第${weekNum}周`
+  // ISO 周：周四所在年即周归属年；周四 = 本周一 + 3 天
+  const thursday = new Date(start)
+  thursday.setDate(start.getDate() + 3)
+  const isoYear = thursday.getFullYear()
+  // 该年 1 月 1 日所在周的周一（ISO 周一对齐）
+  const firstThursday = new Date(isoYear, 0, 4)
+  firstThursday.setDate(firstThursday.getDate() - ((firstThursday.getDay() + 6) % 7))
+  const weekNum = Math.round(
+    (thursday.getTime() - firstThursday.getTime()) / (7 * 24 * 60 * 60 * 1000)
+  ) + 1
+  return `${isoYear}年第${weekNum}周`
 }

@@ -263,7 +263,10 @@ export default function RootLayout({
       unlistenOpenSettings?.()
       unlistenStartMeeting?.()
     }
-  }, [pathname, router])
+    // O10：监听只注册一次（依赖 [pathname] 会导致每次路由变化重注册 + 重复 drain 打开文件）；
+    // openMarkdownFiles 内部按需 router.replace，不依赖本 effect 重跑
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // 重定向旧路径到新的 /core/main
   useEffect(() => {

@@ -259,11 +259,12 @@ export const useCustomerStore = create<CustomerStoreState>((set, get) => ({
     try {
       // 仅删除 visits 记录：客户文件夹中的文件都保留
       await deleteVisitRecord(id)
-      // 清空关联会议的 visitId（否则 ensureVisitForMeeting 会因 visitId 非空跳过重建）
-      const meeting = useMeetingStore.getState().meetings.find((m) => m.visitId === id)
-      if (meeting) {
-        useMeetingStore.getState().updateMeeting(meeting.id, { visitId: '' })
-      }
+      // 级联删除该拜访的待办（O6：此前不删会留孤儿待办、待办面板悬挂）
+      const { deleteVisitTodosByVisit } = await import('@/db/visit-todos')
+      await deleteVisitTodosByVisit(id)
+      // O7：不再清空关联会议的 visitId——若清空，下次 loadVisits 的
+      // backfillVisitsFromMeetings 会把该会议当"未关联"重建拜访（删不掉复活）。
+      // 保留 visitId 指向已删除的拜访即可阻止重建
     } catch (err) {
       // 失败回滚快照，由调用方提示
       set({ visits: snapshot })

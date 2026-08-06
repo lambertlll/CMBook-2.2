@@ -48,10 +48,22 @@ function LiveTranscriptView() {
     recordingMeeting?.status === 'recording' ||
     recordingMeeting?.status === 'paused'
 
+  // 滚动跟随：接近底部时自动贴底；用 rAF 节流合并 interim 高频更新（~100ms/次），
+  // 避免每次片段更新都强制布局 scrollTop=scrollHeight（长会议性能优化 M7）
+  const scrollRafRef = useRef<number | null>(null)
   useEffect(() => {
     const el = scrollRef.current
     if (el && nearBottomRef.current) {
-      el.scrollTop = el.scrollHeight
+      if (scrollRafRef.current !== null) cancelAnimationFrame(scrollRafRef.current)
+      scrollRafRef.current = requestAnimationFrame(() => {
+        scrollRafRef.current = null
+        if (nearBottomRef.current && scrollRef.current) {
+          scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+        }
+      })
+    }
+    return () => {
+      if (scrollRafRef.current !== null) cancelAnimationFrame(scrollRafRef.current)
     }
   }, [segments])
 

@@ -464,8 +464,12 @@ export function VisitTimeline({ customer }: { customer: CustomerRecord }) {
         </Button>
       }
     >
-      {/* 拜访卡片列表（store 已按拜访时间倒序） */}
-      {visits.length === 0 ? (
+      {/* 拜访卡片列表（store 已按拜访时间倒序）——
+          O13：切换客户瞬间 visitsLoadedFor 尚未更新，先显示加载占位，
+          避免短暂显示上一客户的拜访 */}
+      {visitsLoadedFor !== customer.id ? (
+        <p className="text-sm text-muted-foreground mt-3">{t('noVisitsCoach')}</p>
+      ) : visits.length === 0 ? (
         <p className="text-sm text-muted-foreground mt-3">{t('noVisitsCoach')}</p>
       ) : (
         <div className="flex flex-col gap-3 mt-3">

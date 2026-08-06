@@ -232,10 +232,14 @@ export async function replaceMeetingTodos(
   const db = await getDb()
 
   // fullReset 模式：先删除该会议的所有待办，再全部作为新记录插入。
-  // 用于待办确认弹窗：用户明确选择了哪些待办，应以新选择为准，
-  // 不保留旧的 done/confirmed/删除状态。
+  // 用于待办确认弹窗：用户明确选择了哪些待办，应以新选择为准。
+  // 只删除「未确认」行（confirmed=0）：保留已确认行——用户手动确认过的不因
+  // 纪要重新生成/弹窗重开而被清掉（M6 修复：原 DELETE 全表会覆盖手动添加/已确认状态）
   if (options?.fullReset) {
-    await db.execute('DELETE FROM visit_todos WHERE meetingId = $1', [meetingId])
+    await db.execute(
+      'DELETE FROM visit_todos WHERE meetingId = $1 AND confirmed = 0',
+      [meetingId]
+    )
     const now = Date.now()
     const toInsert: Record<string, unknown>[] = rows.map((row) => ({
       id: crypto.randomUUID(),
@@ -466,4 +470,12 @@ export async function deleteVisitTodosByCustomer(customerId: string) {
 export async function deleteVisitTodosByMeeting(meetingId: string) {
   const db = await getDb()
   await db.execute('DELETE FROM visit_todos WHERE meetingId = $1', [meetingId])
+}
+
+/**
+ * 删除某拜访产生的全部待办（删除拜访时级联清理，避免孤儿待办残留，O6）
+ */
+export async function deleteVisitTodosByVisit(visitId: string) {
+  const db = await getDb()
+  await db.execute('DELETE FROM visit_todos WHERE visitId = $1', [visitId])
 }

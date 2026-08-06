@@ -64,9 +64,13 @@ export function TitleBar({ onSearchClick, onActivityClick, activityOpen = false 
         setCurrentPlatform('windows')
       } else if (p === 'linux') {
         setCurrentPlatform('linux')
+      } else {
+        // 未知平台（Web 预览等）：回退 windows 布局，保证窗口控制按钮可用（O9）
+        setCurrentPlatform('windows')
       }
     } catch (error) {
       console.error('Error detecting platform:', error)
+      setCurrentPlatform('windows')
     }
   }, [])
 

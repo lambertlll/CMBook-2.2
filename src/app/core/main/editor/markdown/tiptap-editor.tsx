@@ -25,7 +25,7 @@ import { Markdown } from '@tiptap/markdown'
 import { SearchAndReplace } from '@sereneinserenade/tiptap-search-and-replace'
 import UniqueId from '@tiptap/extension-unique-id'
 import { Extension, nodeInputRule, ResizableNodeView, type Editor as CoreEditor, type ResizableNodeViewDirection } from '@tiptap/core'
-import { AllSelection, EditorState, Plugin, PluginKey, TextSelection, type Selection } from '@tiptap/pm/state'
+import { AllSelection, Plugin, PluginKey, TextSelection, type Selection } from '@tiptap/pm/state'
 import { redoDepth, undoDepth } from '@tiptap/pm/history'
 import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view'
 import { dropPoint } from '@tiptap/pm/transform'
@@ -992,18 +992,6 @@ function emitEditorUndoRedoState(editor: CoreEditor): void {
   emitter.emit('editor-undo-redo-changed', getEditorUndoRedoState(editor))
 }
 
-function resetEditorHistory(editor: CoreEditor): void {
-  const { state } = editor
-  const nextState = EditorState.create({
-    doc: state.doc,
-    selection: state.selection,
-    storedMarks: state.storedMarks,
-    plugins: state.plugins,
-  })
-
-  editor.view.updateState(nextState)
-}
-
 function setEditorContentWithoutUndo(editor: CoreEditor, content: string): void {
   editor
     .chain()
@@ -1011,7 +999,8 @@ function setEditorContentWithoutUndo(editor: CoreEditor, content: string): void 
     .setContent(content, { contentType: 'markdown' })
     .run()
 
-  resetEditorHistory(editor)
+  // O11：不再重置撤销历史——AI 流式写入/远端同步后用 Ctrl+Z 应能撤销到写入前，
+  // 原 resetEditorHistory 清空整个撤销栈导致无法回退
   emitEditorUndoRedoState(editor)
 }
 

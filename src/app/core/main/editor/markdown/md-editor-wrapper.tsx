@@ -276,10 +276,9 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
 
   // Handle content changes - only save if this is the active file
   const handleContentChange = useCallback((content: string) => {
-    // Bug fix: Don't save if content is empty
-    if (content.length === 0) {
-      return
-    }
+    // 允许空内容保存：用户全选删除清空文档是有效操作，若跳过会导致重开后旧内容复活（O5）
+    // 但初始化阶段的空回调（刚加载完的空文件）不应触发保存——由下方 expectedContent 与
+    // 初始化标记兜底，此处不做长度过滤
     // Bug fix: If expected content is set and incoming content doesn't match, skip save
     // This prevents saving stale content during editor initialization race
     // But clear expectedContentRef so subsequent edits can be saved

@@ -53,6 +53,25 @@ function toErrorMessage(err: unknown): string {
 export async function syncMeetingSummaryToCustomer(
   meeting: Pick<Meeting, 'id' | 'title' | 'summary' | 'customerId' | 'visitId' | 'createdAt' | 'exportedFilePath'>
 ): Promise<CustomerSyncResult> {
+  // M8：meetingId 级 in-flight 去重——自动导出与手动「同步到知识库」并发时，
+  // 后到者复用先到者的结果，避免并发读改写 advanceVisitStage/extractVisitTodos
+  const inflight = exportInflight.get(meeting.id)
+  if (inflight) return inflight
+  const promise = doSyncMeetingSummaryToCustomer(meeting)
+  exportInflight.set(meeting.id, promise)
+  try {
+    return await promise
+  } finally {
+    exportInflight.delete(meeting.id)
+  }
+}
+
+/** meetingId → 进行中的导出 Promise（并发去重锁） */
+const exportInflight = new Map<string, Promise<CustomerSyncResult>>()
+
+async function doSyncMeetingSummaryToCustomer(
+  meeting: Pick<Meeting, 'id' | 'title' | 'summary' | 'customerId' | 'visitId' | 'createdAt' | 'exportedFilePath'>
+): Promise<CustomerSyncResult> {
   try {
     if (!meeting.customerId || !meeting.summary.trim()) {
       return { ok: false, skipped: true, failures: [] }
