@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Store } from "@tauri-apps/plugin-store";
-import { register, unregisterAll } from '@tauri-apps/plugin-global-shortcut';
+import { register, unregister, unregisterAll } from '@tauri-apps/plugin-global-shortcut';
 import emitter from '@/lib/emitter';
 
 interface Shortcut {
@@ -34,6 +34,9 @@ function emitShortcutEvent(key: string) {
 // 串行化 bindShortcuts 调用，防止 React StrictMode 双重调用或快速连续调用时
 // unregisterAll / register 交叉执行导致 "HotKey already registered" 竞态
 let bindChain: Promise<void> = Promise.resolve()
+// 模块级初始化守卫：开发模式 React 会 double-invoke effect，
+// 避免第二次 initShortcut 在系统级快捷键尚未释放时重复注册同一组合键
+let shortcutInitialized = false
 
 async function bindShortcuts(shortcuts: Shortcut[]) {
   bindChain = bindChain.then(async () => {
@@ -52,7 +55,19 @@ async function bindShortcuts(shortcuts: Shortcut[]) {
           registeredValues.add(shortcut.value)
         }
       } catch (error) {
+        // 注册失败：Windows 上系统级快捷键释放有延迟，同键重试一次；
+        // 仍失败则静默降级（快捷键不可用不影响主流程）
         console.error(`Failed to register shortcut ${shortcut.value}:`, error);
+        try {
+          await unregister(shortcut.value)
+          await register(shortcut.value, (event) => {
+            if (event.state === 'Pressed') {
+              emitShortcutEvent(shortcut.key)
+            }
+          })
+        } catch (retryError) {
+          console.warn(`Retry failed for shortcut ${shortcut.value}:`, retryError)
+        }
       }
     }
   })
@@ -65,6 +80,10 @@ const useShortcutStore = create<SettingState>((set, get) => ({
   shortcuts: [],
 
   initShortcut: async () => {
+    // 幂等守卫：开发模式 React StrictMode 会 double-invoke effect，第二次调用直接跳过，
+    // 避免与第一次的注册在系统级快捷键释放窗口内冲突（"HotKey already registered"）
+    if (shortcutInitialized) return
+    shortcutInitialized = true
     const store = await Store.load('store.json');
     const shortcuts = await store.get<Shortcut[]>('shortcuts')
     if (shortcuts && shortcuts.length) {
