@@ -419,18 +419,28 @@ export function Outline({
     }
 
     // Listen to editor update events to keep headings in sync
+    // E8-P2：300ms 节流——大纲不需要实时到每个字符，避免每次按键全文档遍历
+    let outlineThrottleTimer: ReturnType<typeof setTimeout> | null = null
     const handleUpdate = () => {
-      try {
-        setHeadings(extractHeadings())
-      } catch (e) {
-        console.error('[Outline] Error in extractHeadings on update:', e)
-      }
+      if (outlineThrottleTimer) return
+      outlineThrottleTimer = setTimeout(() => {
+        outlineThrottleTimer = null
+        try {
+          setHeadings(extractHeadings())
+        } catch (e) {
+          console.error('[Outline] Error in extractHeadings on update:', e)
+        }
+      }, 300)
     }
 
     editor.on('update', handleUpdate)
 
     return () => {
       editor.off('update', handleUpdate)
+      if (outlineThrottleTimer) {
+        clearTimeout(outlineThrottleTimer)
+        outlineThrottleTimer = null
+      }
     }
   }, [editor, extractHeadings])
 

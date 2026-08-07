@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/enhanced-context-menu'
 import { platform } from '@tauri-apps/plugin-os'
 import useSettingStore from '@/stores/setting'
+import useArticleStore from '@/stores/article'
 import type { Mark } from '@/db/marks'
 import { isRecordTabPath } from '../mark/mark-record-tab'
 import { getMarkTypeListBadgeClasses } from '../mark/mark-type-meta'
@@ -159,6 +160,11 @@ function SortableTabWithMenu({
             <FileText className={cn('w-4 h-4 shrink-0', isActive ? 'text-primary' : '')} />
           )}
           <span className="truncate max-w-40">{tab.name}</span>
+
+          {/* E3：脏标记圆点——该 tab 有未落盘内容（pendingSaveContent 等待防抖保存）时显示 */}
+          {!isRecordTab && !tab.isFolder && (
+            <DirtyDot path={tab.path} />
+          )}
 
           {/* Close button */}
           <button
@@ -491,3 +497,18 @@ export function TabBar({
 }
 
 export default TabBar
+
+/**
+ * E3：脏标记圆点——该 tab 对应文件有未落盘内容时显示（pendingSaveContent 等待防抖保存中）。
+ * 独立组件 + 精确 selector，避免每个 TabItem 全量订阅 store。
+ */
+function DirtyDot({ path }: { path: string }) {
+  const activeFilePath = useArticleStore((s) => s.activeFilePath)
+  const pendingSaveContent = useArticleStore((s) => s.pendingSaveContent)
+  // 仅当该 tab 是当前文件且有待保存内容时显示（其他 tab 视为已落盘）
+  const dirty = activeFilePath === path && pendingSaveContent !== null
+  if (!dirty) return null
+  return (
+    <span className="ml-1 inline-block size-1.5 shrink-0 rounded-full bg-primary/70" title="有未保存的修改" />
+  )
+}

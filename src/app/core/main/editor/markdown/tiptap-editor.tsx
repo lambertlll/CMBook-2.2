@@ -1099,6 +1099,9 @@ export function TipTapEditor({
   const isReadyRef = useRef(false)
   // Bug fix: Track if this is the first onUpdate after initialization
   const isFirstUpdateRef = useRef(true)
+  // E8-P1：序列化防抖状态（pendingMarkdownRef=有待序列化内容，markdownFlushTimerRef=防抖定时器）
+  const pendingMarkdownRef = useRef(false)
+  const markdownFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Content version ref for race condition prevention between editor and agent
   const contentVersionRef = useRef(0)
@@ -1469,12 +1472,24 @@ export function TipTapEditor({
       // Bug fix: Only trigger onChange if editor is ready (not during initialization)
       // Using counter to handle rapid successive updates
       if (externalUpdateCounterRef.current === 0 && isReadyRef.current) {
-        const markdown = normalizeMarkdownPlaceholders(editor.getMarkdown())
-        onChange?.(markdown)
+        // E8-P1：序列化防抖——getMarkdown() 要遍历整棵文档树，2 万字文档下每键一次
+        // 全量序列化是最大性能瓶颈。改为 150ms 防抖：连续输入只序列化一次；
+        // 保存/导出/失焦等需要立即内容的路径走 flush（见 flushPendingMarkdown）。
+        pendingMarkdownRef.current = true
+        if (markdownFlushTimerRef.current) {
+          clearTimeout(markdownFlushTimerRef.current)
+        }
+        markdownFlushTimerRef.current = setTimeout(() => {
+          markdownFlushTimerRef.current = null
+          if (!pendingMarkdownRef.current) return
+          pendingMarkdownRef.current = false
+          if (editor.isDestroyed) return
+          const markdown = normalizeMarkdownPlaceholders(editor.getMarkdown())
+          onChange?.(markdown)
+          contentVersionRef.current++
+        }, 150)
         // Mark that we've processed the first update
         isFirstUpdateRef.current = false
-        // Increment version on user content changes
-        contentVersionRef.current++
       } else if (isFirstUpdateRef.current) {
         // Skip the very first update during initialization
       } else {
@@ -1607,6 +1622,17 @@ export function TipTapEditor({
       document.removeEventListener('pointermove', handlePointerMove, true)
       document.removeEventListener('pointerup', handlePointerUp, true)
       document.removeEventListener('pointercancel', handlePointerCancel, true)
+      // E8-P1：卸载时 flush 防抖中的序列化，避免切文件/关标签页丢失最后一次编辑
+      if (markdownFlushTimerRef.current) {
+        clearTimeout(markdownFlushTimerRef.current)
+        markdownFlushTimerRef.current = null
+        if (pendingMarkdownRef.current && editor && !editor.isDestroyed) {
+          pendingMarkdownRef.current = false
+          const markdown = normalizeMarkdownPlaceholders(editor.getMarkdown())
+          onChange?.(markdown)
+          contentVersionRef.current++
+        }
+      }
     }
   }, [editor])
 

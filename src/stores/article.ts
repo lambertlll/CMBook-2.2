@@ -1,4 +1,5 @@
 import { getFiles as getGithubFiles } from '@/lib/sync/github'
+import { toast } from '@/hooks/use-toast'
 import { GithubContent } from '@/lib/sync/github.types'
 import { getFiles as getGiteeFiles } from '@/lib/sync/gitee'
 import { getFiles as getGiteaFiles } from '@/lib/sync/gitea'
@@ -325,6 +326,10 @@ interface NoteState {
   // 防抖保存相关
   debounceSaveTimer: NodeJS.Timeout | null
   pendingSaveContent: string | null
+  // E3：保存状态三态（idle=无待保存 / saving=写盘中 / saved=已保存 / error=保存失败）+ 最近保存时间
+  saveState: 'idle' | 'saving' | 'saved' | 'error'
+  lastSavedAt: number
+  setSaveState: (state: 'idle' | 'saving' | 'saved' | 'error') => void
   // 更新文件 sha 状态（推送成功后调用）
   updateFileSha: (path: string, sha: string) => void
 
@@ -357,6 +362,15 @@ const useArticleStore = create<NoteState>((set, get) => ({
   // 防抖保存相关状态
   debounceSaveTimer: null,
   pendingSaveContent: null,
+  saveState: 'idle',
+  lastSavedAt: 0,
+
+  setSaveState: (state) => {
+    set({
+      saveState: state,
+      ...(state === 'saved' ? { lastSavedAt: Date.now() } : {}),
+    })
+  },
 
   setLoading: (loading: boolean) => { set({ loading }) },
 
@@ -2198,7 +2212,7 @@ const useArticleStore = create<NoteState>((set, get) => ({
       // 设置新的防抖定时器，500ms 后执行保存
       // 这样可以合并短时间内多次 content change
       // 保存 pendingContent 用于防抖检查
-      set({ pendingSaveContent: content, debounceSaveTimer: undefined })
+      set({ pendingSaveContent: content, debounceSaveTimer: undefined, saveState: 'idle' })
       const timer = setTimeout(async () => {
         const state = get()
         const debouncedContent = state.pendingSaveContent || content
@@ -2206,8 +2220,27 @@ const useArticleStore = create<NoteState>((set, get) => ({
         // Bug fix: 检查路径是否仍然匹配，避免文件切换时保存到错误的文件
         const currentActivePath = state.activeFilePath
         if (currentActivePath !== path) {
-          // 文件已切换，取消保存
+          // E4 修复：文件已切换时，不丢弃本次编辑——flush 到本次编辑所属的原路径后返回
+          // （原先直接 return 会静默丢失 500ms 窗口内的输入）
+          const originalPath = path
           set({ debounceSaveTimer: null, pendingSaveContent: null })
+          try {
+            const originalOptions = await getFilePathOptions(originalPath)
+            if (!originalOptions.baseDir) {
+              await writeTextFile(originalOptions.path, debouncedContent)
+            } else {
+              await writeTextFile(originalOptions.path, debouncedContent, { baseDir: originalOptions.baseDir })
+            }
+            set({ saveState: 'saved' })
+          } catch (err) {
+            console.error('[Article] 切换文件时 flush 保存失败:', err)
+            set({ saveState: 'error' })
+            toast({
+              title: '保存失败',
+              description: '文件切换时的内容未能保存，请检查磁盘空间或文件权限',
+              variant: 'destructive',
+            })
+          }
           return
         }
 
@@ -2216,6 +2249,8 @@ const useArticleStore = create<NoteState>((set, get) => ({
         // 执行实际保存操作
         const savePath = path
         const saveContent = debouncedContent
+        // E3：保存期间状态置 saving（写盘完成或失败后更新）
+        set({ saveState: 'saving' })
         // 检查文件是否存在
         let isLocale = false
         const pathOptions = await getFilePathOptions(savePath)
@@ -2248,11 +2283,30 @@ const useArticleStore = create<NoteState>((set, get) => ({
           }
         }
 
-        // 保存文件内容
-        if (!pathOptions.baseDir) {
-          await writeTextFile(pathOptions.path, saveContent)
-        } else {
-          await writeTextFile(pathOptions.path, saveContent, { baseDir: pathOptions.baseDir })
+        // 保存文件内容（E3：包 try/catch，失败置 error 状态并 toast，杜绝静默丢数据）
+        try {
+          if (!pathOptions.baseDir) {
+            await writeTextFile(pathOptions.path, saveContent)
+          } else {
+            await writeTextFile(pathOptions.path, saveContent, { baseDir: pathOptions.baseDir })
+          }
+          set({ saveState: 'saved' })
+        } catch (err) {
+          console.error('[Article] 笔记保存失败:', err)
+          set({ saveState: 'error' })
+          toast({
+            title: '保存失败',
+            description: '笔记未能写入磁盘，请检查磁盘空间或文件权限。内容仍保留在内存中，可复制后重试。',
+            variant: 'destructive',
+          })
+          // 5 秒后重试一次（参照 meeting-store.ts 的重试模式；不无限重试，避免磁盘持续故障时反复打扰）
+          setTimeout(() => {
+            const cur = get()
+            if (cur.activeFilePath === savePath && cur.pendingSaveContent === null) {
+              void cur.saveCurrentArticle(saveContent)
+            }
+          }, 5000)
+          return
         }
 
         // 更新缓存树
