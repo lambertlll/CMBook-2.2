@@ -220,7 +220,10 @@ export function MeetingList() {
         text: [
           meeting.title || '',
           meeting.transcript || '',
-          stripHtml(meeting.manualNotes || ''),
+          // E2：manualNotes 兼容 HTML（存量）与 Markdown（新格式），Markdown 直接参与搜索
+          /<[a-z][\s\S]*>/i.test(meeting.manualNotes || '')
+            ? stripHtml(meeting.manualNotes || '')
+            : (meeting.manualNotes || ''),
           meeting.summary || '',
         ]
           .join('\n')

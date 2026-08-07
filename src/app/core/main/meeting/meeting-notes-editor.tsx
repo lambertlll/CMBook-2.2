@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import type { Editor } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
@@ -11,6 +12,10 @@ import { TextStyle } from '@tiptap/extension-text-style'
 import Highlight from '@tiptap/extension-highlight'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
+import Image from '@tiptap/extension-image'
+import { Markdown } from '@tiptap/markdown'
+import { SlashCommand, suggestionOptions } from '../editor/markdown/slash-command'
+import { handleImageUpload } from '@/lib/image-handler'
 import { useMeetingStore } from './meeting-store'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
@@ -32,6 +37,7 @@ import {
   AlignRight,
   Palette,
   Highlighter,
+  Image as ImageIcon,
 } from 'lucide-react'
 import {
   Popover,
@@ -280,6 +286,29 @@ function MeetingEditorToolbar({
       >
         <AlignRight className="w-4 h-4" />
       </ToolbarButton>
+
+      {/* E1：图片插入（会中截屏 PPT 场景，也可直接粘贴/拖放） */}
+      <ToolbarButton
+        onClick={() => {
+          const input = document.createElement('input')
+          input.type = 'file'
+          input.accept = 'image/*'
+          input.onchange = async () => {
+            const file = input.files?.[0]
+            if (!file) return
+            const src = URL.createObjectURL(file)
+            editor.chain().focus().setImage({ src }).run()
+            const persisted = await handleImageUpload(file, undefined)
+            if (persisted) {
+              editor.chain().focus().updateAttributes('image', { src: persisted }).run()
+            }
+          }
+          input.click()
+        }}
+        title="插入图片（也支持直接粘贴/拖放）"
+      >
+        <ImageIcon className="w-4 h-4" />
+      </ToolbarButton>
     </div>
   )
 }
@@ -299,6 +328,11 @@ export function MeetingNotesEditor({
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
+      // E1：补上会中记笔记真正需要的能力——
+      // SlashCommand（斜杠快速插入）、Image（截屏 PPT 粘贴/拖放）、Markdown（统一存储格式）
+      SlashCommand.configure({
+        suggestion: suggestionOptions,
+      }),
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
       }),
@@ -314,10 +348,23 @@ export function MeetingNotesEditor({
       Highlight.configure({ multicolor: true }),
       TaskList,
       TaskItem.configure({ nested: true }),
+      Image.configure({
+        inline: false,
+        allowBase64: true,
+      }),
+      // E2：统一存储为 Markdown（与纪要/主笔记格式一致；锚点提取侧同步支持）
+      Markdown.configure({
+        indentation: {
+          style: 'space',
+          size: 2,
+        },
+      }),
     ],
     content: content || '',
+    contentType: 'markdown',
     onUpdate: ({ editor }) => {
-      updateMeeting(meetingId, { manualNotes: editor.getHTML() })
+      // E2：改存 Markdown（原为 getHTML()）
+      updateMeeting(meetingId, { manualNotes: editor.getMarkdown() })
     },
     editorProps: {
       attributes: {
@@ -326,6 +373,49 @@ export function MeetingNotesEditor({
       },
     },
   })
+
+  // E1：会中截屏粘贴图片（PPT 展示时最高频操作）——复用主编辑器的图片处理链路
+  useEffect(() => {
+    if (!editor) return
+    const dom = editor.view.dom
+
+    const handlePaste = (event: ClipboardEvent) => {
+      const imageFile = Array.from(event.clipboardData?.items || []).find(
+        (item) => item.type.startsWith('image/')
+      )?.getAsFile()
+      if (!imageFile) return
+      event.preventDefault()
+      const src = URL.createObjectURL(imageFile)
+      editor.chain().focus().setImage({ src }).run()
+      // 后台转为持久化路径（走 image-handler 通用链路）
+      void handleImageUpload(imageFile, undefined).then((persisted) => {
+        if (persisted) {
+          editor.chain().focus().updateAttributes('image', { src: persisted }).run()
+        }
+      })
+    }
+    const handleDrop = (event: DragEvent) => {
+      const imageFile = Array.from(event.dataTransfer?.files || []).find((f) =>
+        f.type.startsWith('image/')
+      )
+      if (!imageFile) return
+      event.preventDefault()
+      const src = URL.createObjectURL(imageFile)
+      editor.chain().focus().setImage({ src }).run()
+      void handleImageUpload(imageFile, undefined).then((persisted) => {
+        if (persisted) {
+          editor.chain().focus().updateAttributes('image', { src: persisted }).run()
+        }
+      })
+    }
+
+    dom.addEventListener('paste', handlePaste as EventListener)
+    dom.addEventListener('drop', handleDrop as EventListener, true)
+    return () => {
+      dom.removeEventListener('paste', handlePaste as EventListener)
+      dom.removeEventListener('drop', handleDrop as EventListener, true)
+    }
+  }, [editor])
 
   return (
     <div className="flex flex-col h-full">

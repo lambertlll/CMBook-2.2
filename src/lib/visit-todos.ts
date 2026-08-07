@@ -10,29 +10,43 @@ export interface ParsedVisitTodo {
 }
 
 /**
- * S8：从笔记 HTML（TipTap 序列化）中提取客户经理亲手勾选的待办。
- * TaskItem 序列化为 <li data-checked="true/false">，是确定性数据（无需 AI），
- * 与纪要解析结果合并可 100% 不丢用户勾选的行动项。
- * 纯 DOM 解析（DOMParser），不依赖 Tauri API。
+ * S8：从笔记中提取客户经理亲手勾选的待办。
+ * 兼容两种格式（E2 后会议笔记为 Markdown）：
+ * - HTML（存量）：<li data-checked="true/false">
+ * - Markdown（新格式）：- [x] / - [ ] 行
+ * 确定性数据（无需 AI），与纪要解析结果合并可 100% 不丢用户勾选的行动项。
  */
 export function extractTodosFromNotes(notesHtml: string | undefined | null): ParsedVisitTodo[] {
-  if (!notesHtml || !notesHtml.includes('data-checked')) return []
-  try {
-    const doc = new DOMParser().parseFromString(notesHtml, 'text/html')
-    const todos: ParsedVisitTodo[] = []
-    doc.querySelectorAll('li[data-checked]').forEach((el) => {
-      const text = (el.textContent || '').trim()
-      if (!text) return
-      // 去掉行首勾选标记（TipTap 序列化通常不含 [ ] 前缀，但稳妥起见清理）
-      const clean = text.replace(/^\[[ xX]\]\s*/, '').trim()
-      if (clean) {
-        todos.push({ content: clean, owner: '', dueText: '' })
-      }
-    })
-    return todos
-  } catch {
-    return []
+  if (!notesHtml || !notesHtml.trim()) return []
+  // HTML 格式：含 data-checked 属性
+  if (notesHtml.includes('data-checked')) {
+    try {
+      const doc = new DOMParser().parseFromString(notesHtml, 'text/html')
+      const todos: ParsedVisitTodo[] = []
+      doc.querySelectorAll('li[data-checked]').forEach((el) => {
+        const text = (el.textContent || '').trim()
+        if (!text) return
+        // 去掉行首勾选标记（TipTap 序列化通常不含 [ ] 前缀，但稳妥起见清理）
+        const clean = text.replace(/^\[[ xX]\]\s*/, '').trim()
+        if (clean) {
+          todos.push({ content: clean, owner: '', dueText: '' })
+        }
+      })
+      return todos
+    } catch {
+      return []
+    }
   }
+  // Markdown 格式：- [x] / - [ ] 行（E2）
+  const todos: ParsedVisitTodo[] = []
+  for (const line of notesHtml.split(/\r?\n/)) {
+    const m = line.match(/^\s*[-*]\s*\[([ xX])\]\s*(.+)$/)
+    if (m) {
+      const text = m[2].trim()
+      if (text) todos.push({ content: text, owner: '', dueText: '' })
+    }
+  }
+  return todos
 }
 
 /**

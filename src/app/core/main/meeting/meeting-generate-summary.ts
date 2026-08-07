@@ -626,14 +626,21 @@ interface StructuredNotes {
 }
 
 /**
- * 从笔记 HTML 中提取三级锚点（一期核心）：
- * - <mark> 高亮：客户经理显式标注，最高权威
- * - <strong> 加粗：次权威
- * - <li data-checked> 待办：行动项
+ * 从笔记中提取三级锚点（一期核心）：
+ * - 高亮：客户经理显式标注，最高权威（HTML <mark> / Markdown ==x==）
+ * - 加粗：次权威（HTML <strong> / Markdown **x**）
+ * - 待办：行动项（HTML <li data-checked> / Markdown - [x]）
+ * 输入兼容 HTML（存量数据）与 Markdown（E2 后会议笔记新格式）。
  * 输出格式化锚点文本，注入校正/生成 prompt，让模型知道哪些内容必须出现且以笔记为准。
  */
-function extractStructuredNotes(html: string): StructuredNotes {
-  const doc = new DOMParser().parseFromString(html, 'text/html')
+function extractStructuredNotes(raw: string): StructuredNotes {
+  // 格式检测：含 HTML 标签（<mark>/<strong>/<li data-checked>）按 HTML 解析，否则按 Markdown
+  const isHtml =
+    /<mark\b|<strong\b|<li[^>]*data-checked/.test(raw)
+  if (!isHtml) {
+    return extractStructuredNotesFromMarkdown(raw)
+  }
+  const doc = new DOMParser().parseFromString(raw, 'text/html')
   const plainText = (doc.body.textContent || '').trim()
 
   const highlights: string[] = []
@@ -659,6 +666,39 @@ function extractStructuredNotes(html: string): StructuredNotes {
     const checked = el.getAttribute('data-checked') === 'true'
     todos.push(`${checked ? '[x]' : '[ ]'} ${text}`)
   })
+
+  return { plainText, anchors: { highlights, bolds, todos } }
+}
+
+/**
+ * E2：从 Markdown 笔记中提取三级锚点（会议笔记改存 Markdown 后走此路径）。
+ * TipTap Markdown 序列化格式：
+ * - 高亮 ==text== / 加粗 **text** / 待办 - [x] 或 - [ ]
+ */
+function extractStructuredNotesFromMarkdown(md: string): StructuredNotes {
+  const plainText = md.trim()
+  const highlights: string[] = []
+  const bolds: string[] = []
+  const todos: string[] = []
+
+  // 高亮：==xxx==
+  for (const m of md.matchAll(/==([^=\n]+)==/g)) {
+    const text = m[1].trim()
+    if (text && !highlights.includes(text)) highlights.push(text)
+  }
+  // 加粗：**xxx**（排除行首待办标记与 ==== 干扰）
+  for (const m of md.matchAll(/(?<!\*)\*\*([^*\n]+)\*\*(?!\*)/g)) {
+    const text = m[1].trim()
+    if (text && !bolds.includes(text)) bolds.push(text)
+  }
+  // 待办：- [x] / - [ ] 行
+  for (const line of md.split(/\r?\n/)) {
+    const m = line.match(/^\s*[-*]\s*\[([ xX])\]\s*(.+)$/)
+    if (m) {
+      const text = m[2].trim()
+      if (text) todos.push(`${m[1].toLowerCase() === 'x' ? '[x]' : '[ ]'} ${text}`)
+    }
+  }
 
   return { plainText, anchors: { highlights, bolds, todos } }
 }

@@ -205,10 +205,13 @@ function NotesTab({ meeting }: { meeting: Meeting }) {
       }),
       TaskList,
       TaskItem.configure({ nested: true }),
+      Markdown,
     ],
     content: meeting.manualNotes || '',
+    contentType: 'markdown',
     onUpdate: ({ editor }) => {
-      updateMeeting(meeting.id, { manualNotes: editor.getHTML() })
+      // E2：统一存 Markdown（与会议笔记编辑器一致）
+      updateMeeting(meeting.id, { manualNotes: editor.getMarkdown() })
     },
     editorProps: {
       attributes: {
@@ -1599,10 +1602,13 @@ export function MeetingResult({ meeting }: MeetingResultProps) {
   const getContentForTab = useCallback((): string => {
     switch (activeTab) {
       case 'notes':
-        // Strip HTML tags for plain text copy
-        const div = document.createElement('div')
-        div.innerHTML = meeting.manualNotes
-        return div.textContent || div.innerText || ''
+        // 兼容 HTML（存量）与 Markdown（E2 后新格式）：HTML 剥离标签，Markdown 直接返回
+        if (/<[a-z][\s\S]*>/i.test(meeting.manualNotes)) {
+          const div = document.createElement('div')
+          div.innerHTML = meeting.manualNotes
+          return div.textContent || div.innerText || ''
+        }
+        return meeting.manualNotes
       case 'transcript':
         return meeting.transcript
       case 'summary':
