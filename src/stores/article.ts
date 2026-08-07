@@ -2231,10 +2231,11 @@ const useArticleStore = create<NoteState>((set, get) => ({
             } else {
               await writeTextFile(originalOptions.path, debouncedContent, { baseDir: originalOptions.baseDir })
             }
-            set({ saveState: 'saved' })
+            // 经 setSaveState 更新（连带刷新 lastSavedAt）
+            get().setSaveState('saved')
           } catch (err) {
             console.error('[Article] 切换文件时 flush 保存失败:', err)
-            set({ saveState: 'error' })
+            get().setSaveState('error')
             toast({
               title: '保存失败',
               description: '文件切换时的内容未能保存，请检查磁盘空间或文件权限',
@@ -2250,7 +2251,7 @@ const useArticleStore = create<NoteState>((set, get) => ({
         const savePath = path
         const saveContent = debouncedContent
         // E3：保存期间状态置 saving（写盘完成或失败后更新）
-        set({ saveState: 'saving' })
+        get().setSaveState('saving')
         // 检查文件是否存在
         let isLocale = false
         const pathOptions = await getFilePathOptions(savePath)
@@ -2290,10 +2291,11 @@ const useArticleStore = create<NoteState>((set, get) => ({
           } else {
             await writeTextFile(pathOptions.path, saveContent, { baseDir: pathOptions.baseDir })
           }
-          set({ saveState: 'saved' })
+          // 经 setSaveState 更新（连带刷新 lastSavedAt）
+          get().setSaveState('saved')
         } catch (err) {
           console.error('[Article] 笔记保存失败:', err)
-          set({ saveState: 'error' })
+          get().setSaveState('error')
           toast({
             title: '保存失败',
             description: '笔记未能写入磁盘，请检查磁盘空间或文件权限。内容仍保留在内存中，可复制后重试。',

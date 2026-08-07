@@ -25,10 +25,29 @@ export function FooterBar({
   onToggleOutline,
 }: FooterBarProps) {
   const activeFilePath = useArticleStore((state) => state.activeFilePath)
+  // E3：保存状态三态指示（编辑中/保存中/已保存 HH:mm/保存失败）
+  const saveState = useArticleStore((state) => state.saveState)
+  const lastSavedAt = useArticleStore((state) => state.lastSavedAt)
   const isMobile = isMobileDevice()
   const fileName = activeFilePath
     ? activeFilePath.split('/').pop() || activeFilePath
     : '未命名'
+
+  // 保存状态文案（E3）
+  const saveIndicator = (() => {
+    if (saveState === 'saving') {
+      return { text: '保存中…', cls: 'text-muted-foreground' }
+    }
+    if (saveState === 'error') {
+      return { text: '保存失败', cls: 'text-destructive' }
+    }
+    if (saveState === 'saved' && lastSavedAt > 0) {
+      const d = new Date(lastSavedAt)
+      const hhmm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+      return { text: `已保存 ${hhmm}`, cls: 'text-muted-foreground/70' }
+    }
+    return { text: '编辑中', cls: 'text-muted-foreground/70' }
+  })()
 
   if (isMobile) {
     return (
@@ -43,6 +62,8 @@ export function FooterBar({
           </div>
         </div>
         <div className="shrink-0 flex items-center gap-2">
+          {/* E3：保存状态（移动端简短显示） */}
+          <span className={`shrink-0 ${saveIndicator.cls}`}>{saveIndicator.text}</span>
           <HistorySheet editor={editor} />
           <SyncButton />
           <PullButton editor={editor} />
@@ -63,6 +84,8 @@ export function FooterBar({
           outlineOpen={outlineOpen}
           onToggleOutline={onToggleOutline}
         />
+        {/* E3：保存状态（编辑中/保存中/已保存 HH:mm/保存失败） */}
+        <span className={`ml-1 shrink-0 ${saveIndicator.cls}`}>{saveIndicator.text}</span>
       </div>
 
       {/* Right side: Sync tools */}

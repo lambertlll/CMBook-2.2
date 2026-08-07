@@ -649,39 +649,6 @@
   border-radius: 2px;
 }
 
-/* 表格工具栏样式 */
-.table-toolbar {
-  display: flex;
-  align-items: center;
-  padding: 8px 12px;
-  background-color: hsl(var(--muted) / 0.3);
-  border-bottom: 1px solid hsl(var(--border));
-  flex-shrink: 0;
-}
-
-.table-toolbar button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: none;
-  background: transparent;
-  border-radius: 6px;
-  cursor: pointer;
-  color: hsl(var(--foreground));
-  transition: all 0.15s ease;
-}
-
-.table-toolbar button:hover {
-  background-color: hsl(var(--accent));
-}
-
-.table-toolbar button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
 /* 暗色模式下的表格样式 */
 .dark .tiptap-editor .ProseMirror table th {
   background-color: hsl(var(--muted) / 0.2);
