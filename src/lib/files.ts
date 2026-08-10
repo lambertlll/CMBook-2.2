@@ -70,7 +70,9 @@ export async function collectMarkdownFiles(folderPath: string): Promise<Array<{p
         }
       }
     } catch (error) {
-      console.error(`读取目录 ${dirPath} 失败:`, error);
+      // 目录可能已被移动/删除（如客户改名后旧文件夹路径失效、笔记文件被外部删除），
+      // 这是正常情况：跳过该目录继续，不打断整个遍历
+      console.warn(`跳过不可读目录 ${dirPath}:`, error);
     }
   };
   

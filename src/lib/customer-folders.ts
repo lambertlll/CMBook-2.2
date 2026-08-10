@@ -125,9 +125,29 @@ export async function renameCustomerFolder(
   const newFolderPath = `${CUSTOMER_ROOT}/${candidate}`
   const oldOptions = await getFilePathOptions(oldFolderPath)
   const newOptions = await getFilePathOptions(newFolderPath)
-  await rename(oldOptions.path, newOptions.path, {
-    oldPathBaseDir: oldOptions.baseDir,
-    newPathBaseDir: newOptions.baseDir,
-  })
+  // 防御：rename 前再次确认旧路径仍存在（exists 与 rename 之间可能有竞态/目录已被移动）。
+  // 旧路径已不存在时降级为"无文件夹可移"——直接返回新路径，不抛错，
+  // 否则改名流程中断导致库/UI 回滚、用户卡死在"改名失败"
+  const oldExists = oldOptions.baseDir
+    ? await exists(oldOptions.path, { baseDir: oldOptions.baseDir })
+    : await exists(oldOptions.path)
+  if (!oldExists) {
+    return newFolderPath
+  }
+  try {
+    await rename(oldOptions.path, newOptions.path, {
+      oldPathBaseDir: oldOptions.baseDir,
+      newPathBaseDir: newOptions.baseDir,
+    })
+  } catch (err) {
+    // 移动失败但旧路径已不存在（并发移动/删除）：视为移动成功，返回新路径
+    const stillExists = oldOptions.baseDir
+      ? await exists(oldOptions.path, { baseDir: oldOptions.baseDir })
+      : await exists(oldOptions.path)
+    if (!stillExists) {
+      return newFolderPath
+    }
+    throw err
+  }
   return newFolderPath
 }

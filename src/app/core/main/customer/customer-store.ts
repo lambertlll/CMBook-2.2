@@ -229,6 +229,10 @@ export const useCustomerStore = create<CustomerStoreState>((set, get) => ({
     // 名称未变：直接返回（避免无意义的文件夹移动与库更新）
     if (target.name === trimmed) return
 
+    // 文件夹移动是否已发生（移动成功后不可回滚——磁盘文件夹已不在旧路径，
+    // 回滚 folderPath 会导致下次改名/os 访问再报"路径不存在"）
+    let folderMoved = false
+
     try {
       // 1. 重命名工作区客户文件夹（含访前/访中/访后/资料全部产物）；
       //    同名冲突自动 -2/-3 后缀；返回新相对路径
@@ -236,13 +240,15 @@ export const useCustomerStore = create<CustomerStoreState>((set, get) => ({
       const newFolderPath = oldFolderPath
         ? await renameCustomerFolder(oldFolderPath, trimmed)
         : ''
+      // renameCustomerFolder 返回新路径即视为移动成功（含旧目录不存在时的降级返回）
+      folderMoved = !!oldFolderPath && !!newFolderPath && oldFolderPath !== newFolderPath
       // 2. 更新库记录（name + folderPath + updatedAt）
       await updateCustomerRecord(id, {
         name: trimmed,
         ...(newFolderPath ? { folderPath: newFolderPath } : {}),
       })
       // 3. 级联更新该客户名下会议的导出路径（exportedFilePath 含旧文件夹前缀）
-      if (oldFolderPath && newFolderPath && oldFolderPath !== newFolderPath) {
+      if (folderMoved) {
         await renameMeetingExportPaths(id, `${oldFolderPath}/`, `${newFolderPath}/`)
         // 同步内存态会议（与 DB 一致）
         const meetingStore = useMeetingStore.getState()
@@ -272,8 +278,23 @@ export const useCustomerStore = create<CustomerStoreState>((set, get) => ({
           .sort((a, b) => b.isPinned - a.isPinned || b.updatedAt - a.updatedAt),
       }))
     } catch (err) {
-      // 失败回滚快照（文件夹移动失败时库记录未更新，保持原名）
-      set({ customers: snapshot })
+      // 失败处理：文件夹未移动 → 整体回滚（库记录未更新，保持原名）；
+      // 文件夹已移动 → 不回滚 folderPath（磁盘已移动，回滚会制造"库指向不存在路径"的不一致），
+      // 仅回滚 name，并让调用方提示部分失败
+      if (!folderMoved) {
+        set({ customers: snapshot })
+      } else {
+        const now = Date.now()
+        set((state) => ({
+          customers: state.customers
+            .map((c) =>
+              c.id === id
+                ? { ...c, folderPath: target.folderPath, name: trimmed, updatedAt: now }
+                : c
+            )
+            .sort((a, b) => b.isPinned - a.isPinned || b.updatedAt - a.updatedAt),
+        }))
+      }
       console.error('[CustomerStore] 客户改名失败:', err)
       throw err
     }
