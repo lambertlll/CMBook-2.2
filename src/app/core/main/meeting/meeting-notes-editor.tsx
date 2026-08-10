@@ -91,7 +91,7 @@ function ToolbarButton({
   )
 }
 
-function MeetingEditorToolbar({
+export function MeetingEditorToolbar({
   editor,
 }: {
   editor: Editor | null

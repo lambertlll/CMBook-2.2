@@ -55,6 +55,7 @@ import { TableRow } from '@tiptap/extension-table-row'
 import { TableHeader } from '@tiptap/extension-table-header'
 import { TableCell } from '@tiptap/extension-table-cell'
 import { Markdown } from '@tiptap/markdown'
+import { MeetingEditorToolbar } from './meeting-notes-editor'
 import Color from '@tiptap/extension-color'
 import { TextStyle } from '@tiptap/extension-text-style'
 import Highlight from '@tiptap/extension-highlight'
@@ -203,6 +204,13 @@ function NotesTab({ meeting }: { meeting: Meeting }) {
       Placeholder.configure({
         placeholder: t('notesPlaceholder'),
       }),
+      TextAlign.configure({
+        types: ['heading', 'paragraph'],
+      }),
+      Underline,
+      TextStyle,
+      Color,
+      Highlight.configure({ multicolor: true }),
       TaskList,
       TaskItem.configure({ nested: true }),
       Markdown,
@@ -222,8 +230,12 @@ function NotesTab({ meeting }: { meeting: Meeting }) {
   })
 
   return (
-    <div className="h-full overflow-y-auto tiptap-editor">
-      <EditorContent editor={editor} />
+    <div className="flex h-full flex-col">
+      {/* 结束会议后的手动笔记编辑：复用会中工具栏（此前完全没有工具栏） */}
+      <MeetingEditorToolbar editor={editor} />
+      <div className="h-full overflow-y-auto tiptap-editor">
+        <EditorContent editor={editor} />
+      </div>
     </div>
   )
 }
