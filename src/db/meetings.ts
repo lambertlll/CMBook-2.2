@@ -251,3 +251,25 @@ export async function clearMeetingCustomerLink(customerId: string) {
     [customerId, Date.now()]
   )
 }
+
+/**
+ * 客户改名后，把该客户名下会议的 exportedFilePath 从旧文件夹前缀替换到新前缀
+ * （导出路径存的是工作区相对路径，形如 customers/<旧名>/访中/xxx.md）。
+ * 先按 customerId 查出全部记录，逐条替换（避免 SQL 里拼接前缀）。
+ */
+export async function renameMeetingExportPaths(customerId: string, oldPrefix: string, newPrefix: string) {
+  const db = await getDb()
+  const rows = await db.select<{ id: string; exportedFilePath: string }[]>(
+    `SELECT id, exportedFilePath FROM meetings WHERE customerId = $1 AND exportedFilePath != ''`,
+    [customerId]
+  )
+  for (const row of rows) {
+    if (row.exportedFilePath.startsWith(oldPrefix)) {
+      const newPath = `${newPrefix}${row.exportedFilePath.slice(oldPrefix.length)}`
+      await db.execute(
+        `UPDATE meetings SET exportedFilePath = $1, updatedAt = $2 WHERE id = $3`,
+        [newPath, Date.now(), row.id]
+      )
+    }
+  }
+}

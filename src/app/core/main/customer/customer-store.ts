@@ -4,6 +4,7 @@ import {
   deleteCustomerRecord,
   getCustomerList,
   toggleCustomerPin,
+  updateCustomerRecord,
   type CustomerRecord,
   type CustomerType,
 } from '@/db/customers'
@@ -17,11 +18,11 @@ import {
   type VisitType,
 } from '@/db/visits'
 import { deleteVisitTodosByCustomer } from '@/db/visit-todos'
-import { clearMeetingCustomerLink } from '@/db/meetings'
+import { clearMeetingCustomerLink, renameMeetingExportPaths } from '@/db/meetings'
 import { deleteVectorDocumentsByFolderPrefix } from '@/db/vector'
 import { useVisitTodosStore } from '@/stores/visit-todos'
 import { useMeetingStore } from '../meeting/meeting-store'
-import { ensureCustomerFolderStructure } from '@/lib/customer-folders'
+import { ensureCustomerFolderStructure, renameCustomerFolder } from '@/lib/customer-folders'
 
 /** 本地日期 YYYY-MM-DD（补建拜访标题兜底用） */
 function formatDate(timestamp: number): string {
@@ -82,6 +83,7 @@ interface CustomerStoreState {
   }) => Promise<string> // 返回新客户 ID，失败时抛错由调用方提示
   selectCustomer: (id: string | null) => void
   removeCustomer: (id: string) => Promise<void>
+  renameCustomer: (id: string, newName: string) => Promise<void>
   togglePin: (id: string) => Promise<void>
 
   // 拜访 Actions
@@ -214,6 +216,67 @@ export const useCustomerStore = create<CustomerStoreState>((set, get) => ({
         // 与 getCustomerList 排序保持一致：置顶优先，其余按更新时间倒序
         .sort((a, b) => b.isPinned - a.isPinned || b.updatedAt - a.updatedAt),
     }))
+  },
+
+  renameCustomer: async (id, newName) => {
+    const trimmed = newName.trim()
+    if (!trimmed) {
+      throw new Error('客户名称不能为空')
+    }
+    const snapshot = get().customers
+    const target = snapshot.find((c) => c.id === id)
+    if (!target) throw new Error('客户不存在')
+    // 名称未变：直接返回（避免无意义的文件夹移动与库更新）
+    if (target.name === trimmed) return
+
+    try {
+      // 1. 重命名工作区客户文件夹（含访前/访中/访后/资料全部产物）；
+      //    同名冲突自动 -2/-3 后缀；返回新相对路径
+      const oldFolderPath = target.folderPath
+      const newFolderPath = oldFolderPath
+        ? await renameCustomerFolder(oldFolderPath, trimmed)
+        : ''
+      // 2. 更新库记录（name + folderPath + updatedAt）
+      await updateCustomerRecord(id, {
+        name: trimmed,
+        ...(newFolderPath ? { folderPath: newFolderPath } : {}),
+      })
+      // 3. 级联更新该客户名下会议的导出路径（exportedFilePath 含旧文件夹前缀）
+      if (oldFolderPath && newFolderPath && oldFolderPath !== newFolderPath) {
+        await renameMeetingExportPaths(id, `${oldFolderPath}/`, `${newFolderPath}/`)
+        // 同步内存态会议（与 DB 一致）
+        const meetingStore = useMeetingStore.getState()
+        for (const m of meetingStore.meetings) {
+          if (m.customerId === id && m.exportedFilePath?.startsWith(`${oldFolderPath}/`)) {
+            meetingStore.updateMeeting(m.id, {
+              exportedFilePath: `${newFolderPath}/${m.exportedFilePath.slice(oldFolderPath.length + 1)}`,
+            })
+          }
+        }
+        // 向量索引前缀随文件夹移动：删旧前缀，重新索引由知识库面板按新路径触发
+        try {
+          await deleteVectorDocumentsByFolderPrefix(`${oldFolderPath}/`)
+        } catch (err) {
+          console.warn('[CustomerStore] 改名清理旧向量索引失败:', err)
+        }
+      }
+      // 4. 更新内存态客户列表（保持排序：置顶优先，其余按更新时间倒序）
+      const now = Date.now()
+      set((state) => ({
+        customers: state.customers
+          .map((c) =>
+            c.id === id
+              ? { ...c, name: trimmed, ...(newFolderPath ? { folderPath: newFolderPath } : {}), updatedAt: now }
+              : c
+          )
+          .sort((a, b) => b.isPinned - a.isPinned || b.updatedAt - a.updatedAt),
+      }))
+    } catch (err) {
+      // 失败回滚快照（文件夹移动失败时库记录未更新，保持原名）
+      set({ customers: snapshot })
+      console.error('[CustomerStore] 客户改名失败:', err)
+      throw err
+    }
   },
 
   loadVisits: async (customerId) => {

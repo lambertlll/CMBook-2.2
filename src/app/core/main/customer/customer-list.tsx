@@ -39,7 +39,7 @@ import {
   DropdownMenuSeparator as DropdownSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Plus, Search, Users, Building2, User, Pin, PinOff, Trash2, MoreHorizontal } from 'lucide-react'
+import { Plus, Search, Users, Building2, User, Pin, PinOff, Trash2, MoreHorizontal, Pencil } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { toast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
@@ -52,6 +52,7 @@ export function CustomerList() {
   const createCustomer = useCustomerStore((s) => s.createCustomer)
   const selectCustomer = useCustomerStore((s) => s.selectCustomer)
   const removeCustomer = useCustomerStore((s) => s.removeCustomer)
+  const renameCustomer = useCustomerStore((s) => s.renameCustomer)
   const togglePin = useCustomerStore((s) => s.togglePin)
   const initialized = useCustomerStore((s) => s.initialized)
 
@@ -90,6 +91,37 @@ export function CustomerList() {
   const [newType, setNewType] = useState<CustomerType>('enterprise')
   const [newIndustry, setNewIndustry] = useState('')
   const [creating, setCreating] = useState(false)
+
+  // 重命名客户对话框状态
+  const [renameTargetId, setRenameTargetId] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+  const [renaming, setRenaming] = useState(false)
+
+  // 打开重命名对话框时预填当前名称
+  useEffect(() => {
+    if (renameTargetId) {
+      const target = customers.find((c) => c.id === renameTargetId)
+      setRenameValue(target?.name || '')
+    }
+  }, [renameTargetId, customers])
+
+  // 提交重命名：调用 store 级联（文件夹/库/会议导出路径），失败 toast
+  const handleRenameSubmit = async () => {
+    if (!renameTargetId || renaming) return
+    setRenaming(true)
+    try {
+      await renameCustomer(renameTargetId, renameValue)
+      setRenameTargetId(null)
+    } catch (err) {
+      toast({
+        title: '重命名失败',
+        description: err instanceof Error ? err.message : '未知错误',
+        variant: 'destructive',
+      })
+    } finally {
+      setRenaming(false)
+    }
+  }
 
   useEffect(() => {
     if (!initialized) {
@@ -226,6 +258,10 @@ export function CustomerList() {
                               </>
                             )}
                           </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setRenameTargetId(customer.id)}>
+                            <Pencil className="w-4 h-4 mr-2" />
+                            重命名
+                          </DropdownMenuItem>
                           <DropdownSeparator />
                           <DropdownMenuItem
                             className="text-destructive focus:text-destructive"
@@ -257,6 +293,10 @@ export function CustomerList() {
                         {t('pin')}
                       </>
                     )}
+                  </ContextMenuItem>
+                  <ContextMenuItem onClick={() => setRenameTargetId(customer.id)}>
+                    <Pencil className="w-4 h-4 mr-2" />
+                    重命名
                   </ContextMenuItem>
                   <ContextMenuSeparator />
                   <ContextMenuItem
@@ -377,6 +417,43 @@ export function CustomerList() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* 重命名客户对话框：自动归类生成错误客户名时手动修正（联动文件夹/导出路径/知识库） */}
+      <Dialog
+        open={!!renameTargetId}
+        onOpenChange={(open) => !open && setRenameTargetId(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>重命名客户</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label>客户名称</Label>
+              <Input
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                placeholder="输入新的客户名称"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !renaming) void handleRenameSubmit()
+                }}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              重命名会同步更新客户文件夹（含访前/访中/访后/资料）、已导出的纪要路径与知识库索引。
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameTargetId(null)}>
+              取消
+            </Button>
+            <Button onClick={() => void handleRenameSubmit()} disabled={renaming || !renameValue.trim()}>
+              {renaming ? '重命名中…' : '确认重命名'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { exists, mkdir } from '@tauri-apps/plugin-fs'
+import { exists, mkdir, rename } from '@tauri-apps/plugin-fs'
 import { getFilePathOptions } from './workspace'
 
 // 客户文件夹根目录（工作区相对路径）
@@ -84,4 +84,50 @@ export async function ensureCustomerFolderStructure(
     })
   }
   return folderPath
+}
+
+/**
+ * 客户改名时重命名文件夹：customers/<旧名> → customers/<新名>
+ * 同名冲突自动追加 -2、-3 后缀（与 ensureCustomerFolderStructure 一致）。
+ * 返回新的相对路径；旧路径不存在时返回空串（调用方决定是否继续更新库记录）。
+ * 注意：重命名会移动客户文件夹内全部产物（访前/访中/访后/资料），
+ * 调用方需同步更新库中的 folderPath 与关联的导出路径。
+ */
+export async function renameCustomerFolder(
+  oldFolderPath: string,
+  newCustomerName: string
+): Promise<string> {
+  const base = sanitizeCustomerFolderName(newCustomerName)
+  if (!base) {
+    throw new Error('客户名称清洗后为空，无法重命名文件夹')
+  }
+  if (!oldFolderPath) return ''
+
+  // 旧目录不存在（如从未建文件夹）：无需移动，直接返回新名称的目录路径（不实际创建）
+  if (!(await workspacePathExists(oldFolderPath))) {
+    return `${CUSTOMER_ROOT}/${base}`
+  }
+
+  // 目标同名冲突（含自身路径相同的情形——重名不改时不移动）
+  let candidate = base
+  let suffix = 2
+  while (
+    await workspacePathExists(`${CUSTOMER_ROOT}/${candidate}`)
+  ) {
+    // 与旧路径完全相同视为无变化
+    if (`${CUSTOMER_ROOT}/${candidate}` === oldFolderPath) {
+      return oldFolderPath
+    }
+    candidate = `${base}-${suffix}`
+    suffix++
+  }
+
+  const newFolderPath = `${CUSTOMER_ROOT}/${candidate}`
+  const oldOptions = await getFilePathOptions(oldFolderPath)
+  const newOptions = await getFilePathOptions(newFolderPath)
+  await rename(oldOptions.path, newOptions.path, {
+    oldPathBaseDir: oldOptions.baseDir,
+    newPathBaseDir: newOptions.baseDir,
+  })
+  return newFolderPath
 }
