@@ -501,26 +501,48 @@ function setUncertaintyDecorations(
 }
 
 /**
- * 在 ProseMirror doc 上定位可疑项片段（修复问题 1：坐标系必须用 doc position）。
- * 遍历文本节点做子串匹配，返回 doc position；找不到返回 null（降级为提示条计数，不高亮）。
- * 不做去标点宽松匹配（±2 硬编码补偿不可靠，删掉）。
+ * 在 ProseMirror doc 上定位可疑项片段（坐标系必须是 doc position）。
+ * 关键：纪要里带格式的文本（加粗/高亮/行内代码）在 ProseMirror 中是多个相邻 text 节点
+ * （mark 边界分割），fragment 往往跨节点——不能在单个文本节点内 indexOf（原实现
+ * 因此定位失败，标记从未渲染）。改为：在 textblock 内拼接全部文本节点后匹配，
+ * 再把拼接偏移映射回 doc position。找不到返回 null（降级为提示条计数，不高亮）。
  */
 function locateUncertaintyInDoc(
   doc: import('@tiptap/pm/model').Node,
   fragment: string
 ): { from: number; to: number } | null {
   if (!fragment.trim()) return null
-  // 逐文本节点查找：doc position = 文本节点起点 + 节点内偏移
   let found: { from: number; to: number } | null = null
-  doc.descendants((node, pos) => {
-    if (found || !node.isText || !node.text) return false
-    const idx = node.text.indexOf(fragment)
+
+  doc.descendants((blockNode, blockPos) => {
+    if (found || !blockNode.isTextblock) return true // 只在文本块内匹配（inline 装饰不能跨块）
+    // 收集块内所有文本节点及其 doc 绝对位置（textblock 内容从 blockPos+1 开始）
+    const textNodes: Array<{ text: string; docFrom: number }> = []
+    blockNode.descendants((child, childPos) => {
+      if (child.isText && child.text) {
+        textNodes.push({ text: child.text, docFrom: blockPos + childPos })
+      }
+    })
+    // 拼接块内文本，在拼接串上匹配 fragment
+    const joined = textNodes.map((t) => t.text).join('')
+    const idx = joined.indexOf(fragment)
     if (idx >= 0) {
-      found = { from: pos + idx, to: pos + idx + fragment.length }
-      return false
+      // 把拼接偏移映射回 doc position：累加文本节点长度，定位 fragment 起点所在节点
+      let accLen = 0
+      for (let i = 0; i < textNodes.length; i++) {
+        const len = textNodes[i].text.length
+        if (idx >= accLen && idx < accLen + len) {
+          const from = textNodes[i].docFrom + (idx - accLen)
+          const to = Math.min(from + fragment.length, blockPos + blockNode.content.size + 1)
+          if (to > from) found = { from, to }
+          break
+        }
+        accLen += len
+      }
     }
     return true
   })
+
   return found
 }
 

@@ -27,11 +27,15 @@
   text-decoration-thickness: 1.5px;
 }
 
-/* S1 低置信度标记：黄色背景 + 边框，仅装饰层渲染（不污染 getMarkdown 序列化） */
+/* S1 低置信度标记：琥珀色背景 + 实描边 + 波浪下划线（对标拼写检查视觉语言），
+   仅装饰层渲染（不污染 getMarkdown 序列化）。
+   注意：透明度不能太低——浅色主题白底上 25% 纯黄几乎不可见（此前的缺陷） */
 .tiptap-editor .ProseMirror .summary-uncertain {
   border-radius: 0.15rem;
-  background: color-mix(in srgb, hsl(45 100% 50%) 25%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, hsl(45 100% 40%) 60%, transparent);
+  background: color-mix(in srgb, hsl(45 100% 50%) 42%, transparent);
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, hsl(38 92% 50%) 75%, transparent);
+  text-decoration: underline wavy hsl(38 92% 50%);
+  text-decoration-thickness: 1.5px;
   cursor: help;
 }
 
