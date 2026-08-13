@@ -173,6 +173,13 @@ export function MeetingList() {
         item,
         existingPaths.length
       )
+      // 残留文件已不存在（扫描后被清理/丢弃的竞态）：静默移除提示项，不报错
+      if (!savedPath) {
+        setInterrupted((prev) =>
+          prev.filter((p) => p.meetingId !== item.meetingId)
+        )
+        return
+      }
       updateMeeting(meeting.id, {
         audioSegments: [...existingPaths, savedPath],
         // audioPath 始终指向第一段（结果页等旧逻辑依赖），为空时才写入

@@ -209,13 +209,20 @@ function sniffAudioMime(bytes: Uint8Array): string {
 /**
  * 把残留的 .part 恢复为该会议的正式音频段：
  * 读取分片 → 识别容器格式 → 走 saveMeetingAudio 管线落为第 N 段 → 删除 .part。
- * 返回正式音频段的相对路径，会议记录字段由调用方更新。
+ * 返回正式音频段的相对路径；残留文件已不存在（竞态：扫描后被清理/丢弃）时返回 null，
+ * 调用方应静默移除提示项而非报错。
  */
 export async function recoverInterruptedRecording(
   item: InterruptedRecording,
   existingSegmentCount: number
-): Promise<string> {
+): Promise<string | null> {
   const fileOpts = await getStoragePathOptions(item.filePath)
+  // 恢复前先确认文件仍存在：扫描到列表显示与用户点击之间存在时间窗，
+  // 文件可能已被丢弃/清理，直接 readFile 会报 os error 2
+  const fileExists = fileOpts.baseDir
+    ? await exists(fileOpts.path, { baseDir: fileOpts.baseDir })
+    : await exists(fileOpts.path)
+  if (!fileExists) return null
   const bytes = fileOpts.baseDir
     ? await readFile(fileOpts.path, { baseDir: fileOpts.baseDir })
     : await readFile(fileOpts.path)
