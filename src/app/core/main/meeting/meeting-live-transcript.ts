@@ -206,10 +206,12 @@ export function isRealtimeAsrModel(model: string): boolean {
 /**
  * 录音开始后调用：旁路采集 PCM 并开始切块转写。
  * 不满足条件或同会议已在采集时直接忽略。
+ * @param force 实时转写开关从「关→开」时传入 true：即使同会议已有残留 active
+ *   （异常残留未复位）也强制重建采集会话，恢复实时转写。
  */
-export function startLiveTranscript(meetingId: string): void {
+export function startLiveTranscript(meetingId: string, force = false): void {
   const state = useLiveTranscriptStore.getState()
-  if (state.meetingId === meetingId && (state.active || capturing)) return
+  if (!force && state.meetingId === meetingId && (state.active || capturing)) return
   if (!isLiveTranscriptEnabled()) return
 
   // 新录音会话：清理上一场残留并重置片段列表
@@ -305,6 +307,23 @@ export function pauseLiveTranscript(): void {
 /** 继续录音：恢复切块累积 */
 export function resumeLiveTranscript(): void {
   capturePaused = false
+}
+
+/**
+ * 录音中关闭实时转写：暂停采集并断开转写通道（不影响录音）。
+ * 之后可通过 startLiveTranscript(meetingId, true) 在录音中恢复。
+ * 仅当当前采集归属该会议时生效。
+ */
+export function stopLiveTranscript(meetingId: string): void {
+  if (useLiveTranscriptStore.getState().meetingId !== meetingId) return
+  capturing = false
+  teardownCapture()
+  teardownDs()
+  // 暂停采集：清空未转写的 PCM 缓冲，避免恢复后把暂停期间的音频补发出去
+  pcmBuffers = []
+  bufferedSamples = 0
+  dsPendingClear()
+  useLiveTranscriptStore.setState({ active: false, segments: [] })
 }
 
 /**

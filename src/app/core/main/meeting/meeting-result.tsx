@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useMeetingStore, getMeetingAudioPaths, type Meeting } from './meeting-store'
+import { startLiveTranscript, stopLiveTranscript } from './meeting-live-transcript'
 import { MEETING_TEMPLATES } from './meeting-templates'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -2384,12 +2385,22 @@ export function MeetingResult({ meeting }: MeetingResultProps) {
               {t('summaryEditedSinceSync')}
             </span>
           )}
-          {/* 实时转写开关（复用现有全局设置，影响后续录音） */}
+          {/* 实时转写开关：切换时联动当前录音中的会议（关闭→停止采集；开启→恢复采集） */}
           <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
             {t('liveToggle')}
             <Switch
               checked={meetingLiveTranscript}
-              onCheckedChange={(checked) => void setMeetingLiveTranscript(checked)}
+              onCheckedChange={(checked) => {
+                void setMeetingLiveTranscript(checked)
+                const recordingId = useMeetingStore.getState().recordingMeetingId
+                if (recordingId) {
+                  if (checked) {
+                    startLiveTranscript(recordingId, true)
+                  } else {
+                    stopLiveTranscript(recordingId)
+                  }
+                }
+              }}
             />
           </label>
         </div>
