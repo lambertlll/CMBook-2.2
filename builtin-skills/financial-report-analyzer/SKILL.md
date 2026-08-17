@@ -5,6 +5,15 @@ license: 仅供内部使用
 metadata:
   version: "2.0.0"
   author: CMBook
+allowed-tools:
+  - skill_load
+  - note_search_files
+  - note_read_file
+  - note_read_files_batch
+  - note_create_file
+  - note_update_file
+  - web_search
+  - web_fetch
 ---
 
 # 财报分析助手（financial-report-analyzer）

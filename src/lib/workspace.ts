@@ -185,6 +185,15 @@ export async function ensureSafeWorkspaceRelativePath(relativePath: string): Pro
     throw new Error('不允许使用绝对路径')
   }
 
+  // 盘符绝对路径（如 C:/Users/...）与 UNC 路径（如 //server/share）也属于绝对路径，
+  // 必须拦截——否则 Agent 工具可读写工作区外的任意文件（路径穿越漏洞）
+  if (/^[a-zA-Z]:/.test(normalized)) {
+    throw new Error('不允许使用盘符绝对路径')
+  }
+  if (normalized.startsWith('//') || normalized.startsWith('\\\\')) {
+    throw new Error('不允许使用 UNC 路径')
+  }
+
   const segments = normalized.split('/').filter(Boolean)
   if (segments.some(segment => segment === '..')) {
     throw new Error('路径不能包含 ..')
