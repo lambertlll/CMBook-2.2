@@ -14,9 +14,8 @@ function incrementStoreBackedContentVersion() {
   return storeBackedContentVersion
 }
 
-function buildEditorContentPayload(markdown: string, version: number): AgentEditorStateSnapshot & { text: string } {
+function buildEditorContentPayload(markdown: string, version: number): AgentEditorStateSnapshot {
   const normalizedMarkdown = markdown.replace(/&nbsp;/g, ' ')
-  const text = normalizedMarkdown
   const markdownLines = normalizedMarkdown.split('\n')
   const totalLines = markdownLines.length
   const lineNumberWidth = String(totalLines).length
@@ -26,9 +25,8 @@ function buildEditorContentPayload(markdown: string, version: number): AgentEdit
 
   return {
     markdown: normalizedMarkdown,
-    text,
-    wordCount: text.split(/\s+/).filter(w => w).length,
-    charCount: text.length,
+    wordCount: normalizedMarkdown.split(/\s+/).filter(w => w).length,
+    charCount: normalizedMarkdown.length,
     totalLines,
     numberedLines,
     version,
