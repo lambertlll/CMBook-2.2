@@ -12,6 +12,7 @@ import { useLocalStorage } from 'react-use';
 import { ModelSelect } from "./model-select"
 import { getWorkspacePath } from "@/lib/workspace"
 import { PromptSelect } from "./prompt-select"
+import { SkillSelect } from "./skill-select"
 import { ChatSend } from "./chat-send"
 import { LinkedFileDisplay } from "./file-link"
 import { LinkedResource, MarkdownFile, LinkedFolder } from "@/lib/files"
@@ -104,9 +105,10 @@ function createImageAttachmentId(prefix: string) {
 // 可排序的工具栏项组件 - 定义在外部以避免每次 ChatInput re-render 时重新创建
 interface SortableToolbarItemProps {
   id: string
+  onInvokeSkill?: (skillId: string, skillName: string) => void
 }
 
-const SortableToolbarItem = React.memo(function SortableToolbarItem({ id }: SortableToolbarItemProps) {
+const SortableToolbarItem = React.memo(function SortableToolbarItem({ id, onInvokeSkill }: SortableToolbarItemProps) {
   const {
     attributes,
     listeners,
@@ -129,6 +131,8 @@ const SortableToolbarItem = React.memo(function SortableToolbarItem({ id }: Sort
         return <ModelSelect />
       case 'promptSelect':
         return <PromptSelect />
+      case 'skillsButton':
+        return <SkillSelect onInvokeSkill={onInvokeSkill} />
       case 'mcpButton':
         return <McpButton />
       case 'ragSwitch':
@@ -193,6 +197,11 @@ export const ChatInput = React.memo(function ChatInput() {
   const placeholderRequestIdRef = useRef(0)
   const imageInputRef = useRef<HTMLInputElement>(null)
   const isMobileDevice_ = isMobileDevice()
+
+  // 工具栏「技能」入口回调（stable ref，SortableToolbarItem 为 memo 组件不会因此重渲染）
+  const handleInvokeSkillRef = useRef<(skillId: string, skillName: string) => void>(() => {})
+  const handleInvokeSkill = (skillId: string, skillName: string) =>
+    handleInvokeSkillRef.current(skillId, skillName)
   const imageDragDepthRef = useRef(0)
   const onboardingAgentPromptArmedRef = useRef(false)
   const onboardingTypingTimerRefs = useRef<number[]>([])
@@ -817,6 +826,13 @@ export const ChatInput = React.memo(function ChatInput() {
       // 内容直接随调用传给 sendChat，不等输入框状态提交（原 100ms setTimeout 存在竞态与卸载泄漏）
       chatSendRef.current?.sendChat(message)
     })
+
+    // 工具栏「技能」入口：点击技能后，把触发指令注入对话并发送，
+    // 让模型按 skill 工作流执行（skill 通过描述自动匹配）
+    handleInvokeSkillRef.current = (skillId: string, skillName: string) => {
+      const message = `使用技能 ${skillName}（${skillId}），按该技能的指令执行`
+      emitter.emit('send-chat-message', { content: message })
+    }
     emitter.on('ai-placeholder-generated', (event: unknown) => {
       const promptText = normalizePlaceholderText(event)
       setPlaceholder(promptText || defaultPlaceholder)
@@ -1204,6 +1220,7 @@ ${previewLines.join('\n')}
                       <SortableToolbarItem
                         key={item.id}
                         id={item.id}
+                        onInvokeSkill={handleInvokeSkill}
                       />
                     ))}
                   </div>

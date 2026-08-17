@@ -1460,11 +1460,12 @@ const useSettingStore = create<SettingState>((set, get) => ({
     // 底部工具栏（可排序）
     { id: 'modelSelect', enabled: true, order: 0 },
     { id: 'promptSelect', enabled: true, order: 1 },
-    { id: 'mcpButton', enabled: true, order: 2 },
-    { id: 'ragSwitch', enabled: true, order: 3 },
-    { id: 'clipboardMonitor', enabled: true, order: 4 },
+    { id: 'skillsButton', enabled: true, order: 2 },
+    { id: 'mcpButton', enabled: true, order: 3 },
+    { id: 'ragSwitch', enabled: true, order: 4 },
+    { id: 'clipboardMonitor', enabled: true, order: 5 },
     // 顶部工具栏 - 右侧（不参与排序）
-    { id: 'newChat', enabled: true, order: 5 },
+    { id: 'newChat', enabled: true, order: 6 },
   ],
   setChatToolbarConfigPc: async (config: ChatToolbarItem[]) => {
     set({ chatToolbarConfigPc: config })

@@ -1193,6 +1193,9 @@
           "promptSelect": {
             "desc": "选择对话使用的预设提示词"
           },
+          "skillsButton": {
+            "desc": "选择可用技能（内置：客户尽调/审贷会/财报分析等）"
+          },
           "chatLanguage": {
             "desc": "设置对话的语言"
           },
@@ -2245,6 +2248,12 @@
         "promptSelect": {
           "tooltip": "选择 Prompt",
           "placeholder": "搜索 Prompt"
+        },
+        "skillSelect": {
+          "tooltip": "选择技能",
+          "placeholder": "搜索技能",
+          "groupLabel": "可用技能",
+          "empty": "暂无可用技能"
         },
         "newChat": "开始新对话",
         "temporaryChat": "临时会话",
