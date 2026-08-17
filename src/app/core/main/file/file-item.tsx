@@ -32,6 +32,7 @@ import { VectorKnowledgeMenu } from "./vector-knowledge-menu";
 import { NoteToCustomerMenu } from "./note-to-customer-menu";
 import { isSkillsFolder } from "@/lib/skills/utils";
 import { exportMarkdownFile, type MarkdownExportFormat } from "../editor/markdown/markdown-export";
+import { exportMarkdownToWord } from "@/lib/export-word";
 import { setFileManagerDragData } from "./file-dnd";
 import { debugSyncPath } from "@/lib/sync/remote-file";
 import { cn } from "@/lib/utils";
@@ -734,6 +735,30 @@ export function FileItem({
     }
   }
 
+  async function handleExportWord() {
+    try {
+      setExportingFormat('word')
+      const { getFilePathOptions } = await import('@/lib/workspace')
+      const { readTextFile } = await import('@tauri-apps/plugin-fs')
+      const fileOptions = await getFilePathOptions(path)
+      const content = fileOptions.baseDir
+        ? await readTextFile(fileOptions.path, { baseDir: fileOptions.baseDir })
+        : await readTextFile(fileOptions.path)
+      const fileName = path.split('/').pop()?.replace(/\.md$/, '') || 'document'
+      await exportMarkdownToWord(content, fileName)
+      toast({ title: 'Word 导出成功' })
+    } catch (error) {
+      console.error(`Export selected file to Word failed: ${path}`, error)
+      toast({
+        title: '导出失败',
+        description: error instanceof Error ? error.message : String(error),
+        variant: 'destructive',
+      })
+    } finally {
+      setExportingFormat(null)
+    }
+  }
+
   async function handleEditEnd() {
     if (currentFolder && currentFolder.children) {
       const index = currentFolder?.children?.findIndex(item => item.name === '')
@@ -1009,6 +1034,15 @@ export function FileItem({
                   >
                     <FileText className="mr-2 h-4 w-4" />
                     PDF
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    inset
+                    disabled={exportingFormat !== null}
+                    onClick={() => { void handleExportWord() }}
+                    menuType="file"
+                  >
+                    <FileDown className="mr-2 h-4 w-4" />
+                    Word
                   </ContextMenuItem>
                 </ContextMenuSubContent>
               </ContextMenuSub>

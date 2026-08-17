@@ -25,7 +25,7 @@ import { normalizeLatexForKatex } from '@/lib/latex'
 import { resolveImagePathFromMarkdown } from '@/lib/markdown-image-path'
 import { shouldTransformImageSrcToWorkspaceAsset } from './image-src'
 
-export type MarkdownExportFormat = 'markdown' | 'html' | 'json' | 'pdf'
+export type MarkdownExportFormat = 'markdown' | 'html' | 'json' | 'pdf' | 'word'
 
 export interface MarkdownExportSource {
   baseName: string

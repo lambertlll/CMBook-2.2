@@ -1,15 +1,16 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { readDir, stat } from '@tauri-apps/plugin-fs'
+import { readDir, stat, readTextFile } from '@tauri-apps/plugin-fs'
 import { getFilePathOptions } from '@/lib/workspace'
+import { exportMarkdownToWord } from '@/lib/export-word'
 import { useSidebarStore } from '@/stores/sidebar'
 import useArticleStore from '@/stores/article'
 import type { CustomerRecord } from '@/db/customers'
 import type { VisitRecord } from '@/db/visits'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ClipboardList, FileText, Loader2, Sparkles } from 'lucide-react'
+import { ClipboardList, FileText, Loader2, Sparkles, Download } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { toast } from '@/hooks/use-toast'
 import emitter from '@/lib/emitter'
@@ -150,6 +151,22 @@ export function PrevisitSection({
     }
   }
 
+  /** 导出访前文档为 Word（读取 md 内容 → exportMarkdownToWord） */
+  const exportDoc = async (path: string) => {
+    try {
+      const fileOptions = await getFilePathOptions(path)
+      const content = fileOptions.baseDir
+        ? await readTextFile(fileOptions.path, { baseDir: fileOptions.baseDir })
+        : await readTextFile(fileOptions.path)
+      const fileName = path.split('/').pop()?.replace(/\.md$/, '') || 'report'
+      await exportMarkdownToWord(content, fileName)
+      toast({ description: t('previsitExportSuccess') })
+    } catch (err) {
+      console.error('[PrevisitSection] 导出访前文档失败:', err)
+      toast({ description: t('previsitExportFailed'), variant: 'destructive' })
+    }
+  }
+
   /** 实际发起生成：任务交给模块级管理器排队执行（失败/完成由管理器反馈） */
   const proceedGenerate = async () => {
     // 确保右栏可见（当前在客户 Tab，右栏即 Chat 面板）
@@ -209,25 +226,38 @@ export function PrevisitSection({
       ) : (
         <div className="flex flex-col mt-1">
           {docs.map((doc) => (
-            <button
+            <div
               key={doc.path}
-              type="button"
-              className="flex items-center gap-1.5 rounded px-1 py-0.5 text-left hover:bg-accent"
-              onClick={() => openDoc(doc.path)}
-              title={doc.path}
+              className="group flex items-center gap-1 rounded px-1 py-0.5 hover:bg-accent"
             >
-              <FileText className="w-3 h-3 shrink-0 text-muted-foreground" />
-              <span className="min-w-0">
-                <span className="block text-sm text-primary truncate">
-                  {doc.name}
-                </span>
-                {doc.modifiedAt > 0 && (
-                  <span className="block text-xs text-muted-foreground">
-                    {formatDateTime(doc.modifiedAt)}
+              <button
+                type="button"
+                className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+                onClick={() => openDoc(doc.path)}
+                title={doc.path}
+              >
+                <FileText className="w-3 h-3 shrink-0 text-muted-foreground" />
+                <span className="min-w-0">
+                  <span className="block text-sm text-primary truncate">
+                    {doc.name}
                   </span>
-                )}
-              </span>
-            </button>
+                  {doc.modifiedAt > 0 && (
+                    <span className="block text-xs text-muted-foreground">
+                      {formatDateTime(doc.modifiedAt)}
+                    </span>
+                  )}
+                </span>
+              </button>
+              {/* 导出 Word（hover 显示；点击不触发打开） */}
+              <button
+                type="button"
+                className="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-accent-foreground/10 hover:text-foreground group-hover:opacity-100"
+                onClick={() => exportDoc(doc.path)}
+                title={t('previsitExportTitle')}
+              >
+                <Download className="w-3.5 h-3.5" />
+              </button>
+            </div>
           ))}
         </div>
       )}
