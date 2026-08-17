@@ -305,11 +305,16 @@ export const createFileTool: Tool = {
         }
       }
 
-      // 如果没有提供 fileName，生成默认文件名
+      // 如果没有提供 fileName，生成默认文件名。
+      // 默认按 Markdown 笔记格式命名（note-<时间戳>.md），比 file-<时间戳>.txt
+      // 语义更明确；并在结果中提醒 LLM 未传文件名，促使后续调用带上有意义的名字，
+      // 避免在根目录堆积难以辨识的临时文件。
       let fileName = params.fileName
+      let usedDefaultName = false
       if (!fileName || typeof fileName !== 'string' || fileName.trim() === '') {
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-        fileName = `file-${timestamp}.txt`
+        fileName = `note-${timestamp}.md`
+        usedDefaultName = true
       }
       fileName = fileName.trim().replace(/\\/g, '/')
 
@@ -405,7 +410,9 @@ export const createFileTool: Tool = {
           filePath,
           fullPath,
         },
-        message: `成功创建文件: ${fullPath}`,
+        message: usedDefaultName
+          ? `成功创建文件: ${fullPath}（注意：本次未指定文件名，使用了默认名 note-<时间戳>.md；下次创建请使用有意义且带扩展名的文件名，如"审贷会材料.md"）`
+          : `成功创建文件: ${fullPath}`,
       }
     } catch (error) {
       return {
