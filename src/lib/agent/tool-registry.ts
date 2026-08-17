@@ -31,6 +31,7 @@ import { saveMemoryTool, listMemoriesTool, deleteMemoryTool, clearMemoriesTool }
 import { executeSkillScriptTool, loadSkillContentTool } from './tools/system-tools'
 import { webFetchTool, webSearchTool } from './tools/web-tools'
 import { chatTools } from './tools/chat-tools'
+import { customerGetContextTool } from './tools/customer-data-tool'
 import type {
   AgentChange,
   AgentTool,
@@ -998,6 +999,14 @@ function buildTools(): AgentTool[] {
         legacy: tool,
       })
     ),
+    // 客户结构化数据读取（skill 生成材料时获取"本行掌握情况"，read 只读）
+    adaptLegacyTool({
+      name: 'customer_get_context',
+      title: '读取客户结构化上下文',
+      category: 'note',
+      risk: 'read',
+      legacy: customerGetContextTool,
+    }),
     adaptLegacyTool({ name: 'folder_list', title: '列出文件夹', category: 'folder', risk: 'read', legacy: listFoldersTool }),
     adaptLegacyTool({ name: 'folder_check_exists', title: '检查文件夹', category: 'folder', risk: 'read', legacy: checkFolderExistsTool }),
     adaptLegacyTool({ name: 'folder_create', title: '创建文件夹', category: 'folder', risk: 'file-create', legacy: createFolderTool, execute: executeFolderCreateWithChange }),
