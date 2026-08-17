@@ -383,8 +383,8 @@ const useArticleStore = create<NoteState>((set, get) => ({
     if (sortType) set({ sortType })
     if (sortDirection) set({ sortDirection })
 
-    // 如果需要按时间排序，加载统计信息
-    if (sortType === 'created' || sortType === 'modified') {
+    // 如果需要按时间排序，加载统计信息（'none' 默认分支也按修改时间倒序，需加载）
+    if (sortType === 'created' || sortType === 'modified' || sortType === 'none') {
       await get().loadFileStatsIfNeeded()
     }
 
@@ -421,8 +421,8 @@ const useArticleStore = create<NoteState>((set, get) => ({
     const store = await getStore()
     await store.set('sortType', sortType)
     
-    // 如果需要按时间排序，先加载统计信息
-    if (sortType === 'created' || sortType === 'modified') {
+    // 如果需要按时间排序，先加载统计信息（'none' 默认分支也按修改时间倒序，需加载）
+    if (sortType === 'created' || sortType === 'modified' || sortType === 'none') {
       await get().loadFileStatsIfNeeded()
     }
     
@@ -437,7 +437,7 @@ const useArticleStore = create<NoteState>((set, get) => ({
     
     // 如果当前是按时间排序，确保统计信息已加载
     const sortType = get().sortType
-    if (sortType === 'created' || sortType === 'modified') {
+    if (sortType === 'created' || sortType === 'modified' || sortType === 'none') {
       await get().loadFileStatsIfNeeded()
     }
     
@@ -460,11 +460,16 @@ const useArticleStore = create<NoteState>((set, get) => ({
       if (aIsSkills && !bIsSkills) return -1
       if (!aIsSkills && bIsSkills) return 1
 
-      // 如果排序类型为 'none'，在 skills 置顶后，文件夹在文件上方
+      // 如果排序类型为 'none'（默认）：skills 置顶后，文件夹在文件上方，
+      // 文件按修改时间倒序（时间越近越靠前）——笔记标签下的默认浏览体验
       if (sortType === 'none') {
         if (a.isDirectory && !b.isDirectory) return -1
         if (!a.isDirectory && b.isDirectory) return 1
-        return 0
+        // 同类型（均为文件夹或均为文件）：文件夹之间保持原顺序，文件按修改时间倒序
+        if (a.isDirectory && b.isDirectory) return 0
+        const aTime = a.modifiedAt ? new Date(a.modifiedAt).getTime() : 0
+        const bTime = b.modifiedAt ? new Date(b.modifiedAt).getTime() : 0
+        return bTime - aTime
       }
 
       // 文件夹始终在文件上方
@@ -966,7 +971,9 @@ const useArticleStore = create<NoteState>((set, get) => ({
     // 使用正确的基础路径
     const basePath = workspace.isCustom ? workspace.path : await join(await appDataDir(), 'article')
     await get().updateFileStats(basePath, fileTree)
-    set({ fileTree: [...fileTree] }) // 触发重新渲染
+    // 统计加载后重新排序（'none' 默认分支按修改时间倒序，需要 modifiedAt 就绪后重排）
+    const sortedTree = get().sortFileTree(fileTree)
+    set({ fileTree: sortedTree }) // 触发重新渲染
   },
   
   loadFileTree: async (options) => {
@@ -1105,6 +1112,9 @@ const useArticleStore = create<NoteState>((set, get) => ({
     // 排序文件树
     const sortedDirs = get().sortFileTree(dirs)
     set({ fileTree: sortedDirs })
+
+    // 'none' 默认分支按修改时间倒序：加载文件统计（modifiedAt）后重排
+    void get().loadFileStatsIfNeeded()
 
     // 先显示本地文件树
     set({ fileTreeLoading: false })
