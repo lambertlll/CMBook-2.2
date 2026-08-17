@@ -326,6 +326,27 @@ function supportsEnableThinkingSwitch(aiConfig?: AiConfig): boolean {
   return isQwenProvider && model.includes('qwen')
 }
 
+/**
+ * 判断是否为阿里云百炼 OpenAI 兼容端点（maas.aliyuncs.com / dashscope.aliyuncs.com）。
+ * 百炼的 compatible-mode 支持 `enable_search` 参数开启模型侧联网搜索，
+ * 无需额外配置 Tavily 等搜索 API Key（费用计入模型 token 用量）。
+ */
+export function isBailianCompatibleEndpoint(baseURL?: string): boolean {
+  const url = (baseURL || '').toLowerCase()
+  return url.includes('maas.aliyuncs.com') || url.includes('dashscope.aliyuncs.com')
+}
+
+/**
+ * 判断当前模型/端点是否应开启模型侧联网搜索（enable_search）。
+ * 仅对阿里云百炼 compatible-mode 且模型明确支持时启用，避免污染其他 provider。
+ */
+function supportsModelSearch(aiConfig?: AiConfig): boolean {
+  if (!aiConfig) return false
+  if (!isBailianCompatibleEndpoint(aiConfig.baseURL)) return false
+  // 百炼 compatible-mode 下开启模型侧搜索（enable_search: true）
+  return true
+}
+
 export function withFastAiRequestOptions<const T extends OpenAI.Chat.ChatCompletionCreateParams>(
   params: T,
   aiConfig?: AiConfig
@@ -337,6 +358,9 @@ export function withFastAiRequestOptions<const T extends OpenAI.Chat.ChatComplet
     ...tokenLimitParams,
     ...params,
     ...(supportsEnableThinkingSwitch(aiConfig) ? { enable_thinking: false } : {}),
+    // 阿里云百炼 compatible-mode：开启模型侧联网搜索（无需搜索 API Key，
+    // 模型自行联网，费用计入 token；DeepSeek V4 Flash 等百炼模型支持）
+    ...(supportsModelSearch(aiConfig) ? { enable_search: true } : {}),
   } as T
 }
 

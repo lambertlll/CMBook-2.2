@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { getAISettings, validateAIService, prepareMessages, createOpenAIClient, getChatTokenLimitParams, handleAIError, convertImageToBase64 } from './utils';
+import { getAISettings, validateAIService, prepareMessages, createOpenAIClient, getChatTokenLimitParams, handleAIError, convertImageToBase64, isBailianCompatibleEndpoint } from './utils';
 
 /**
  * 非流式方式获取AI结果
@@ -31,6 +31,8 @@ export async function fetchAi(
       temperature: aiConfig?.temperature || 1,
       top_p: aiConfig?.topP || 1,
       ...getChatTokenLimitParams(aiConfig),
+      // 阿里云百炼 compatible-mode：开启模型侧联网搜索（无需搜索 API Key）
+      ...(isBailianCompatibleEndpoint(aiConfig?.baseURL) ? { enable_search: true } : {}),
     })
 
     return completion.choices[0].message.content || ''
@@ -133,6 +135,8 @@ export async function fetchAiStream(
       top_p: aiConfig?.topP,
       stream: true,
       ...getChatTokenLimitParams(aiConfig),
+      // 阿里云百炼 compatible-mode：开启模型侧联网搜索（无需搜索 API Key）
+      ...(isBailianCompatibleEndpoint(aiConfig?.baseURL) ? { enable_search: true } : {}),
     }
 
     // 如果有 MCP 工具，添加到请求中
@@ -342,6 +346,8 @@ export async function fetchAiStream(
           tools: mcpTools,
           tool_choice: 'auto',
           ...getChatTokenLimitParams(aiConfig),
+          // 阿里云百炼 compatible-mode：开启模型侧联网搜索（无需搜索 API Key）
+          ...(isBailianCompatibleEndpoint(aiConfig?.baseURL) ? { enable_search: true } : {}),
         }, {
           signal: abortSignal
         }) as unknown as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>
@@ -454,6 +460,8 @@ export async function fetchAiStreamToken(text: string, onUpdate: (content: strin
       top_p: aiConfig?.topP,
       stream: true,
       ...getChatTokenLimitParams(aiConfig),
+      // 阿里云百炼 compatible-mode：开启模型侧联网搜索（无需搜索 API Key）
+      ...(isBailianCompatibleEndpoint(aiConfig?.baseURL) ? { enable_search: true } : {}),
     }, {
       signal: abortSignal
     })
