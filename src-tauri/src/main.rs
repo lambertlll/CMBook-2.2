@@ -45,7 +45,59 @@ use screenshot::{cleanup_temp_screenshot_dir, screenshot};
 use skills::{import_skill_zip, install_builtin_skills};
 use tray::update_tray_menu_labels;
 
+/// 清理失效的系统代理环境变量（HTTP_PROXY/HTTPS_PROXY/ALL_PROXY）。
+///
+/// 背景：代理软件退出后 Windows 系统设置常残留指向 localhost 的代理地址
+/// （如 http://localhost:15236/），但代理进程已不在运行。reqwest（含
+/// tauri-plugin-http、AI 流式请求）默认读环境代理 → 所有出网请求走失效
+/// 代理 → "error sending request"。AI 端点（阿里云 MaaS 等）直连更稳。
+///
+/// 策略：仅当代理地址指向本机（localhost/127.0.0.1）且该端口无监听时移除，
+/// 不影响真正可用的代理（如公司内网代理）。
+fn sanitize_proxy_env() {
+    for key in ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"] {
+        let Some(value) = std::env::var(key).ok().filter(|v| !v.is_empty()) else {
+            continue
+        };
+        let Some(host_port) = extract_proxy_host_port(&value) else {
+            continue
+        };
+        // 只处理指向本机的代理
+        let is_local = matches!(
+            host_port.0.as_str(),
+            "localhost" | "127.0.0.1" | "::1" | "[::1]"
+        );
+        if !is_local {
+            continue
+        }
+        let port = host_port.1;
+        // 端口无监听 → 视为失效代理，移除
+        if std::net::TcpStream::connect(("127.0.0.1", port)).is_err() {
+            std::env::remove_var(key);
+            eprintln!(
+                "[proxy-sanitize] removed dead local proxy env {key}={value} (no listener on port {port})"
+            );
+        }
+    }
+}
+
+/// 从代理 URL 提取 (host, port)，如 http://localhost:15236/ → ("localhost", 15236)
+fn extract_proxy_host_port(value: &str) -> Option<(String, u16)> {
+    let trimmed = value.trim();
+    let rest = trimmed
+        .strip_prefix("http://")
+        .or_else(|| trimmed.strip_prefix("https://"))?;
+    let authority = rest.split('/').next().unwrap_or(rest);
+    let (host, port_str) = match authority.rsplit_once(':') {
+        Some((h, p)) if !p.is_empty() => (h, p),
+        _ => return None,
+    };
+    let port: u16 = port_str.parse().ok()?;
+    Some((host.to_string(), port))
+}
+
 fn main() {
+    sanitize_proxy_env();
     tauri::Builder::default()
         // 单实例插件必须最先加载，避免 Windows 文件关联二次启动时继续初始化托盘等资源。
         .plugin(tauri_plugin_single_instance::init(
