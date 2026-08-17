@@ -112,6 +112,10 @@ fn build_client() -> Result<Client, String> {
         .get_or_init(|| {
             Client::builder()
                 .connect_timeout(Duration::from_secs(10))
+                // 禁用环境代理（HTTP_PROXY/HTTPS_PROXY）：系统残留失效代理（如代理软件
+                // 退出后未清理的设置）会导致 AI 请求 "error sending request" 连不上。
+                // AI 端点走直连更稳；需走代理的环境由显式配置替代。
+                .no_proxy()
                 .build()
                 .map_err(|error| format!("Failed to build HTTP client: {error}"))
         })
