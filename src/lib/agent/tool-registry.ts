@@ -26,10 +26,11 @@ import {
 } from './tools/note-tools'
 import { listFoldersTool, checkFolderExistsTool, createFolderTool, deleteFolderTool } from './tools/folder-tools'
 import { listTagsTool, createTagTool, updateTagTool, deleteTagTool, searchTagsTool } from './tools/tag-tools'
-import { readMarksTool, searchMarksTool, createMarkTool, updateMarkTool, deleteMarkTool } from './tools/mark-tools'
+import { readMarksTool, searchMarksTool, createMarkTool, updateMarkTool, deleteMarkTool, restoreMarkTool } from './tools/mark-tools'
 import { saveMemoryTool, listMemoriesTool, deleteMemoryTool, clearMemoriesTool } from './tools/memory-tools'
 import { executeSkillScriptTool, loadSkillContentTool } from './tools/system-tools'
 import { webFetchTool, webSearchTool } from './tools/web-tools'
+import { chatTools } from './tools/chat-tools'
 import type {
   AgentChange,
   AgentTool,
@@ -983,6 +984,20 @@ function buildTools(): AgentTool[] {
       legacy: copyFileTool,
       execute: executeCopyFileWithChange,
     }),
+    // chat 对话工具（此前定义了但从未注册，属死代码；银行场景需要翻查历史对话/记录）
+    ...chatTools.map((tool) =>
+      adaptLegacyTool({
+        name: tool.name,
+        title: tool.name,
+        category: 'chat',
+        risk: /read|search|list/.test(tool.name)
+          ? 'read'
+          : tool.name.includes('delete') || tool.name.includes('clear')
+            ? 'delete'
+            : 'medium',
+        legacy: tool,
+      })
+    ),
     adaptLegacyTool({ name: 'folder_list', title: '列出文件夹', category: 'folder', risk: 'read', legacy: listFoldersTool }),
     adaptLegacyTool({ name: 'folder_check_exists', title: '检查文件夹', category: 'folder', risk: 'read', legacy: checkFolderExistsTool }),
     adaptLegacyTool({ name: 'folder_create', title: '创建文件夹', category: 'folder', risk: 'file-create', legacy: createFolderTool, execute: executeFolderCreateWithChange }),
@@ -1076,6 +1091,14 @@ function buildTools(): AgentTool[] {
         (params) => String(params.id ?? ''),
         false
       ),
+    }),
+    // 恢复软删除的记录（mark_delete 配套，此前定义了但未注册）
+    adaptLegacyTool({
+      name: 'mark_restore',
+      title: '恢复记录',
+      category: 'mark',
+      risk: 'medium',
+      legacy: restoreMarkTool,
     }),
     adaptLegacyTool({ name: 'memory_list', title: '列出记忆', category: 'memory', risk: 'read', legacy: listMemoriesTool }),
     adaptLegacyTool({
