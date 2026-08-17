@@ -857,6 +857,9 @@ class SkillManager {
 
       for (const entry of entries) {
         if (entry.isDirectory && !entry.name.startsWith('.')) {
+          // 跳过内置 skill 安装机制留下的备份目录（client-research.bak 等），
+          // 否则会被当作 skill 加载并因 ID 后缀不同而重复出现
+          if (/\.bak\d*$/.test(entry.name)) continue
           dirs.push(entry.name)
         }
       }
