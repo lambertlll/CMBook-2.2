@@ -521,13 +521,22 @@ function repairQuotedEditorWriteArgs(
   return repairedArgs
 }
 
-function buildToolChoice(context: AgentContextSnapshot): OpenAI.Chat.ChatCompletionToolChoiceOption {
+function buildToolChoice(context: AgentContextSnapshot, modelName = ''): OpenAI.Chat.ChatCompletionToolChoiceOption {
   const forcedTool = getForcedActionTool(context)
   if (!forcedTool) {
     return 'auto'
   }
+  // thinking/reasoning 模型不支持 required/object 形式 tool_choice，降级 auto
+  if (isThinkingModelName(modelName)) {
+    return 'auto'
+  }
 
   return forceToolChoice(forcedTool)
+}
+
+function isThinkingModelName(modelName: string | undefined): boolean {
+  const name = (modelName || '').toLowerCase()
+  return /(reasoner|thinking|deepseek-r1|\br1\b|o[134]-mini|o[134]\b)/.test(name)
 }
 
 function getForcedActionTool(context: AgentContextSnapshot) {
@@ -889,7 +898,7 @@ export class AgentRuntime {
     const client = await createOpenAIClient(aiConfig)
     let editorStateReadLocked = hasInlineCurrentEditorState(context)
     let openAITools = getOpenAITools(tools, editorStateReadLocked)
-    let baseToolChoice = buildToolChoice(context)
+    let baseToolChoice = buildToolChoice(context, aiConfig?.model)
     let documentWideBatchEditorIntent = hasDocumentWideBatchEditorIntent(context)
     let documentWideSnapshotRead = editorStateReadLocked
     let finalContent = ''
@@ -944,7 +953,7 @@ export class AgentRuntime {
       tools = selectToolsForContext(context, allTools)
       editorStateReadLocked = false
       openAITools = getOpenAITools(tools, editorStateReadLocked)
-      baseToolChoice = buildToolChoice(context)
+      baseToolChoice = buildToolChoice(context, aiConfig?.model)
       documentWideBatchEditorIntent = hasDocumentWideBatchEditorIntent(context)
       documentWideSnapshotRead = false
       missingWriteToolRepairCount = 0
@@ -1028,9 +1037,14 @@ export class AgentRuntime {
         activeModelStreamedTokenCount = 0
         callbacks.onTrace?.(modelTrace)
 
-        const toolChoice = documentWideBatchEditorIntent
-          ? forceToolChoice(documentWideSnapshotRead ? 'editor_apply_transaction' : 'editor_get_state')
-          : baseToolChoice
+        // thinking/reasoning 模式（DeepSeek R1 等）的 OpenAI 兼容 API 不支持
+        // tool_choice 为 required/object 形式（400 invalid_parameter_error），
+        // 强制工具选择对这类模型降级为 'auto'（由模型自行决定是否调工具）
+        const isThinkingModel = isThinkingModelName(aiConfig?.model)
+        const forcedToolChoice =
+          documentWideBatchEditorIntent && !isThinkingModel
+            ? forceToolChoice(documentWideSnapshotRead ? 'editor_apply_transaction' : 'editor_get_state')
+            : baseToolChoice
         const stream = await this.recoveryManager.withRetry(() =>
           client.chat.completions.create(withFastAiRequestOptions({
             model: aiConfig?.model || '',
@@ -1038,7 +1052,7 @@ export class AgentRuntime {
             temperature: aiConfig?.temperature,
             top_p: aiConfig?.topP,
             tools: openAITools,
-            tool_choice: toolChoice,
+            tool_choice: forcedToolChoice,
             stream: true,
             ...getChatTokenLimitParams(aiConfig),
           }, aiConfig), {
