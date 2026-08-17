@@ -254,12 +254,22 @@ export class AgentHandler {
 
     try {
       await skillsStore.initSkills()
-      const enabledSkills = await skillManager.getEnabledSkills()
-      return enabledSkills.map((skill) => ({
+      let enabledSkills = await skillManager.getEnabledSkills()
+      // 容错：skillManager 可能因初始化时机早于目录就绪而加载为空，
+      // 显式重新发现一次再取（内置 skill 在全局目录，正常应在首次就绪）
+      if (enabledSkills.length === 0) {
+        await skillManager.reload()
+        enabledSkills = await skillManager.getEnabledSkills()
+      }
+      const result = enabledSkills.map((skill) => ({
         id: skill.metadata.id,
         name: skill.metadata.name,
         description: skill.metadata.description,
       }))
+      if (result.length === 0) {
+        console.warn('[Agent Handler] getSkillsInfo: 未发现任何可用 skill（全局目录与工作区均为空或加载失败）')
+      }
+      return result
     } catch (error) {
       console.error('[Agent Handler] Failed to load skills:', error)
       return []

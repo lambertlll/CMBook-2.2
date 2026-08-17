@@ -544,6 +544,13 @@ function getForcedActionTool(context: AgentContextSnapshot) {
     return undefined
   }
 
+  // 用户明确要求使用技能（skill）时，不强制任何工具——技能工作流需要
+  // 完整工具集（skill_load 加载指令、note_* 检索/读写、web_* 联网补充），
+  // 强制成单个写工具会导致技能无法执行（模型报"无 skill 加载工具/无法联网"）
+  if (hasExplicitSkillIntent(context.userInput)) {
+    return undefined
+  }
+
   const forcedWriteTool = getForcedWriteTool(context)
   if (forcedWriteTool) {
     return forcedWriteTool
@@ -562,6 +569,13 @@ function getForcedActionTool(context: AgentContextSnapshot) {
   }
 
   return undefined
+}
+
+/** 判断用户是否明确要求使用技能（"使用 xxx skill / 按 skill / 用技能"） */
+function hasExplicitSkillIntent(userInput: string) {
+  return /使用\s+[\w-]+\s+skill|请使用\s+[\w-]+\s+skill|按.{0,8}skill.{0,8}执行|使用技能|调用技能|用\s+[\w-]+\s+技能/i.test(
+    userInput
+  )
 }
 
 function isCurrentEditorWriteIntent(context: AgentContextSnapshot) {
