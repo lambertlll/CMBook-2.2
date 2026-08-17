@@ -122,7 +122,7 @@
 /* 基础样式 - 包含主题变量定义 */
 @layer base {
   :root {
-    /* CMBook 招本 商务蓝主题（浅色） */
+    /* CMBook 招悟 商务蓝主题（浅色） */
     --background: 210 25% 98%;
     --foreground: 222 47% 11%;
     --card: 0 0% 100%;
@@ -175,7 +175,7 @@
   }
 
   .dark {
-    /* CMBook 招本 商务蓝主题（暗色） */
+    /* CMBook 招悟 商务蓝主题（暗色） */
     --background: 222 47% 7%;
     --foreground: 210 40% 96%;
     --card: 222 40% 10%;

@@ -13,7 +13,7 @@
     "window": "窗口",
     "pinToggle": "置顶/取消置顶",
     "hideWindow": "隐藏到托盘",
-    "quit": "退出 招本"
+    "quit": "退出 招悟"
   },
   "settings": {
     "defaultModels": {
@@ -349,7 +349,7 @@
       "runtimeManualOnly": "当前平台暂不支持自动安装该运行时，请手动安装后重新检查。",
       "installRuntime": "安装运行时",
       "runtimeInstallTitle": "安装运行时",
-      "runtimeInstallDesc": "确认后，招本 将执行以下安装命令。",
+      "runtimeInstallDesc": "确认后，招悟 将执行以下安装命令。",
       "runtimeInstallPreparing": "准备安装",
       "runtimeInstallRunning": "安装中",
       "runtimeInstallCompleted": "安装完成",
@@ -730,7 +730,7 @@
       "resourcesTitle": "资源与支持",
       "resourcesDesc": "查看文档、版本记录，或进入社区反馈问题。",
       "licenseText": "开源项目 · GitHub · GPL-3.0",
-      "version": "招本 v{version}",
+      "version": "招悟 v{version}",
       "checkReleases": "查询历史版本",
       "language": "语言",
       "sections": {
@@ -740,7 +740,7 @@
         },
         "donation": {
           "title": "捐赠支持",
-          "desc": "如果 招本 对你有帮助，可以通过捐赠支持项目持续维护。"
+          "desc": "如果 招悟 对你有帮助，可以通过捐赠支持项目持续维护。"
         },
         "docs": {
           "title": "文档与配置",
@@ -767,7 +767,7 @@
           "desc": "配置 Git、S3 和 WebDAV 同步。"
         },
         "donate": {
-          "title": "支持 招本",
+          "title": "支持 招悟",
           "buttonName": "捐赠",
           "desc": "前往捐赠页面支持项目。"
         },
@@ -1425,7 +1425,7 @@
     },
     "shortcuts": {
       "title": "快捷键",
-      "desc": "在这里，你可以配置快捷键，帮助你更高效地使用 招本。",
+      "desc": "在这里，你可以配置快捷键，帮助你更高效地使用 招悟。",
       "resetDefaults": "重置",
       "clear": "清空",
       "noShortcut": "未设置",
@@ -1434,7 +1434,7 @@
       "conflictGlobal": "与全局快捷键「{name}」冲突",
       "globalShortcuts": {
         "title": "全局快捷键",
-        "desc": "这些快捷键由系统注册，招本 不在前台时也可能触发。"
+        "desc": "这些快捷键由系统注册，招悟 不在前台时也可能触发。"
       },
       "editorShortcuts": {
         "title": "编辑器快捷键",
@@ -2700,7 +2700,7 @@
         "empty": "暂无最近编辑的笔记",
         "today": "今天"
       },
-      "defaultName": "招本"
+      "defaultName": "招悟"
     },
     "noteToCustomer": {
       "archiveToCustomer": "归入客户知识库",
@@ -2740,7 +2740,7 @@
     },
     "emptyState": {
       "title": "开始创作",
-      "subtitle": "招本，记录招行智慧",
+      "subtitle": "招悟，记录招行智慧",
       "tip": "💡 提示：你也可以从左侧文件管理器中选择文件",
       "startMeeting": {
         "title": "开始会议",
@@ -2766,14 +2766,14 @@
       },
       "onboarding": {
         "title": "新手引导",
-        "subtitle": "跟着这两步体验 招本 的核心工作流。",
+        "subtitle": "跟着这两步体验 招悟 的核心工作流。",
         "dismiss": "跳过新手引导",
         "reopen": "重新显示新手引导",
         "start": "开始引导",
         "viewHint": "查看提示",
         "continue": "继续下一步",
         "completed": "已完成",
-        "allDone": "新手任务已全部完成，你已经体验了 招本 的基础工作流。",
+        "allDone": "新手任务已全部完成，你已经体验了 招悟 的基础工作流。",
         "stepLabel": "任务 ({current}/{total})",
         "stepCompletedLabel": "已完成任务 ({current}/{total})",
         "afterOrganizeDialog": {

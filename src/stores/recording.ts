@@ -101,7 +101,7 @@ const useRecordingStore = create<RecordingState>((set, get) => ({
       // 根据错误类型提供更具体的错误信息
       if (error instanceof DOMException) {
         if (error.name === 'NotAllowedError') {
-          throw new Error('麦克风权限被拒绝，请在系统设置中允许招本访问麦克风')
+          throw new Error('麦克风权限被拒绝，请在系统设置中允许招悟访问麦克风')
         } else if (error.name === 'NotFoundError') {
           throw new Error('未检测到麦克风设备，请连接麦克风后重试')
         } else if (error.name === 'NotReadableError') {

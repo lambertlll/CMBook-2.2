@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>CMBook 招悟 · 产品一页介绍</title>
+<style>
+  @page { size: 1280px 720px; margin: 0; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#EDEAE3; font-family:"PingFang SC","Microsoft YaHei",-apple-system,sans-serif; display:flex; align-items:center; justify-content:center; min-height:100vh; }
+  .slide { width:1280px; height:720px; background:#FCFBF8; position:relative; overflow:hidden; display:flex; flex-direction:column; }
+  .serif { font-family:"Songti SC","SimSun","Noto Serif SC",serif; }
+  .lbl { font-size:10.5px; color:#9E2A2B; letter-spacing:.2em; margin-bottom:8px; }
+
+  /* 页头 */
+  .hd { padding:22px 40px 0; display:flex; justify-content:space-between; align-items:flex-end; }
+  .logo { width:38px;height:38px;background:#9E2A2B;display:flex;align-items:center;justify-content:center;color:#FCFBF8;font-size:19px; }
+  .rule { height:2px; background:#232323; margin:11px 40px 0; }
+
+  /* 数字带 */
+  .band { margin:15px 40px 0; background:#232323; display:grid; grid-template-columns:1.15fr 1fr 1fr 1.05fr; }
+  .bcell { padding:11px 16px; border-right:1px solid #3D3D3D; }
+  .bcell:last-child { border-right:none; }
+  .bcell .t { font-size:10px; color:#A39A86; letter-spacing:.08em; }
+  .bcell .n { color:#FCFBF8; margin-top:2px; }
+  .bcell .n b { font-size:23px; font-weight:500; }
+  .bcell .n span { font-size:11px; color:#CFC7B0; margin-left:3px; }
+  .bcell .s { font-size:9.5px; color:#8C8578; margin-top:1px; }
+
+  /* 流程 */
+  .flow { margin:14px 40px 0; display:grid; grid-template-columns:repeat(4,1fr); gap:0; }
+  .step { position:relative; padding:0 15px 0 0; }
+  .step:not(:last-child)::after { content:""; position:absolute; right:6px; top:11px; width:0;height:0; border-left:5px solid #C7BFA9; border-top:4px solid transparent; border-bottom:4px solid transparent; }
+  .stag { display:flex; align-items:center; gap:6px; margin-bottom:7px; }
+  .snum { width:17px;height:17px;background:#9E2A2B;color:#FCFBF8;font-size:10px;display:flex;align-items:center;justify-content:center; }
+  .stt { font-size:14px; color:#232323; font-weight:600; letter-spacing:.04em; }
+  .sbox { background:#F6F4EF; border-top:2px solid #9E2A2B; padding:9px 11px; }
+  .sbox p { font-size:10.5px; color:#6E6A5F; line-height:1.6; }
+  .sbox p.k { color:#232323; }
+  .tm { margin-top:7px; padding-top:6px; border-top:1px solid #E4E0D7; display:flex; align-items:baseline; gap:5px; font-size:10.5px; }
+  .tm .o { color:#A39A86; text-decoration:line-through; }
+  .tm .arw { color:#CFC7B0; }
+  .tm .nn { color:#9E2A2B; font-weight:600; font-size:12px; }
+  .tm .pc { margin-left:auto; color:#9E2A2B; font-size:10px; }
+
+  /* 下半栏 */
+  .low { flex:1; margin:15px 40px 0; display:grid; grid-template-columns:1.62fr 1fr; gap:26px; min-height:0; }
+  .hl { background:#F6F4EF; padding:9px 11px; border-left:2px solid #9E2A2B; }
+  .hl h4 { font-size:12px; color:#232323; font-weight:600; margin-bottom:3px; }
+  .hl p { font-size:10px; color:#6E6A5F; line-height:1.55; }
+  .kv { display:flex; justify-content:space-between; padding:4.5px 0; border-bottom:1px solid #E4E0D7; font-size:11px; }
+  .kv b { color:#232323; font-weight:600; }
+  .kv span { color:#6E6A5F; }
+
+  .ft { padding:10px 40px 16px; border-top:1px solid #E4E0D7; display:flex; justify-content:space-between; align-items:center; }
+</style>
+</head>
+<body>
+<div class="slide">
+
+  <div class="hd">
+    <div style="display:flex;gap:13px;align-items:center;">
+      <div class="logo serif">招</div>
+      <div>
+        <div style="display:flex;gap:9px;align-items:baseline;">
+          <h1 class="serif" style="font-size:26px;color:#232323;letter-spacing:.02em;">招悟 CMBook</h1>
+          <span style="font-size:11px;color:#9E2A2B;border:1px solid #9E2A2B;padding:1px 5px;">v2.8.0 已落地</span>
+        </div>
+        <p style="font-size:11.5px;color:#6E6A5F;margin-top:3px;letter-spacing:.04em;">对公客户经理智能拜访工作台 · 让每一次拜访，都成为可继承的资产</p>
+      </div>
+    </div>
+    <div style="text-align:right;">
+      <p class="serif" style="font-size:12px;color:#232323;">把客户经理的时间，还给客户经营</p>
+      <p style="font-size:10px;color:#A39A86;margin-top:3px;">Windows · macOS 单包分发 · 零服务端依赖 · 数据不出终端</p>
+    </div>
+  </div>
+
+  <div class="rule"></div>
+
+  <div class="band">
+    <div class="bcell">
+      <p class="t">单人每周节约事务性时间</p>
+      <p class="n"><b class="serif">6—9</b><span>小时</span></p>
+      <p class="s">按每周 3 次拜访测算，相当于多出近一个工作日</p>
+    </div>
+    <div class="bcell">
+      <p class="t">关键环节效率提升</p>
+      <p class="n"><b class="serif">88%—93%</b></p>
+      <p class="s">单次任务耗时实测对比</p>
+    </div>
+    <div class="bcell">
+      <p class="t">20 人团队年化释放产能</p>
+      <p class="n"><b class="serif">6000+</b><span>小时</span></p>
+      <p class="s">≈ 增配 3—4 名客户经理，不增人力成本</p>
+    </div>
+    <div class="bcell">
+      <p class="t">纪要成稿</p>
+      <p class="n"><b class="serif">2</b><span>分钟内 · 可直接用于授信材料</span></p>
+      <p class="s">双通道机制保障术语、数字、口径还原</p>
+    </div>
+  </div>
+
+  <p class="lbl" style="margin:16px 40px 0;">核心能力 · 一次拜访的完整生命周期，四环自动衔接、无人工搬运</p>
+
+  <div class="flow">
+    <div class="step">
+      <div class="stag"><div class="snum serif">前</div><div class="stt">访前 · 知己知彼</div></div>
+      <div class="sbox">
+        <p class="k">客户尽调助手一键成稿</p>
+        <p>先查本行历史纪要与资料，再补工商、公告、舆情；内部/公开信息逐条标注来源与日期，输出风险提示与问题清单。</p>
+        <div class="tm"><span class="o">1—2 小时</span><span class="arw">→</span><span class="nn">10 分钟</span><span class="pc">↑90%</span></div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="stag"><div class="snum serif">中</div><div class="stt">访中 · 完整记录</div></div>
+      <div class="sbox">
+        <p class="k">录音＋实时转写＋笔记同屏</p>
+        <p>长录音分片秒级落盘，支持暂停续录与异常恢复；实时转写边说边出字，手动笔记随手锚定关键数字与术语。</p>
+        <div class="tm"><span class="o">会后补录 30 分钟</span><span class="arw">→</span><span class="nn">2 分钟</span><span class="pc">↑93%</span></div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="stag"><div class="snum serif">后</div><div class="stt">访后 · 沉淀复用</div></div>
+      <div class="sbox">
+        <p class="k">知识库归档＋授信材料生成</p>
+        <p>纪要自动归档客户知识库（向量＋BM25 混合召回）；一键产出财报分析与审贷会材料，含评委提问预测，可导出 Word。</p>
+        <div class="tm"><span class="o">财报 4 小时</span><span class="arw">→</span><span class="nn">30 分钟</span><span class="pc">↑88%</span></div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="stag"><div class="snum serif">报</div><div class="stt">周报 · 管理闭环</div></div>
+      <div class="sbox">
+        <p class="k">数据自动聚合，一键成稿</p>
+        <p>聚合本周拜访次数、涉及客户、待办完成率与逾期事项，生成三段式周报；管理者一屏掌握团队动态，无需逐人收集。</p>
+        <div class="tm"><span class="o">1 小时</span><span class="arw">→</span><span class="nn">5 分钟</span><span class="pc">↑92%</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="low">
+    <div>
+      <p class="lbl">核心优势与亮点 · HIGHLIGHTS</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div class="hl">
+          <h4>「笔记＋录音转录」双通道纪要（首创）</h4>
+          <p>以客户经理手记为权威锚点反向校正转写，再经分段提炼、银行模板生成、覆盖度自检四步提纯——攻克银行术语／金额／人名的转写失真难题，纪要从「能看的文字稿」升级为「可支撑授信申报的正式纪要」。</p>
+        </div>
+        <div class="hl">
+          <h4>三个银行业务智能体，把个人经验变组织能力</h4>
+          <p>客户尽调、财报分析、审贷会助手内置逾 1,800 行行内方法论与报告模板（含 628 行评委提问预测），强制「先查本行知识库、再补公开信息」，新人也能产出老手水准的材料。</p>
+        </div>
+        <div class="hl">
+          <h4>知识库自生长，轮岗不再归零</h4>
+          <p>每次拜访自动沉淀为可检索的客户认知资产，并被后续 AI 任务复用——拜访越多、认知越厚、报告越准。人员变动时新人即查即用，堵住对公条线最隐性的资产流失。</p>
+        </div>
+        <div class="hl">
+          <h4>本地优先架构，合规即可用</h4>
+          <p>客户档案、录音、纪要、知识库全程不出终端，无行外服务器与上传通道；凭据经系统钥匙串＋AES 加密；AI 写操作逐次审批、来源逐条可溯。单包分发、零运维，装上即生效。</p>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;min-height:0;">
+      <p class="lbl">进展与规划 · PROGRESS</p>
+      <div style="background:#F6F4EF;padding:10px 12px;">
+        <p style="font-size:11px;color:#232323;line-height:1.7;"><b class="serif" style="font-size:12.5px;color:#9E2A2B;">已落地</b>　访前尽调、访中纪要、访后报告、待办跟进、周报汇总五环节全部可用，客户经理真实拜访场景日常使用。</p>
+        <p style="font-size:10.5px;color:#6E6A5F;line-height:1.65;margin-top:6px;">迭代至 v2.8.0，历经 6 次数据库结构演进；已完成周报模块、批量管理、多主题与编辑体验统一。</p>
+      </div>
+      <div style="margin-top:10px;">
+        <div class="kv"><b>工程体量</b><span>前端 ~4.9 万行 · Rust 18 模块</span></div>
+        <div class="kv"><b>STT 通道</b><span>3 条可切换（含真流式）</span></div>
+        <div class="kv"><b>纪要模板</b><span>5 种 · 支持自定义</span></div>
+        <div class="kv" style="border-bottom:none;"><b>推广条件</b><span>可对接行内 AI 网关与搜索源</span></div>
+      </div>
+      <p class="lbl" style="margin-top:11px;">下一步 · NEXT</p>
+      <p style="font-size:10.5px;color:#6E6A5F;line-height:1.65;">对接行内统一网关实现模型调用不出行 · 沉淀行内专属热词词表 · 移动端外勤入口 · 周报升级团队效能仪表盘 · 探索与 CRM／授信系统对接</p>
+    </div>
+  </div>
+
+  <div class="ft">
+    <p style="font-size:10px;color:#A39A86;">领域：数字金融　|　赛道：AI＋批发金融　|　招商银行内部使用</p>
+    <p class="serif" style="font-size:12px;color:#9E2A2B;letter-spacing:.1em;">招悟，记录招行智慧</p>
+  </div>
+
+</div>
+</body>
+</html>

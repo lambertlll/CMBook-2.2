@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>CMBook 招悟 · 产品一页介绍</title>
+<style>
+  @page { size:1280px 720px; margin:0; }
+  :root{
+    --pad:48px; --g:8px;
+    --ink:#232323; --red:#9E2A2B; --paper:#FCFBF8; --tint:#F6F4EF;
+    --line:#E4E0D7; --sub:#6E6A5F; --dim:#A39A86;
+  }
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  body{ background:#EDEAE3; min-height:100vh; display:flex; align-items:center; justify-content:center;
+    font-family:"PingFang SC","Microsoft YaHei",-apple-system,sans-serif; -webkit-font-smoothing:antialiased; }
+  .slide{ width:1280px; height:720px; flex:none; background:var(--paper); overflow:hidden;
+    display:flex; flex-direction:column; padding:24px var(--pad) 0; }
+  .serif{ font-family:"Songti SC","SimSun","Noto Serif SC",serif; }
+  .num{ font-variant-numeric:tabular-nums; font-feature-settings:"tnum" 1; }
+
+  /* 区块标题：统一结构，右侧延长线拉通对齐 */
+  .lbl{ font-size:10.5px; color:var(--red); letter-spacing:.2em; line-height:1;
+    display:flex; align-items:center; gap:10px; height:11px; }
+  .lbl::after{ content:""; flex:1; height:1px; background:var(--line); }
+  .lbl em{ font-style:normal; color:var(--dim); letter-spacing:.04em; }
+
+  /* 页头 */
+  .hd{ display:flex; justify-content:space-between; align-items:center; }
+  .logo{ width:40px; height:40px; background:var(--red); color:var(--paper); font-size:20px;
+    display:flex; align-items:center; justify-content:center; flex:none; }
+  .hd h1{ font-size:26px; color:var(--ink); letter-spacing:.02em; line-height:1; }
+  .badge{ font-size:11px; color:var(--red); border:1px solid var(--red); padding:2px 6px; line-height:1.2; }
+  .rule{ height:2px; background:var(--ink); margin-top:12px; }
+
+  /* 数字带：四等分，每格内三行定高，跨列基线严格对齐 */
+  .band{ margin-top:16px; background:var(--ink); display:grid; grid-template-columns:repeat(4,1fr); }
+  .bc{ padding:12px 18px; border-right:1px solid #3A3A3A; display:flex; flex-direction:column; }
+  .bc:last-child{ border-right:none; }
+  .bc .t{ font-size:10px; color:var(--dim); letter-spacing:.08em; height:12px; line-height:12px; }
+  .bc .n{ height:30px; display:flex; align-items:baseline; gap:4px; color:var(--paper); }
+  .bc .n b{ font-size:24px; font-weight:500; line-height:1; }
+  .bc .n i{ font-style:normal; font-size:11px; color:#CFC7B0; line-height:1; }
+  .bc .s{ font-size:9.5px; color:#8C8578; line-height:1.4; margin-top:auto; }
+
+  /* 流程：四等分 grid + gap，卡片等宽；箭头绝对定位在 gap 中央 */
+  .flow{ margin-top:12px; display:grid; grid-template-columns:repeat(4,1fr); gap:20px; }
+  .step{ position:relative; display:flex; flex-direction:column; }
+  .step:not(:last-child)::after{ content:""; position:absolute; right:-13px; top:38px;
+    width:0; height:0; border-left:6px solid #C7BFA9;
+    border-top:4.5px solid transparent; border-bottom:4.5px solid transparent; }
+  .stag{ display:flex; align-items:center; gap:7px; height:20px; margin-bottom:9px; }
+  .snum{ width:20px; height:20px; background:var(--red); color:var(--paper); font-size:11px;
+    display:flex; align-items:center; justify-content:center; flex:none; }
+  .stt{ font-size:14px; color:var(--ink); font-weight:600; letter-spacing:.03em; line-height:1; }
+  /* 卡片 flex 列 + 定高正文，四张卡底部对照条严格同高 */
+  .sbox{ background:var(--tint); border-top:2px solid var(--red); padding:10px 12px;
+    flex:1; display:flex; flex-direction:column; }
+  .sk{ font-size:11px; color:var(--ink); font-weight:600; line-height:1.5; height:17px; }
+  .sd{ font-size:10.5px; color:var(--sub); line-height:1.62; height:68px; margin-top:3px; }
+  .tm{ margin-top:auto; padding-top:7px; border-top:1px solid var(--line);
+    display:flex; align-items:baseline; gap:5px; font-size:10.5px; }
+  .tm .o{ color:var(--dim); text-decoration:line-through; }
+  .tm .a{ color:#CFC7B0; }
+  .tm .v{ color:var(--red); font-weight:600; font-size:12.5px; }
+  .tm .p{ margin-left:auto; color:var(--red); font-size:10px; }
+
+  /* 下半栏：两栏等高，各栏内部 flex 列，底部自动拉平 */
+  .low{ flex:1; min-height:0; margin-top:18px; display:grid; grid-template-columns:1.62fr 1fr; gap:28px; }
+  .col{ display:flex; flex-direction:column; min-height:0; }
+  .hls{ margin-top:12px; display:grid; grid-template-columns:1fr 1fr; gap:10px; flex:1; }
+  .hl{ background:var(--tint); border-left:2px solid var(--red); padding:10px 12px;
+    display:flex; flex-direction:column; }
+  .hl h4{ font-size:12px; color:var(--ink); font-weight:600; line-height:1.45; height:18px; }
+  .hl p{ font-size:10px; color:var(--sub); line-height:1.6; margin-top:4px; }
+  .kv{ display:flex; justify-content:space-between; align-items:baseline;
+    height:23px; border-bottom:1px solid var(--line); font-size:11px; }
+  .kv:last-child{ border-bottom:none; }
+  .kv b{ color:var(--ink); font-weight:600; }
+  .kv span{ color:var(--sub); }
+
+  .ft{ margin-top:16px; padding:11px 0 18px; border-top:1px solid var(--line);
+    display:flex; justify-content:space-between; align-items:baseline; }
+</style>
+</head>
+<body>
+<div class="slide">
+
+  <div class="hd">
+    <div style="display:flex;gap:14px;align-items:center;">
+      <div class="logo serif">招</div>
+      <div>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <h1 class="serif">招悟 CMBook</h1>
+          <span class="badge num">v2.8.0 已落地</span>
+        </div>
+        <p style="font-size:11.5px;color:var(--sub);letter-spacing:.04em;margin-top:6px;line-height:1;">对公客户经理智能拜访工作台 · 让每一次拜访，都成为可继承的资产</p>
+      </div>
+    </div>
+    <div style="text-align:right;">
+      <p class="serif" style="font-size:13px;color:var(--ink);line-height:1;">把客户经理的时间，还给客户经营</p>
+      <p style="font-size:10px;color:var(--dim);margin-top:7px;line-height:1;">Windows · macOS 单包分发　零服务端依赖　数据不出终端</p>
+    </div>
+  </div>
+
+  <div class="rule"></div>
+
+  <div class="band">
+    <div class="bc">
+      <p class="t">单人每周节约事务性时间</p>
+      <p class="n"><b class="serif num">6—9</b><i>小时</i></p>
+      <p class="s">按每周 3 次拜访测算，相当于多出近一个工作日</p>
+    </div>
+    <div class="bc">
+      <p class="t">关键环节效率提升</p>
+      <p class="n"><b class="serif num">88%—93%</b></p>
+      <p class="s">基于单次任务耗时实测与保守估算</p>
+    </div>
+    <div class="bc">
+      <p class="t">20 人团队年化释放产能</p>
+      <p class="n"><b class="serif num">6000+</b><i>小时</i></p>
+      <p class="s">≈ 增配 3—4 名客户经理，不增人力成本</p>
+    </div>
+    <div class="bc">
+      <p class="t">纪要成稿时间</p>
+      <p class="n"><b class="serif num">2</b><i>分钟内</i></p>
+      <p class="s">双通道机制保障术语、数字、口径还原</p>
+    </div>
+  </div>
+
+  <div style="margin-top:18px;">
+    <p class="lbl">核心能力 <em>一次拜访的完整生命周期，四环自动衔接、无人工搬运</em></p>
+  </div>
+
+  <div class="flow">
+    <div class="step">
+      <div class="stag"><div class="snum serif">前</div><div class="stt">访前 · 知己知彼</div></div>
+      <div class="sbox">
+        <p class="sk">客户尽调助手一键成稿</p>
+        <p class="sd">先查本行历史纪要与资料，再补工商、公告、舆情；内部与公开信息逐条标注来源日期，输出风险提示与问题清单。</p>
+        <div class="tm"><span class="o num">1—2 小时</span><span class="a">→</span><span class="v num">10 分钟</span><span class="p num">↑90%</span></div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="stag"><div class="snum serif">中</div><div class="stt">访中 · 完整记录</div></div>
+      <div class="sbox">
+        <p class="sk">录音、实时转写、笔记同屏</p>
+        <p class="sd">长录音分片秒级落盘，支持暂停续录与异常恢复；实时转写边说边出字，手动笔记随手锚定关键数字与术语。</p>
+        <div class="tm"><span class="o num">补录 30 分钟</span><span class="a">→</span><span class="v num">2 分钟</span><span class="p num">↑93%</span></div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="stag"><div class="snum serif">后</div><div class="stt">访后 · 沉淀复用</div></div>
+      <div class="sbox">
+        <p class="sk">知识库归档＋授信材料生成</p>
+        <p class="sd">纪要自动归档客户知识库（向量＋BM25 混合召回）；一键产出财报分析与审贷会材料，含评委提问预测，可导出 Word。</p>
+        <div class="tm"><span class="o num">财报 4 小时</span><span class="a">→</span><span class="v num">30 分钟</span><span class="p num">↑88%</span></div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="stag"><div class="snum serif">报</div><div class="stt">周报 · 管理闭环</div></div>
+      <div class="sbox">
+        <p class="sk">数据自动聚合，一键成稿</p>
+        <p class="sd">聚合本周拜访次数、涉及客户、待办完成率与逾期事项，生成三段式周报；管理者一屏掌握团队动态，无需逐人收集。</p>
+        <div class="tm"><span class="o num">1 小时</span><span class="a">→</span><span class="v num">5 分钟</span><span class="p num">↑92%</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="low">
+    <div class="col">
+      <p class="lbl">核心优势与亮点 <em>HIGHLIGHTS</em></p>
+      <div class="hls">
+        <div class="hl">
+          <h4>「笔记＋录音转录」双通道纪要</h4>
+          <p>以客户经理手记为权威锚点反向校正转写，再经分段提炼、银行模板生成、覆盖度自检四步提纯——攻克银行术语／金额／人名的转写失真难题，纪要从「能看的文字稿」升级为「可支撑授信申报的正式纪要」。</p>
+        </div>
+        <div class="hl">
+          <h4>三个业务智能体，个人经验变组织能力</h4>
+          <p>客户尽调、财报分析、审贷会助手内置逾 1,800 行行内方法论与报告模板（含 628 行评委提问预测），强制「先查本行知识库、再补公开信息」，新人也能产出老手水准的材料。</p>
+        </div>
+        <div class="hl">
+          <h4>知识库自生长，轮岗不再归零</h4>
+          <p>每次拜访自动沉淀为可检索的客户认知资产，并被后续 AI 任务复用——拜访越多、认知越厚、报告越准。人员变动时新人即查即用，堵住对公条线最隐性的资产流失。</p>
+        </div>
+        <div class="hl">
+          <h4>本地优先架构，合规即可用</h4>
+          <p>客户档案、录音、纪要、知识库全程不出终端，无行外服务器与上传通道；凭据经系统钥匙串＋AES 加密；AI 写操作逐次审批、来源逐条可溯。单包分发、零运维，装上即生效。</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="col">
+      <p class="lbl">进展与规划 <em>PROGRESS</em></p>
+      <div style="margin-top:12px;background:var(--tint);padding:11px 13px;">
+        <p style="font-size:11px;color:var(--ink);line-height:1.7;"><b class="serif" style="font-size:12.5px;color:var(--red);">已落地</b>　访前尽调、访中纪要、访后报告、待办跟进、周报汇总五环节全部可用，客户经理真实拜访场景日常使用。</p>
+        <p style="font-size:10.5px;color:var(--sub);line-height:1.65;margin-top:7px;">迭代至 v2.8.0，历经 6 次数据库结构演进；已完成周报模块、批量管理、多主题与编辑体验统一。</p>
+      </div>
+      <div style="margin-top:11px;">
+        <div class="kv"><b>工程体量</b><span class="num">前端 ~4.9 万行 · Rust 18 模块</span></div>
+        <div class="kv"><b>能力配置</b><span class="num">STT 3 通道 · 纪要模板 5 种</span></div>
+        <div class="kv"><b>推广条件</b><span>可对接行内 AI 网关与搜索源</span></div>
+      </div>
+      <p class="lbl" style="margin-top:auto;">下一步 <em>NEXT</em></p>
+      <p style="font-size:10.5px;color:var(--sub);line-height:1.68;margin-top:9px;">对接行内统一网关实现模型调用不出行 · 沉淀行内专属热词词表 · 移动端外勤入口 · 周报升级团队效能仪表盘 · 探索与 CRM／授信系统对接</p>
+    </div>
+  </div>
+
+  <div class="ft">
+    <p style="font-size:10px;color:var(--dim);">领域：数字金融　|　赛道：AI＋批发金融　|　招商银行内部使用</p>
+    <p class="serif" style="font-size:12px;color:var(--red);letter-spacing:.1em;">招悟，记录招行智慧</p>
+  </div>
+
+</div>
+</body>
+</html>

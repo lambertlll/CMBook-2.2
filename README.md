@@ -1,6 +1,6 @@
 <div align="center">
-  <h1>CMBook（招本）</h1>
-  <p><strong>招本，记录招行智慧 —— 录音 + 笔记 → AI 智能纪要，一站式客户会议管理工具</strong></p>
+  <h1>CMBook（招悟）</h1>
+  <p><strong>招悟，记录招行智慧 —— 录音 + 笔记 → AI 智能纪要，一站式客户会议管理工具</strong></p>
   <p>
     <img alt="Version" src="https://img.shields.io/badge/version-2.8.0-0f766e?style=flat-square">
     <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-ffc131?style=flat-square&logo=tauri&logoColor=111111">
@@ -12,7 +12,7 @@
 
 ## 项目简介
 
-CMBook（招本）是一款面向客户经理的智能会议管理工具，以「录音 → 转写 → AI 纪要 → 客户管理」为核心链路，将会议录音、语音转写、AI 结构化纪要、客户拜访管理、待办追踪和知识库问答融为一体。所有数据本地存储，凭据加密保护，隐私安全可控。
+CMBook（招悟）是一款面向客户经理的智能会议管理工具，以「录音 → 转写 → AI 纪要 → 客户管理」为核心链路，将会议录音、语音转写、AI 结构化纪要、客户拜访管理、待办追踪和知识库问答融为一体。所有数据本地存储，凭据加密保护，隐私安全可控。
 
 ## 核心功能
 

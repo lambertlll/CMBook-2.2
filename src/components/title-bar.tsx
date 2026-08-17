@@ -174,7 +174,7 @@ export function TitleBar({ onSearchClick, onActivityClick, activityOpen = false 
           <span className="paper-seal flex size-5 items-center justify-center self-center rounded-[5px] bg-brand text-[11px] font-semibold leading-none text-brand-foreground">
             招
           </span>
-          <span className="paper-brand-name text-[13px] font-semibold">招本</span>
+          <span className="paper-brand-name text-[13px] font-semibold">招悟</span>
           <span className="text-[12px] font-normal text-muted-foreground">CMBook</span>
           <span className="text-[10px] text-muted-foreground/70">
             · {t('navigation.slogan')}

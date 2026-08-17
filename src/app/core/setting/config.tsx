@@ -97,7 +97,7 @@ export default baseConfig
 
 // D1 设置搜索：常见别名映射（中英文），按 anchor 命中标题/描述之外的常见叫法
 export const settingSearchAliases: Record<string, string[]> = {
-  about: ['关于', '版本', '协议', 'about', 'version', 'license', 'cmbook', '招本', 'notegen'],
+  about: ['关于', '版本', '协议', 'about', 'version', 'license', 'cmbook', '招悟', '招本', 'notegen'],
   general: ['常规', '通用', '主题', '语言', '外观', 'general', 'theme', 'language', 'dark', '暗黑'],
   chat: ['对话', '聊天', '主模型', '工具栏', 'chat', 'primary model', 'toolbar'],
   editor: ['编辑器', '补全', '提交信息', 'editor', 'completion', 'commit'],

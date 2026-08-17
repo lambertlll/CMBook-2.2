@@ -34,7 +34,7 @@ pub fn setup_app(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
                 use tauri_plugin_dialog::DialogExt;
                 let handle = app_handle.clone();
                 let msg = format!(
-                    "您的 macOS 版本为 {}.{}，招本需要 macOS 11 (Big Sur) 或更高版本。\n\n\
+                    "您的 macOS 版本为 {}.{}，招悟需要 macOS 11 (Big Sur) 或更高版本。\n\n\
                      请升级 macOS 系统后重试，或联系管理员更换设备。",
                     major, minor
                 );
