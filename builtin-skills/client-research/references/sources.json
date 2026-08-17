@@ -121,9 +121,9 @@
     "individual": {
       "background": [
         {
-          "name": "LinkedIn",
-          "url": "https://www.linkedin.com",
-          "description": "职业履历",
+          "name": "企查查",
+          "url": "https://www.qcc.com",
+          "description": "职业履历、任职信息、工商关联",
           "priority": 1
         },
         {
@@ -189,14 +189,14 @@
         "[公司名] 法定代表人"
       ],
       "financial": [
-        "[公司名] 财报 2026",
+        "[公司名] 财报 最近年度",
         "[公司名] 年报",
         "[公司名] 营收",
         "[公司名] 业绩"
       ],
       "news": [
         "[公司名] 最新消息",
-        "[公司名] 2026",
+        "[公司名] 本年度",
         "[公司名] 新闻"
       ],
       "management": [

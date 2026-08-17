@@ -138,7 +138,7 @@ Examples:
       if (!embedding) {
         return {
           success: false,
-          error: 'Cannot generate vector embedding, please check embedding model configuration',
+          error: '无法生成向量嵌入（embedding），请检查设置中的嵌入模型配置（Embedding 模型与 API Key），或改用未启用向量索引的模式',
         }
       }
 

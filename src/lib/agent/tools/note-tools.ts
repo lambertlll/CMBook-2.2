@@ -684,6 +684,10 @@ export const searchMarkdownFilesTool: Tool = {
 **IMPORTANT - Only use when user EXPLICITLY requests search**:
 - ✅ CORRECT: User says "搜索关于React的笔记" / "查找包含xxx的内容" / "帮我找找"
 - ❌ WRONG: User asks a question without explicitly asking to search (e.g., "What is React?" without asking to search)
+- ⚠️ EXCEPTION: When running a Skill whose workflow requires local knowledge base lookup first
+  (e.g. client-research / credit-committee-assistant / financial-report-analyzer), searching the
+  local library is a REQUIRED step of that workflow — use this tool as the skill instructs,
+  even if the user did not explicitly say "search".
 
 Two modes:
 - keyword (default): Fast exact matching for specific terms like "useState", "React", "API"
