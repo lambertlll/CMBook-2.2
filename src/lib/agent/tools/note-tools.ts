@@ -423,9 +423,15 @@ export const createFileTool: Tool = {
   },
 }
 
+/** 解析 Markdown 标题层级（"## 经营分析" → 2），非标题返回 0 */
+function matchHeadingLevel(line: string): number {
+  const m = /^(#{1,6})\s+/.exec(line.trim())
+  return m ? m[1].length : 0
+}
+
 export const updateMarkdownFileTool: Tool = {
   name: 'update_markdown_file',
-  description: 'Update the content of a Markdown note file. Optionally provide `expectedModifiedAt` to avoid overwriting a file that changed since it was last read.',
+  description: 'Update the content of a Markdown note file. Optionally provide `expectedModifiedAt` to avoid overwriting a file that changed since it was last read. For large files, provide `section` (Markdown heading text, e.g. "## 经营分析") or `startLine`/`endLine` (1-based line range) to patch only part of the file instead of replacing the whole content.',
   category: 'note',
   requiresConfirmation: true,
   parameters: [
@@ -440,6 +446,24 @@ export const updateMarkdownFileTool: Tool = {
       type: 'string',
       description: 'New content (Markdown format)',
       required: true,
+    },
+    {
+      name: 'section',
+      type: 'string',
+      description: 'Optional: replace the section starting with this Markdown heading (e.g. "## 经营分析") up to the next same-or-higher-level heading, keeping the rest of the file intact',
+      required: false,
+    },
+    {
+      name: 'startLine',
+      type: 'number',
+      description: 'Optional: 1-based start line of the range to replace (must be used with endLine)',
+      required: false,
+    },
+    {
+      name: 'endLine',
+      type: 'number',
+      description: 'Optional: 1-based end line of the range to replace, inclusive (must be used with startLine)',
+      required: false,
     },
     {
       name: 'expectedModifiedAt',
@@ -483,13 +507,78 @@ export const updateMarkdownFileTool: Tool = {
         }
       }
 
-      if (baseDir) {
-        await writeTextFile(path, params.content, { baseDir })
-      } else {
-        await writeTextFile(path, params.content)
+      // 局部更新：section / startLine+endLine 定位，避免大文档整篇重传
+      const hasRange = (params.startLine != null && params.endLine != null)
+      let finalContent = params.content
+      if (params.section || hasRange) {
+        const { readTextFile } = await import('@tauri-apps/plugin-fs')
+        const existingContent = baseDir
+          ? await readTextFile(path, { baseDir })
+          : await readTextFile(path)
+        const lines = existingContent.split('\n')
+        let startIdx = -1
+        let endIdx = -1
+
+        if (params.section) {
+          // 按标题定位：找到 section 标题行，替换到下一个同级或更高级标题之前
+          const headingLevel = matchHeadingLevel(params.section)
+          for (let i = 0; i < lines.length; i++) {
+            const line = lines[i]
+            if (startIdx < 0 && line.trim() === params.section.trim()) {
+              startIdx = i
+              continue
+            }
+            if (startIdx >= 0) {
+              const nextLevel = matchHeadingLevel(line)
+              if (nextLevel !== 0 && nextLevel <= headingLevel) {
+                endIdx = i - 1
+                break
+              }
+            }
+          }
+          if (startIdx >= 0 && endIdx < 0) {
+            endIdx = lines.length - 1
+          }
+          if (startIdx < 0) {
+            return {
+              success: false,
+              error: `未找到标题 "${params.section}"，已取消更新（检查标题文本是否完全一致）`,
+            }
+          }
+        } else if (hasRange) {
+          const startLine = Number(params.startLine)
+          const endLine = Number(params.endLine)
+          if (startLine < 1 || endLine < startLine || endLine > lines.length) {
+            return {
+              success: false,
+              error: `行号范围无效: ${startLine}-${endLine}（文件共 ${lines.length} 行）`,
+            }
+          }
+          startIdx = startLine - 1
+          endIdx = endLine - 1
+        }
+
+        // 替换目标区间的行（section 模式保留标题行本身，替换其下方内容）
+        const replacement = params.content
+        const contentLines = replacement.split('\n')
+        const before = lines.slice(0, params.section ? startIdx + 1 : startIdx)
+        const after = lines.slice(endIdx + 1)
+        const newLines = [
+          ...before,
+          ...contentLines,
+          ...after,
+        ]
+        // 清理可能的空行重复：移除紧邻的空行（若替换内容以空行结尾）
+        finalContent = newLines.join('\n').replace(/\n{3,}/g, '\n\n')
       }
 
-      const updatedContent = typeof params.content === 'string' ? params.content : String(params.content ?? '')
+      if (baseDir) {
+        await writeTextFile(path, finalContent, { baseDir })
+      } else {
+        await writeTextFile(path, finalContent)
+      }
+
+      const updatedContent = typeof finalContent === 'string' ? finalContent : String(finalContent ?? '')
       const articleStore = useArticleStore.getState()
       emitter.emit('editor-file-content-updated', {
         path: normalizedFilePath,
