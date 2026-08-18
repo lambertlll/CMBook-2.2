@@ -64,7 +64,13 @@ export function UnsupportedFile({ filePath }: UnsupportedFileProps) {
           createdAt: fileStat.birthtime?.getTime() || null
         })
       } catch (error) {
-        console.error('Failed to get file metadata:', error)
+        // 文件不存在（新建被取消/输入被清空等瞬态）时静默降级，不刷错误日志：
+        // UnsupportedFile 的元信息仅用于展示，缺失不影响其他功能
+        if (String(error).includes('os error 2') || String(error).includes('not found')) {
+          console.warn('[UnsupportedFile] 文件不存在（可能已取消创建）:', filePath)
+        } else {
+          console.error('Failed to get file metadata:', error)
+        }
       } finally {
         setLoading(false)
       }
