@@ -955,17 +955,18 @@ const useArticleStore = create<NoteState>((set, get) => ({
   // 按需加载文件统计信息（仅在需要排序时）
   loadFileStatsIfNeeded: async () => {
     const fileTree = get().fileTree
-    
-    // 检查是否已加载过统计信息（检查第一个文件）
-    const hasStats = fileTree.some(entry => 
-      entry.isFile && (entry.createdAt !== undefined || entry.modifiedAt !== undefined)
+
+    // 检查是否存在缺少统计信息的本地文件（loadFileTree 每次重建树后 modifiedAt 全丢，
+    // 若只判断"是否加载过"会导致新建/修改文件永远补不上时间 → 排不到最前）
+    const missingStats = fileTree.some(
+      (entry) => entry.isFile && entry.isLocale && entry.createdAt === undefined && entry.modifiedAt === undefined
     )
-    
-    if (hasStats) {
-      // 已经加载过，无需重复加载
+
+    if (!missingStats) {
+      // 所有文件已有统计信息，无需重复加载
       return
     }
-    
+
     // 加载统计信息
     const workspace = await getWorkspacePath()
     // 使用正确的基础路径
