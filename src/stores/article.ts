@@ -933,10 +933,9 @@ const useArticleStore = create<NoteState>((set, get) => ({
             const filePath = await join(basePath, entry.name)
             fileStat = await stat(filePath)
           } else {
-            // 默认工作区：basePath 形如 "article"（工作区相对路径），
-            // 直接交给 getFilePathOptions 解析（内部拼 article/ + AppData baseDir），
-            // 不要先拼绝对路径再 toWorkspaceRelativePath 转回——绝对路径转换会失败
-            // 导致 stat 抛错被静默吞掉，modifiedAt 永远补不上（排序失效的根因）
+            // 默认工作区：basePath 为空串，relPath = entry.name（不含 article 前缀），
+            // getFilePathOptions 内部会拼 article/ + AppData baseDir。
+            // 不能传带 article 前缀的路径——会拼成 article/article/xxx 双重前缀。
             const relPath = await join(basePath, entry.name)
             const pathOptions = await getFilePathOptions(relPath)
             fileStat = await stat(pathOptions.path, { baseDir: pathOptions.baseDir })
@@ -944,8 +943,11 @@ const useArticleStore = create<NoteState>((set, get) => ({
           entry.createdAt = fileStat.birthtime?.toISOString()
           entry.modifiedAt = fileStat.mtime?.toISOString()
           entry.size = fileStat.size
-        } catch {
-          // 静默失败，不阻塞排序功能
+        } catch (err) {
+          // 静默失败，不阻塞排序功能（但记录便于排查：排序异常多为 stat 路径问题）
+          if (entry.isFile && entry.isLocale) {
+            console.warn('[updateFileStats] stat 失败:', entry.name, err)
+          }
         }
       } else if (entry.isDirectory && entry.children) {
         const dirPath = await join(basePath, entry.name)
@@ -972,10 +974,10 @@ const useArticleStore = create<NoteState>((set, get) => ({
 
     // 加载统计信息
     const workspace = await getWorkspacePath()
-    // 基础路径：自定义工作区用绝对路径；默认工作区用相对形式 "article"
-    // （updateFileStats 默认分支依赖 getFilePathOptions(相对路径) 解析，
-    //   传 appDataDir()/article 绝对路径会导致转换失败、stats 补不上）
-    const basePath = workspace.isCustom ? workspace.path : 'article'
+    // 基础路径：自定义工作区用绝对路径；默认工作区用空字符串
+    // （getFilePathOptions 会自己拼 "article/" 前缀，若此处传 "article"
+    //   会导致 article/article/xxx 双重前缀，stat 失败、stats 补不上）
+    const basePath = workspace.isCustom ? workspace.path : ''
     await get().updateFileStats(basePath, fileTree)
     // 统计加载后重新排序（'none' 默认分支按修改时间倒序，需要 modifiedAt 就绪后重排）
     const sortedTree = get().sortFileTree(fileTree)
