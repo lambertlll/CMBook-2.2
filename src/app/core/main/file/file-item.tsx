@@ -594,6 +594,24 @@ export function FileItem({
           } else {
             await writeTextFile(pathOptions.path, '', { baseDir: pathOptions.baseDir })
           }
+
+          // 新建文件写入成功：给缓存树节点补上修改时间并按当前排序规则重排，
+          // 否则节点 modifiedAt 为 undefined，"按修改时间倒序"（默认 none 分支）
+          // 会把它排到末尾（用户反馈"新建文档排不到最前"的根因之一）
+          const freshTree = cloneDeep(useArticleStore.getState().fileTree)
+          const freshFile = targetRelativePath.includes('/')
+            ? (() => {
+                const folder = getCurrentFolder(targetRelativePath, freshTree)
+                const fname = targetRelativePath.split('/').pop()
+                return folder?.children?.find((f: DirTree) => f.name === fname)
+              })()
+            : freshTree.find((f) => f.name === targetRelativePath)
+          if (freshFile) {
+            const now = new Date().toISOString()
+            freshFile.modifiedAt = now
+            if (!freshFile.createdAt) freshFile.createdAt = now
+          }
+          setFileTree(freshTree)
         }
       }
       

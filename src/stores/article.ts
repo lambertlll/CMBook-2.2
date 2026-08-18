@@ -2329,48 +2329,67 @@ const useArticleStore = create<NoteState>((set, get) => ({
           return
         }
 
-        // 更新缓存树
-        if (!isLocale) {
-          const cacheTree = cloneDeep(get().fileTree)
-          const current = savePath.includes('/') ? getCurrentFolder(savePath, cacheTree) : cacheTree.find(item => item.name === savePath)
-          if (current) {
-            current.isLocale = true
+        // 更新缓存树：刷新刚保存文件的修改时间并重排（无论 isLocale 与否，
+        // 新建文件 isLocale 已为 true 也要更新时间戳——否则排不到最前）
+        const cacheTree = cloneDeep(get().fileTree)
+        let current: DirTree | undefined
+        if (savePath.includes('/')) {
+          const parentFolder = getCurrentFolder(savePath, cacheTree)
+          const fileName = savePath.split('/').pop()
+          current = parentFolder?.children?.find((item) => item.name === fileName)
+        } else {
+          current = cacheTree.find((item) => item.name === savePath)
+        }
+        if (current) {
+          // 保存后立即刷新该文件的修改时间——"按修改时间倒序"（默认 'none' 分支）
+          // 依赖此字段，不刷新则本次修改/新建看不到排序变化
+          current.modifiedAt = new Date().toISOString()
+          if (!current.createdAt) {
+            current.createdAt = current.modifiedAt
+          }
+        }
 
-            // 更新父文件夹链的 isLocale 状态
-            const updateParentFolders = async (node: DirTree | undefined) => {
-              let parent = node
-              const pathParts = savePath.split('/')
-              let currentDepth = pathParts.length - 1
+        if (!isLocale && current) {
+          current.isLocale = true
 
-              while (parent && currentDepth > 0) {
-                if (parent.isLocale) {
-                  break
-                }
-                const parentPath = pathParts.slice(0, currentDepth).join('/')
-                const parentOptions = await getFilePathOptions(parentPath)
-                let parentExists = false
-                try {
-                  if (!parentOptions.baseDir) {
-                    parentExists = await exists(parentOptions.path)
-                  } else {
-                    parentExists = await exists(parentOptions.path, { baseDir: parentOptions.baseDir })
-                  }
-                } catch {
-                  parentExists = false
-                }
-                if (parentExists) {
-                  parent.isLocale = true
-                  parent = parent.parent
-                  currentDepth--
+          // 更新父文件夹链的 isLocale 状态
+          const updateParentFolders = async (node: DirTree | undefined) => {
+            let parent = node
+            const pathParts = savePath.split('/')
+            let currentDepth = pathParts.length - 1
+
+            while (parent && currentDepth > 0) {
+              if (parent.isLocale) {
+                break
+              }
+              const parentPath = pathParts.slice(0, currentDepth).join('/')
+              const parentOptions = await getFilePathOptions(parentPath)
+              let parentExists = false
+              try {
+                if (!parentOptions.baseDir) {
+                  parentExists = await exists(parentOptions.path)
                 } else {
-                  break
+                  parentExists = await exists(parentOptions.path, { baseDir: parentOptions.baseDir })
                 }
+              } catch {
+                parentExists = false
+              }
+              if (parentExists) {
+                parent.isLocale = true
+                parent = parent.parent
+                currentDepth--
+              } else {
+                break
               }
             }
-
-            await updateParentFolders(current.parent)
           }
-          set({ fileTree: cacheTree })
+
+          await updateParentFolders(current.parent)
+        }
+
+        // 保存后重排：按当前排序规则（默认 'none' 按修改时间倒序）把刚保存的文件排到最前
+        if (current) {
+          set({ fileTree: get().sortFileTree(cacheTree) })
         }
 
         // 触发防抖向量计算
