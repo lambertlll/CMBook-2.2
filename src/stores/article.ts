@@ -922,19 +922,22 @@ const useArticleStore = create<NoteState>((set, get) => ({
   fileTreeLoading: false,
   updateFileStats: async (basePath: string, tree: DirTree[]) => {
     const workspace = await getWorkspacePath()
-    
+
     for (const entry of tree) {
       // 跳过非本地文件（远程同步文件）
       if (entry.isFile && entry.isLocale) {
-        const filePath = await join(basePath, entry.name)
         try {
           let fileStat
           if (workspace.isCustom) {
-            // 自定义工作区，使用绝对路径
+            // 自定义工作区：basePath 即工作区绝对路径，直接拼绝对路径 stat
+            const filePath = await join(basePath, entry.name)
             fileStat = await stat(filePath)
           } else {
-            // 默认工作区，使用AppData路径
-            const relPath = await toWorkspaceRelativePath(filePath)
+            // 默认工作区：basePath 形如 "article"（工作区相对路径），
+            // 直接交给 getFilePathOptions 解析（内部拼 article/ + AppData baseDir），
+            // 不要先拼绝对路径再 toWorkspaceRelativePath 转回——绝对路径转换会失败
+            // 导致 stat 抛错被静默吞掉，modifiedAt 永远补不上（排序失效的根因）
+            const relPath = await join(basePath, entry.name)
             const pathOptions = await getFilePathOptions(relPath)
             fileStat = await stat(pathOptions.path, { baseDir: pathOptions.baseDir })
           }
@@ -969,8 +972,10 @@ const useArticleStore = create<NoteState>((set, get) => ({
 
     // 加载统计信息
     const workspace = await getWorkspacePath()
-    // 使用正确的基础路径
-    const basePath = workspace.isCustom ? workspace.path : await join(await appDataDir(), 'article')
+    // 基础路径：自定义工作区用绝对路径；默认工作区用相对形式 "article"
+    // （updateFileStats 默认分支依赖 getFilePathOptions(相对路径) 解析，
+    //   传 appDataDir()/article 绝对路径会导致转换失败、stats 补不上）
+    const basePath = workspace.isCustom ? workspace.path : 'article'
     await get().updateFileStats(basePath, fileTree)
     // 统计加载后重新排序（'none' 默认分支按修改时间倒序，需要 modifiedAt 就绪后重排）
     const sortedTree = get().sortFileTree(fileTree)
