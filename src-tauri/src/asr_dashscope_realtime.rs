@@ -33,6 +33,7 @@ use tokio_tungstenite::{
     connect_async,
     tungstenite::{client::IntoClientRequest, http::HeaderValue, Message},
 };
+use tokio_util::bytes::Bytes;
 
 /// 模型名（固定，文档"连接端点"章节通过 model 查询参数指定）
 const MODEL: &str = "qwen3-asr-flash-realtime";
@@ -343,7 +344,7 @@ pub async fn dashscope_asr_connect(
                 }
                 _ = ping_interval.tick() => {
                     // 忽略首次立即 tick（interval 首拍立即触发），后续每 30s 一次
-                    if sink.send(Message::Ping(vec![])).await.is_err() {
+                    if sink.send(Message::Ping(Bytes::new())).await.is_err() {
                         break;
                     }
                 }
