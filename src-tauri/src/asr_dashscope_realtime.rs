@@ -38,6 +38,8 @@ use tokio_tungstenite::{
 const MODEL: &str = "qwen3-asr-flash-realtime";
 /// 连接握手与 session.created/session.updated 确认的超时
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
+/// WS 心跳间隔：长时会议（30 分钟+）下保持连接活跃，避免被服务端/中间层 RST
+const WS_PING_INTERVAL: Duration = Duration::from_secs(30);
 /// finish 等待 session.finished 的超时（服务端收尾一般较快，留足余量）
 const FINISH_TIMEOUT: Duration = Duration::from_secs(60);
 
@@ -322,11 +324,29 @@ pub async fn dashscope_asr_connect(
     let (tx, mut rx) = mpsc::unbounded_channel::<Message>();
     let (done_tx, done_rx) = watch::channel(false);
 
-    // writer 任务：独占 sink，转发写通道消息；通道关闭后主动关闭连接
+    // writer 任务：独占 sink，转发写通道消息；每 30s 发送一次 Ping 保活
+    // （长时会议录音下连接持续 30 分钟以上，无心跳会被服务端/中间层判定
+    //   非活跃而 RST 断开——用户实测 19/35 分钟均出现 IO error 断连）
     tokio::spawn(async move {
-        while let Some(msg) = rx.recv().await {
-            if sink.send(msg).await.is_err() {
-                break;
+        let mut ping_interval = tokio::time::interval(WS_PING_INTERVAL);
+        loop {
+            tokio::select! {
+                msg = rx.recv() => {
+                    match msg {
+                        Some(msg) => {
+                            if sink.send(msg).await.is_err() {
+                                break;
+                            }
+                        }
+                        None => break, // 通道关闭（会话结束）
+                    }
+                }
+                _ = ping_interval.tick() => {
+                    // 忽略首次立即 tick（interval 首拍立即触发），后续每 30s 一次
+                    if sink.send(Message::Ping(vec![])).await.is_err() {
+                        break;
+                    }
+                }
             }
         }
         let _ = sink.close().await;

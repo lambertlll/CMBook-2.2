@@ -39,6 +39,7 @@ export interface Meeting {
   visitId: string // 关联拜访 ID（2.0 新增，空串表示未关联）
   exportedFilePath: string // 纪要导出到客户知识库的文件相对路径（空串表示未导出）
   pendingTranscribe: boolean // true=离线结束待联网补转写（P1-2：独立字段，替代 error 文案匹配）
+  summaryUncertainties?: string // 低置信度黄标核对项 JSON 数组（空串=已核对完；切换标签/会议后恢复用）
   hasSummary: number // 是否已有纪要（列表查询的轻量标记 0/1，不读 summary 大字段；不持久化）
   createdAt: number // timestamp
   transcribeProgress: number // 仅运行时使用，不持久化

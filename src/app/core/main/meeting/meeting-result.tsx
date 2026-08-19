@@ -678,6 +678,32 @@ function SummaryEditor({ meeting }: { meeting: Meeting }) {
     lastContentRef.current = meeting.summary
   }, [meeting.summary, editor])
 
+  // S1：恢复持久化的低置信度黄标——切换标签/会议后组件重建，从 DB 恢复
+  // 未核对完的标记（summaryUncertainties），直到用户点击"清除标记"才消失
+  useEffect(() => {
+    if (!editor) return
+    if (!meeting.summaryUncertainties) return
+    try {
+      const saved = JSON.parse(meeting.summaryUncertainties) as SummaryUncertainty[]
+      if (!Array.isArray(saved) || saved.length === 0) return
+      // 在 ProseMirror doc 上重新定位每个可疑项（与 runUncertaintyCheck 相同逻辑）
+      const located: Array<{ from: number; to: number; item: SummaryUncertainty }> = []
+      for (const item of saved) {
+        const pos = locateUncertaintyInDoc(editor.state.doc, item.fragment)
+        if (pos) {
+          located.push({ ...pos, item })
+        }
+      }
+      setUncertaintyDecorations(editor, located)
+      setUncertainties(saved)
+    } catch (err) {
+      console.warn('[Summary] 恢复低置信度标记失败:', err)
+      // 数据损坏时清空持久化，避免每次打开都报错
+      void updateMeeting(meeting.id, { summaryUncertainties: '' })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅在 editor 就绪且数据变化时恢复一次
+  }, [editor, meeting.summaryUncertainties])
+
   // 选中文字 → 右侧 AI 对话（与笔记 tiptap-editor syncEditorSelectionQuote 同机制）：
   // 选区变化时把选中内容构造为 PendingQuote 写入 chat store，AI 对话输入框上方出现引用卡片
   useEffect(() => {
@@ -887,10 +913,16 @@ function SummaryEditor({ meeting }: { meeting: Meeting }) {
         setUncertaintyDecorations(editor, located)
         // 展示状态：能定位的进装饰层 + 计数提示；未能定位的也计入总数（提示条可见）
         setUncertainties(list)
+        // 持久化到会议记录：切换标签/会议后恢复黄标与提示条，直到用户确认清除
+        // （S1：核对状态必须跨会话保持——组件卸载丢失内存态，需从 DB 恢复）
+        void updateMeeting(meeting.id, {
+          summaryUncertainties: list.length > 0 ? JSON.stringify(list) : '',
+        })
       } catch (err) {
         console.warn('[Summary] 低置信度自检失败:', err)
         setUncertainties([])
         setUncertaintyDecorations(editor, [])
+        void updateMeeting(meeting.id, { summaryUncertainties: '' })
       } finally {
         setUncertaintyChecking(false)
       }
@@ -933,6 +965,8 @@ function SummaryEditor({ meeting }: { meeting: Meeting }) {
                 onClick={() => {
                   setUncertainties([])
                   if (editor) setUncertaintyDecorations(editor, [])
+                  // 用户确认核对完：清除持久化标记，切换标签/会议后不再恢复黄标
+                  void updateMeeting(meeting.id, { summaryUncertainties: '' })
                 }}
               >
                 清除标记

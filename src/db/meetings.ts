@@ -18,6 +18,7 @@ export interface MeetingRecord {
   visitId?: string // 关联拜访 ID（2.0 新增，空串表示未关联）
   exportedFilePath?: string // 纪要导出到客户知识库的文件相对路径（空串表示未导出）
   pendingTranscribe?: number // 1=离线结束待联网补转写（P1-2：独立布尔字段替代 error 文案匹配）
+  summaryUncertainties?: string // 低置信度黄标核对项 JSON 数组（空串=已核对完；切换标签/会议后恢复用）
   createdAt: number
   updatedAt: number
 }
@@ -64,6 +65,9 @@ export async function initMeetingsDb() {
   await ensureColumn(db, 'exportedFilePath', `exportedFilePath TEXT DEFAULT ''`)
   // 2.8.3 新增：离线结束待补转写标记（独立布尔字段，替代 error 文案匹配的脆弱方案）
   await ensureColumn(db, 'pendingTranscribe', `pendingTranscribe INTEGER DEFAULT 0`)
+  // 2.9 新增：纪要低置信度黄标核对项（JSON 数组字符串，空串表示已全部核对完；
+  // 切换标签/会议后据此恢复黄标与提示条，直到用户确认清除）
+  await ensureColumn(db, 'summaryUncertainties', `summaryUncertainties TEXT DEFAULT ''`)
 }
 
 /**
@@ -209,6 +213,7 @@ export async function updateMeetingRecord(
     'visitId',
     'exportedFilePath',
     'pendingTranscribe',
+    'summaryUncertainties',
   ] as const
 
   for (const field of allowedFields) {

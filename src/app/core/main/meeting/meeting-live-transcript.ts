@@ -780,6 +780,10 @@ async function connectDsSession(token: number): Promise<void> {
     }
     dsSessionId = sessionId
     dsFailed = false
+    // 成功建立会话：复位重连计数——每次成功会话都重新获得完整重连机会，
+    // 否则 3 次机会用完后即使会话已恢复也不再自动重连（长时会议 30 分钟+
+    // 会被服务端 RST 多次，旧逻辑累计消耗机会导致后期断连后彻底放弃）
+    dsReconnectAttempts = 0
     useLiveTranscriptStore.setState({ error: null })
     dsUnlisteners = [
       await listen<DashscopeAsrResultEvent>('dashscope-asr-result', (event) => {
