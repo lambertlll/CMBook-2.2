@@ -4,7 +4,6 @@ import "./globals.css";
 import 'react-photo-view/dist/react-photo-view.css';
 import { Suspense, useEffect } from "react";
 import { NextIntlProvider } from "@/components/providers/NextIntlProvider";
-import Script from "next/script";
 import { getSyncPushQueue } from "@/lib/sync/sync-push-queue";
 import { ConsoleFilter } from "@/components/console-filter";
 
@@ -39,16 +38,22 @@ export default function RootLayout({
           {/* eslint-disable-next-line @next/next/no-sync-scripts -- 必须在任何应用 JS 前同步应用主题 */}
           <script src="/theme-init.js" />
           {/* Define isSpace function globally to fix markdown-it issues with Next.js + Turbopack
-          https://github.com/markdown-it/markdown-it/issues/1082#issuecomment-2749656365 */}
-          <Script id="markdown-it-fix" strategy="beforeInteractive">
-            {`
-              if (typeof window !== 'undefined' && typeof window.isSpace === 'undefined') {
-                window.isSpace = function(code) {
-                  return code === 0x20 || code === 0x09 || code === 0x0A || code === 0x0B || code === 0x0C || code === 0x0D;
-                };
-              }
-            `}
-          </Script>
+          https://github.com/markdown-it/markdown-it/issues/1082#issuecomment-2749656365
+          必须用同步阻塞 <script>（而非 next/script beforeInteractive——后者异步执行，
+          某些 WebView 环境下 markdown-it 可能先于 polyfill 运行，导致
+          "isSpace is not defined" 报错，报告渲染崩溃）。 */}
+          {/* eslint-disable-next-line @next/next/no-sync-scripts -- 必须在任何应用 JS 前同步定义，否则 markdown-it 在部分 WebView 崩溃 */}
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `
+                if (typeof window !== 'undefined' && typeof window.isSpace === 'undefined') {
+                  window.isSpace = function(code) {
+                    return code === 0x20 || code === 0x09 || code === 0x0A || code === 0x0B || code === 0x0C || code === 0x0D;
+                  };
+                }
+              `,
+            }}
+          />
         </head>
         <body suppressHydrationWarning>
           <ConsoleFilter />
