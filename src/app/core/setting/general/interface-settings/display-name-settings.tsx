@@ -17,7 +17,7 @@ export function DisplayNameSettings() {
   const setUserDisplayName = useSettingStore((s) => s.setUserDisplayName)
   const [draft, setDraft] = useState(userDisplayName)
 
-  // 外部变化（如其他设备同步）时同步草稿
+  // store 值变化时同步草稿（失焦保存后回填，或外部重置）
   useEffect(() => {
     setDraft(userDisplayName)
   }, [userDisplayName])
