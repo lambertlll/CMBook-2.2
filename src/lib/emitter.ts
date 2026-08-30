@@ -20,7 +20,6 @@ interface Events {
   'onboarding-step-complete': { step: OnboardingStepId; filePath?: string };
   'openWindow': unknown;
   'startMeeting': unknown;
-  'immediate-pull-needed': { type: string; path: string; hash: string; filePath: string } | { type: string; filePath: string } | { filePath: string; isRemoteFile: boolean };
   'getSettingModelList': unknown;
   'insert-quote': {
     quote: string;
@@ -36,18 +35,6 @@ interface Events {
   'toolbar-shortcut-file': unknown;
   'toolbar-shortcut-todo': unknown;
   'editor-ai-streaming': { isStreaming: boolean; targetFilePath?: string; terminate?: () => void };
-  'latest-commit-info': {
-    sha: string;
-    message: string;
-    author: string;
-    date: Date;
-    additions?: number;
-    deletions?: number;
-  };
-  'sync-success': unknown;
-  'sync-content-updated': { path: string; content: string };
-  'sync-push-completed': { path: string; success: boolean; sha?: string };
-  'sync-sha-mismatch': { path: string; localSha?: string; remoteSha?: string; force?: boolean };
   'revertChat': unknown;
   'fileSelected': {
     name: string;

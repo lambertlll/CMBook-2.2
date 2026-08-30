@@ -63,7 +63,6 @@ export function EditorLayout() {
     addTab,
     removeTab,
     initOpenTabs,
-    initShowCloudFiles
   } = useArticleStore()
   const { setLeftSidebarTab, rightSidebarVisible, toggleRightSidebar } = useSidebarStore()
   const { setOnboardingPromptDraft } = useChatStore()
@@ -127,9 +126,8 @@ export function EditorLayout() {
     if (!isInitializedRef.current) {
       isInitializedRef.current = true
       initOpenTabs()
-      initShowCloudFiles()
     }
-  }, [initOpenTabs, initShowCloudFiles])
+  }, [initOpenTabs])
 
   useEffect(() => {
     const loadOnboardingProgress = async () => {

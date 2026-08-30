@@ -10,7 +10,6 @@ import { computedParentPath, getCurrentFolder, joinRelativePath } from "@/lib/pa
 import useSettingStore from '@/stores/setting'
 import { isSkillsFolder } from "@/lib/skills/utils"
 import { cn } from "@/lib/utils"
-import SyncFolder from './sync-folder'
 import { NewFile } from './new-file'
 import { NewFolder } from './new-folder'
 import { ViewDirectory } from './view-directory'
@@ -31,7 +30,6 @@ import { LinkedFolder } from '@/lib/files'
 import {
   collectFolderMarkdownPaths,
   deleteLocalFolderIfExists,
-  deleteRemoteFolder,
   deleteVectorDocumentsByPaths,
   removeFolderFromTree,
 } from './delete-folder-utils'
@@ -42,7 +40,6 @@ import {
   moveFileManagerEntry,
   setFileManagerDragData,
 } from '../file-dnd'
-import { debugSyncPath } from "@/lib/sync/remote-file";
 import { BatchSelectionContextMenu } from "../batch-selection-context-menu";
 import type { FileSelectionEntry } from "../file-selection";
 
@@ -291,11 +288,7 @@ export function FolderItem({
       if (!confirmed) return
 
       const markdownPaths = await collectFolderMarkdownPaths(path, item)
-      const localDeleted = await deleteLocalFolderIfExists(path)
-      const remoteResult = await deleteRemoteFolder(item, localDeleted)
-      if (remoteResult.failedPaths.length > 0) {
-        throw new Error(`Delete remote folder failed: ${remoteResult.failedPaths.join(', ')}`)
-      }
+      await deleteLocalFolderIfExists(path)
 
       // 如果删除的文件夹包含当前活动文件，清除活动文件路径
       if (activeFilePath && activeFilePath.startsWith(path)) {
@@ -371,12 +364,6 @@ export function FolderItem({
       const parentPath = path.split('/').slice(0, -1).join('/')
       const targetRelativePath = joinRelativePath(parentPath, nextName)
       const newPathOptions = await getFilePathOptions(targetRelativePath)
-      debugSyncPath('folder.renamePlan', {
-        originalName: item.name,
-        enteredName: nextName,
-        sourcePath: path,
-        targetRelativePath,
-      })
       
       // 根据工作区类型执行重命名操作
       if (workspace.isCustom) {
@@ -895,8 +882,6 @@ export function FolderItem({
             <CopyFolder item={item} shortcut={`${modKey}C`} />
             <DuplicateFolder item={item} />
             <PasteInFolder item={item} shortcut={`${modKey}V`} />
-            <ContextMenuSeparator />
-            <SyncFolder item={item} />
             <ContextMenuSeparator />
             <RenameFolder item={item} onStartRename={handleStartRename} shortcut={renameKey} />
             <DeleteFolder item={item} shortcut={deleteKey} />

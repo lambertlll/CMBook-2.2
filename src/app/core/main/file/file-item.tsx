@@ -3,13 +3,10 @@ import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
 import useArticleStore, { DirTree } from "@/stores/article";
 import { BaseDirectory, exists, remove, rename, writeTextFile } from "@tauri-apps/plugin-fs";
-import { Copy, Database, Download, File, FileCode, FileDown, FileJson, FileText, FileUp, FolderOpen, ImageIcon, LoaderCircle, RefreshCwOff, Trash2 } from "lucide-react"
+import { Copy, Database, Download, File, FileCode, FileDown, FileJson, FileText, FolderOpen, ImageIcon, LoaderCircle, Trash2 } from "lucide-react"
 import { useEffect, useRef, useState, useCallback } from "react";
 import { ask } from '@tauri-apps/plugin-dialog';
 import { platform } from '@tauri-apps/plugin-os';
-import { Store } from '@tauri-apps/plugin-store';
-import { RepoNames } from "@/lib/sync/github.types";
-import { S3Config, WebDAVConfig } from "@/types/sync";
 import { cloneDeep } from "lodash-es";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { computedParentPath, getCurrentFolder } from "@/lib/path";
@@ -17,13 +14,6 @@ import { toast } from "@/hooks/use-toast";
 import { useTranslations } from "next-intl";
 import useClipboardStore from "@/stores/clipboard";
 import { appDataDir, join } from '@tauri-apps/api/path';
-import { deleteFile } from "@/lib/sync/github";
-import { deleteFile as deleteGiteeFile } from "@/lib/sync/gitee";
-import { deleteFile as deleteGitlabFile } from "@/lib/sync/gitlab";
-import { deleteFile as deleteGiteaFile } from "@/lib/sync/gitea";
-import { s3Delete } from "@/lib/sync/s3";
-import { webdavDelete } from "@/lib/sync/webdav";
-import { getSyncRepoName } from "@/lib/sync/repo-utils";
 import { generateUniqueFilename } from "@/lib/default-filename";
 import { MobileActionMenu, MobileMenuItem, MobileSeparator } from "./mobile-action-menu";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -34,7 +24,6 @@ import { isSkillsFolder } from "@/lib/skills/utils";
 import { exportMarkdownFile, type MarkdownExportFormat } from "../editor/markdown/markdown-export";
 import { exportMarkdownToWord } from "@/lib/export-word";
 import { setFileManagerDragData } from "./file-dnd";
-import { debugSyncPath } from "@/lib/sync/remote-file";
 import { cn } from "@/lib/utils";
 import { BatchSelectionContextMenu } from "./batch-selection-context-menu";
 import type { FileSelectionEntry } from "./file-selection";
@@ -42,10 +31,6 @@ import { pasteIntoFolder } from "./folder-item/paste-into-folder";
 import { isUntitledNoteName, resolveFirstLineTitle, stripNoteExtension } from "../editor/empty-state-actions";
 
 type Platform = 'macos' | 'windows' | 'linux' | 'unknown'
-
-function shouldAutoSyncOnInitialRead(options?: { isNewFile?: boolean }) {
-  return options?.isNewFile !== true
-}
 
 function buildFileRenamePlan({
   originalName,
@@ -325,165 +310,6 @@ export function FileItem({
     }
   }
 
-  async function handleDeleteSyncFile() {
-    const answer = await ask(t('context.deleteSyncFile') + '?', {
-      title: item.name,
-      kind: 'warning',
-    });
-    if (answer) {
-      const currentPath = computedParentPath(item)
-
-      // 设置 loading 状态
-      const cacheTree = cloneDeep(fileTree)
-      const setLoadingStatus = (items: typeof cacheTree): boolean => {
-        for (const entry of items) {
-          const entryPath = computedParentPath(entry)
-          if (entryPath === currentPath && entry.isFile) {
-            entry.loading = true
-            return true
-          }
-          if (entry.children && setLoadingStatus(entry.children)) {
-            return true
-          }
-        }
-        return false
-      }
-      if (setLoadingStatus(cacheTree)) {
-        setFileTree(cacheTree)
-      }
-
-      try {
-        // 获取当前主要备份方式
-        const store = await Store.load('store.json');
-        const backupMethod = await store.get<'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav'>('primaryBackupMethod') || 'github';
-        const repoName = backupMethod === 's3' || backupMethod === 'webdav'
-          ? RepoNames.sync
-          : await getSyncRepoName(backupMethod)
-
-        let success = false
-        switch (backupMethod) {
-          case 'github': {
-            const result = await deleteFile({ path: currentPath, sha: item.sha as string, repo: repoName });
-            success = !!result
-            break;
-          }
-          case 'gitee': {
-            const result = await deleteGiteeFile({ path: currentPath, sha: item.sha as string, repo: repoName });
-            success = result !== false
-            break;
-          }
-          case 'gitlab': {
-            const result = await deleteGitlabFile({ path: currentPath, sha: item.sha as string, repo: repoName });
-            success = !!result
-            break;
-          }
-          case 'gitea': {
-            const result = await deleteGiteaFile({ path: currentPath, sha: item.sha as string, repo: repoName });
-            success = !!result
-            break;
-          }
-          case 's3': {
-            const s3Config = await store.get<S3Config>('s3SyncConfig')
-            if (s3Config) {
-              const result = await s3Delete(s3Config, currentPath)
-              success = result
-            }
-            break;
-          }
-          case 'webdav': {
-            const webdavConfig = await store.get<WebDAVConfig>('webdavSyncConfig')
-            if (webdavConfig) {
-              const result = await webdavDelete(webdavConfig, currentPath)
-              success = result
-            }
-            break;
-          }
-        }
-
-        if (success) {
-          // 只更新当前文件的状态，不刷新整个文件树
-          const cacheTree = cloneDeep(fileTree)
-
-          // 递归查找并更新/删除文件
-          const updateOrRemoveFile = (items: typeof cacheTree): boolean => {
-            for (let i = 0; i < items.length; i++) {
-              const entry = items[i]
-              const entryPath = computedParentPath(entry)
-              if (entryPath === currentPath && entry.isFile) {
-                if (entry.isLocale) {
-                  // 本地存在：只清除远程 SHA
-                  entry.sha = undefined
-                  entry.loading = undefined
-                } else {
-                  // 本地不存在：从列表中移除
-                  items.splice(i, 1)
-                }
-                return true
-              }
-              if (entry.children && updateOrRemoveFile(entry.children)) {
-                return true
-              }
-            }
-            return false
-          }
-
-          if (updateOrRemoveFile(cacheTree)) {
-            setFileTree(cacheTree)
-          }
-
-          toast({
-            title: t('context.delete'),
-            description: t('context.deleteSyncFileSuccess'),
-          });
-        } else {
-          // 删除失败，清除 loading 状态
-          const cacheTree = cloneDeep(fileTree)
-          const clearLoadingStatus = (items: typeof cacheTree): boolean => {
-            for (const entry of items) {
-              const entryPath = computedParentPath(entry)
-              if (entryPath === currentPath && entry.isFile) {
-                entry.loading = undefined
-                return true
-              }
-              if (entry.children && clearLoadingStatus(entry.children)) {
-                return true
-              }
-            }
-            return false
-          }
-          if (clearLoadingStatus(cacheTree)) {
-            setFileTree(cacheTree)
-          }
-          throw new Error('删除操作返回失败')
-        }
-      } catch (error) {
-        // 删除失败，清除 loading 状态
-        const cacheTree = cloneDeep(fileTree)
-        const clearLoadingStatus = (items: typeof cacheTree): boolean => {
-          for (const entry of items) {
-            const entryPath = computedParentPath(entry)
-            if (entryPath === currentPath && entry.isFile) {
-              entry.loading = undefined
-              return true
-            }
-            if (entry.children && clearLoadingStatus(entry.children)) {
-              return true
-            }
-          }
-          return false
-        }
-        if (clearLoadingStatus(cacheTree)) {
-          setFileTree(cacheTree)
-        }
-        console.error('[handleDeleteSyncFile] 删除远程文件失败:', error);
-        toast({
-          title: t('context.delete'),
-          description: t('context.deleteSyncFileError'),
-          variant: 'destructive',
-        });
-      }
-    }
-  }
 
   async function handleStartRename() {
     // 延迟执行，确保上下文菜单完全关闭
@@ -530,12 +356,6 @@ export function FileItem({
         originalName,
         currentPath: path,
         enteredName: finalName,
-      })
-      debugSyncPath('file.renamePlan', {
-        originalName,
-        enteredName: finalName,
-        displayName: renamePlan.displayName,
-        targetRelativePath: renamePlan.targetRelativePath,
       })
       const { displayName, operation, targetRelativePath } = renamePlan
       
@@ -623,7 +443,7 @@ export function FileItem({
       }
       setActiveFilePath(newPath)
       // 新建文件后自动选择该文件并读取内容
-      readArticle(newPath, '', shouldAutoSyncOnInitialRead({ isNewFile: true }))
+      readArticle(newPath)
     } else {
       // 处理取消创建或无变更的情况
       if (originalName === '') {
@@ -940,9 +760,6 @@ export function FileItem({
                     <MobileMenuItem disabled={!item.isLocale} onClick={handleStartRename}>
                       {t('context.rename')}
                     </MobileMenuItem>
-                    <MobileMenuItem disabled={!item.sha} className="text-danger" onClick={handleDeleteSyncFile}>
-                      {t('context.deleteSyncFile')}
-                    </MobileMenuItem>
                     <MobileMenuItem disabled={!item.isLocale || item.name === ''} className="text-danger" onClick={handleDeleteFile}>
                       {t('context.deleteLocalFile')}
                     </MobileMenuItem>
@@ -962,10 +779,8 @@ export function FileItem({
                   <div className="relative flex shrink-0 items-center">
                     { item.loading ? (
                       <LoaderCircle className={`${iconSize} shrink-0 animate-spin`} />
-                    ) : item.isLocale ? (
-                      item.sha ? <FileUp className={`${iconSize} shrink-0`} /> : <File className={`${iconSize} shrink-0`} />
                     ) : (
-                      <FileDown className={`${iconSize} shrink-0`} />
+                      <File className={`${iconSize} shrink-0`} />
                     )}
                   </div>
                   <span className={`text-${fileManagerTextSize} min-w-0 flex-1 truncate`}>{displayName}</span>
@@ -989,9 +804,6 @@ export function FileItem({
                     <MobileSeparator />
                     <MobileMenuItem disabled={!item.isLocale} onClick={handleStartRename}>
                       {t('context.rename')}
-                    </MobileMenuItem>
-                    <MobileMenuItem disabled={!item.sha} className="text-danger" onClick={handleDeleteSyncFile}>
-                      {t('context.deleteSyncFile')}
                     </MobileMenuItem>
                     <MobileMenuItem disabled={!item.isLocale || item.name === ''} className="text-danger" onClick={handleDeleteFile}>
                       {t('context.deleteLocalFile')}
@@ -1100,10 +912,6 @@ export function FileItem({
                 <ContextMenuShortcut menuType="file">
                   <Kbd>{renameKey}</Kbd>
                 </ContextMenuShortcut>
-              </ContextMenuItem>
-              <ContextMenuItem disabled={!item.sha} inset className="text-danger" onClick={handleDeleteSyncFile} menuType="file">
-                <RefreshCwOff className="mr-2 h-4 w-4" />
-                {t('context.deleteSyncFile')}
               </ContextMenuItem>
               <ContextMenuItem disabled={!item.isLocale || item.name === ''} inset className="text-danger" onClick={handleDeleteFile} menuType="file">
                 <Trash2 className="mr-2 h-4 w-4" />

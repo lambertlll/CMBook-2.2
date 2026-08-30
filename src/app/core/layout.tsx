@@ -10,7 +10,6 @@ import zh from "dayjs/locale/zh-cn";
 import en from "dayjs/locale/en";
 import { useI18n } from "@/hooks/useI18n"
 import useVectorStore from "@/stores/vector"
-import useImageStore from "@/stores/imageHosting"
 import useShortcutStore from "@/stores/shortcut"
 import useEditorShortcutStore from "@/stores/editor-shortcut"
 import { useRouter, usePathname } from "next/navigation"
@@ -23,8 +22,6 @@ import { Store } from '@tauri-apps/plugin-store'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { invoke } from '@tauri-apps/api/core'
 import { TextSizeProvider } from "@/contexts/text-size-context"
-import { SyncConfirmDialog } from "@/components/sync-confirm-dialog"
-import { AutoDataSyncConflictDialog } from "@/components/auto-data-sync-conflict-dialog"
 import { applyThemeColors } from "@/lib/theme-utils"
 import { applyAppFontFamily } from "@/lib/font-settings"
 import emitter from "@/lib/emitter"
@@ -32,7 +29,6 @@ import { isEditableKeyboardTarget } from "@/lib/is-editable-keyboard-target"
 import useArticleStore from "@/stores/article"
 import { resolveOpenedMarkdownPath } from "@/lib/opened-files"
 import { useToast } from "@/hooks/use-toast"
-import { initAutoDataSyncRuntime } from "@/lib/sync/auto-data-sync-queue"
 import { useSidebarStore } from "@/stores/sidebar"
 import { useTranslations } from "next-intl"
 import { quickStartMeeting } from "@/app/core/main/meeting/meeting-quick-start"
@@ -47,7 +43,6 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const { initSettingData, uiScale, customThemeColors, appFontFamily } = useSettingStore()
-  const { initMainHosting } = useImageStore()
   const { currentLocale } = useI18n()
   const { initShortcut } = useShortcutStore()
   const { initEditorShortcuts } = useEditorShortcutStore()
@@ -290,12 +285,9 @@ export default function RootLayout({
         // 导致首屏先以 classic 渲染、后跳变为纸韵的闪烁
         await useUiThemeStore.getState().initUiTheme()
         await initSettingData()
-        initMainHosting()
 
         // 先完成数据库和默认工作区初始化，避免首次启动时其他逻辑抢先读取空目录或未建表数据库。
         await initAllDatabases()
-        if (cancelled) return
-        await initAutoDataSyncRuntime()
         if (cancelled) return
 
         initShortcut()
@@ -421,8 +413,6 @@ export default function RootLayout({
         </main>
         <ActivityDrawer open={activityOpen} onOpenChange={setActivityOpen} />
         <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
-        <SyncConfirmDialog />
-        <AutoDataSyncConflictDialog />
       </TextSizeProvider>
     </ThemeProvider>
   );

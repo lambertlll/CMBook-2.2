@@ -2,9 +2,8 @@
 import { Toaster } from "@/components/ui/toaster"
 import "./globals.css";
 import 'react-photo-view/dist/react-photo-view.css';
-import { Suspense, useEffect } from "react";
+import { Suspense } from "react";
 import { NextIntlProvider } from "@/components/providers/NextIntlProvider";
-import { getSyncPushQueue } from "@/lib/sync/sync-push-queue";
 import { ConsoleFilter } from "@/components/console-filter";
 
 export default function RootLayout({
@@ -12,11 +11,6 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // 初始化同步推送队列
-  useEffect(() => {
-    getSyncPushQueue()
-  }, [])
-
   return (
     <>
       <html lang="en" suppressHydrationWarning>

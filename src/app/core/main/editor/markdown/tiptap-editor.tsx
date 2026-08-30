@@ -1076,7 +1076,6 @@ export function TipTapEditor({
   const isInitializedRef = useRef(false)
   const initializedForPathRef = useRef<string | null>(null)
   const externalUpdateCounterRef = useRef(0)
-  const pendingSyncUpdateRef = useRef<{ path: string; content: string } | null>(null)
   const restoredViewPathRef = useRef<string | null>(null)
   const lastViewStateRef = useRef<{ path: string; selectionFrom: number; selectionTo: number; scrollTop: number } | null>(null)
 
@@ -1129,7 +1128,6 @@ export function TipTapEditor({
       isReadyRef.current = false
       isFirstUpdateRef.current = true
       initializedForPathRef.current = activeFilePath
-      pendingSyncUpdateRef.current = null
       restoredViewPathRef.current = null
       setIsRestoringMobileView(isMobile)
     }
@@ -3670,45 +3668,7 @@ export function TipTapEditor({
 
   // NOTE: Removed initialContent useEffect that caused cursor jump during local edits
   // Remote pull is now handled via 'editor-content-from-remote' event
-  // Sync and external updates are handled by their respective events
-
-  // Handle sync content updated from auto-sync
-  useEffect(() => {
-    const handleSyncContentUpdated = (event: { path: string; content: string }) => {
-      // Bug fix: Only update if this is the active file
-      if (!editor || !event || event.path !== activeFilePath) return
-
-      // Bug fix: Skip if content hasn't actually changed
-      const currentContent = editor.getMarkdown()
-      if (currentContent === event.content) return
-
-      // Bug fix: Set pending update and verify path when processing
-      pendingSyncUpdateRef.current = event
-
-      // Bug fix: Mark editor as not ready during update
-      isReadyRef.current = false
-      externalUpdateCounterRef.current++
-      // Use setTimeout to avoid flushSync conflict during React render
-      setTimeout(() => {
-        editor.commands.setContent(event.content, { contentType: 'markdown' })
-        // Bug fix: Mark editor as ready after content is set
-        isReadyRef.current = true
-        // Reset the counter and pending update after a short delay
-        setTimeout(() => {
-          // Only reset if this is still the same pending update
-          if (pendingSyncUpdateRef.current === event) {
-            pendingSyncUpdateRef.current = null
-          }
-          externalUpdateCounterRef.current = Math.max(0, externalUpdateCounterRef.current - 1)
-        }, 100)
-      }, 0)
-    }
-
-    emitter.on('sync-content-updated', handleSyncContentUpdated as any)
-    return () => {
-      emitter.off('sync-content-updated', handleSyncContentUpdated as any)
-    }
-  }, [editor, activeFilePath])
+  // External updates are handled by their respective events
 
   // Handle external content updates (e.g., from Agent tools)
   useEffect(() => {

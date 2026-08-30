@@ -2,11 +2,9 @@ import { Store } from '@tauri-apps/plugin-store'
 import { writeFile, exists, mkdir } from '@tauri-apps/plugin-fs'
 import { dirname } from '@tauri-apps/api/path'
 import { v4 as uuidv4 } from 'uuid'
-import { uploadImage } from './imageHosting'
 import { getFilePathOptions, toWorkspaceRelativePath, getWorkspacePath } from './workspace'
 import { convertImageByWorkspace } from './utils'
 import { toMarkdownImagePath } from './markdown-image-path'
-import { getNormalizedImageHosting } from './image-hosting-config'
 import { getWritingAssetsDirName } from './writing-assets-path'
 import useArticleStore from '@/stores/article'
 
@@ -15,12 +13,12 @@ export interface ImageUploadResult {
   src: string
   /** 用于 Markdown 保存的路径 */
   relativePath: string
-  /** 是否使用了图床上传 */
+  /** 是否使用了图床上传（图床能力已移除，恒为 false） */
   useImageHosting: boolean
 }
 
 /**
- * 处理图片文件：上传到图床或保存到本地
+ * 处理图片文件：保存到本地工作区
  * @param file 图片文件
  * @param activeFilePath 当前编辑的文件路径（用于确定本地保存位置）
  * @returns 图片 URL 或本地路径
@@ -29,31 +27,7 @@ export async function handleImageUpload(
   file: File,
   activeFilePath?: string
 ): Promise<ImageUploadResult> {
-  // 检查是否配置了图床
-  const isConfigured = await isImageHostingConfigured()
-
-  // 1. 如果配置了图床，尝试上传
-  if (isConfigured) {
-    try {
-      const imageHostingUrl = await uploadImage(file)
-      if (imageHostingUrl) {
-        return {
-          src: imageHostingUrl,
-          relativePath: imageHostingUrl,
-          useImageHosting: true,
-        }
-      }
-      // 如果返回 undefined，说明上传失败（配置了图床但上传返回空）
-      // 抛出错误，不要静默失败
-      throw new Error('Image hosting upload returned empty result')
-    } catch (error) {
-      console.error('[ImageHandler] Failed to upload to image hosting:', error)
-      // 图床上传失败，抛出错误而不是回退到本地保存
-      throw error
-    }
-  }
-
-  // 2. 如果没有配置图床，保存到本地
+  // 图片一律保存到本地（图床上传能力已移除）
   if (activeFilePath) {
     try {
       const { imageRelativePath, markdownRelativePath } = await saveImageLocally(file, activeFilePath)
@@ -70,7 +44,7 @@ export async function handleImageUpload(
     }
   }
 
-  throw new Error('No image hosting configured and no active file path for local storage')
+  throw new Error('No active file path for local image storage')
 }
 
 /**
@@ -189,39 +163,4 @@ async function ensureDirectoryExists(dirPath: string): Promise<void> {
   } catch {
     // 目录可能不存在，但这是正常的
   }
-}
-
-/**
- * 检查是否配置了图床
- */
-export async function isImageHostingConfigured(): Promise<boolean> {
-  const store = await Store.load('store.json')
-  const useImageRepo = await store.get<boolean>('useImageRepo')
-  const savedMainImageHosting = await store.get<string>('mainImageHosting')
-  const normalizedImageHosting = getNormalizedImageHosting(savedMainImageHosting)
-  const mainImageHosting = useImageRepo ? normalizedImageHosting.value : savedMainImageHosting
-  const isConfigured = !!(useImageRepo && mainImageHosting && mainImageHosting !== 'none')
-
-  if (useImageRepo && normalizedImageHosting.shouldPersist) {
-    await store.set('mainImageHosting', normalizedImageHosting.value)
-    await store.save()
-  }
-
-  return isConfigured
-}
-
-/**
- * 将 File 对象转换为 base64
- */
-export function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.readAsDataURL(file)
-    reader.onload = () => {
-      resolve(reader.result as string)
-    }
-    reader.onerror = (error) => {
-      reject(error)
-    }
-  })
 }

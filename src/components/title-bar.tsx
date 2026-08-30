@@ -8,8 +8,6 @@ import { Search, Minus, Square, Copy, X, PanelLeft, SquarePen, CalendarDays } fr
 import { useTranslations } from 'next-intl'
 import { useSidebarStore } from '@/stores/sidebar'
 import { PinToggle } from './pin-toggle'
-import { SyncToggle } from './title-bar-toolbars/sync-toggle'
-import AppStatus from './app-status'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Button } from '@/components/ui/button'
 import React from 'react'
@@ -257,11 +255,8 @@ export function TitleBar({ onSearchClick, onActivityClick, activityOpen = false 
             </TooltipContent>
           </Tooltip>
 
-          <SyncToggle />
-
           <PinToggle />
 
-          <AppStatus />
         </div>
 
         {/* Windows 控制按钮 */}

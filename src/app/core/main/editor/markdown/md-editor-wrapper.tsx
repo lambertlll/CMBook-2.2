@@ -4,7 +4,7 @@ import useArticleStore from '@/stores/article'
 import { useEffect, useState, useCallback, useRef, RefObject } from 'react'
 import { TipTapEditor } from './tiptap-editor'
 import { Outline } from './outline'
-import { Loader2, Download } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import emitter from '@/lib/emitter'
 import {
@@ -26,14 +26,11 @@ interface MdEditorProps {
 export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) {
   const {
     saveCurrentArticle,
-    isPulling,
     setCurrentArticle,
     activeFilePath,
     currentArticle,
-    justPulledFile
   } = useArticleStore()
 
-  const t = useTranslations('article.file.sync')
   const tEditor = useTranslations('editor')
   const [initialContent, setInitialContent] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -257,12 +254,6 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
       setIsLoading(false)
       // Mark as initialized so that subsequent saves are allowed
       contentInitializedRef.current = true
-
-      // Fix cursor jump: Only trigger remote content update if this is a remote pull
-      // This prevents unnecessary setContent during local saves
-      if (justPulledFile) {
-        emitter.emit('editor-content-from-remote', { content: currentArticle })
-      }
     } else if (currentArticle === '' && isThisFile && initialContent === '') {
       // Genuinely empty file - hide loading and mark as initialized
       // Bug fix: Set expected content for empty file
@@ -272,7 +263,7 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
       // Mark as initialized for empty files so user can start typing
       contentInitializedRef.current = true
     }
-  }, [currentArticle, filePath, tabContentsRef, initialContent, justPulledFile])
+  }, [currentArticle, filePath, tabContentsRef, initialContent])
 
   // Handle content changes - only save if this is the active file
   const handleContentChange = useCallback((content: string) => {
@@ -364,24 +355,6 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
   }
 
   // Loading state - wait for content to be loaded
-  // 如果正在从远程拉取，优先显示拉取遮罩
-  if (isPulling) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3 text-muted-foreground">
-          <div className="relative">
-            <Loader2 className="size-8 animate-spin" />
-            <Download className="size-4 absolute inset-0 m-auto" />
-          </div>
-          <div className="text-center">
-            <p className="text-sm font-medium">{t('syncingRemote')}</p>
-            <p className="text-xs mt-1">{t('pullingRemote')}</p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   // 如果 currentArticle 已经有内容，直接显示（拉取完成）
   const showContent = (currentArticle && currentArticle.length > 0) || initialContent !== null
   if (isLoading && !showContent) {
@@ -394,22 +367,6 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
 
   return (
     <div id="onboarding-target-editor-content" className="flex-1 relative w-full h-full">
-      {/* Pull loading overlay */}
-      {isPulling && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-          <div className="flex flex-col items-center gap-3 text-muted-foreground">
-            <div className="relative">
-              <Loader2 className="size-8 animate-spin" />
-              <Download className="size-4 absolute inset-0 m-auto" />
-            </div>
-            <div className="text-center">
-              <p className="text-sm font-medium">{t('syncingRemote')}</p>
-              <p className="text-xs mt-1">{t('pullingRemote')}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Editor - initialContent only set once on mount */}
       <TipTapEditor
         initialContent={initialContent || ''}
@@ -421,7 +378,7 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
         outlinePosition={outlinePosition}
         outlineWidth={outlineWidth}
         onToggleOutline={handleToggleOutline}
-        editable={!isPulling && !aiStreaming}
+        editable={!aiStreaming}
         autoScroll={aiStreaming}
         showOverlay={aiStreaming}
         onTerminate={() => {
@@ -434,7 +391,7 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
         }
       />
 
-      {outlineOpen && !isPulling && editorReady && editorInstance && (
+      {outlineOpen && editorReady && editorInstance && (
         <Outline
           editor={editorInstance}
           isOpen={outlineOpen}

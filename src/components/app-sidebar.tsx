@@ -1,24 +1,20 @@
 'use client'
-import { ImageUp, Search, Settings, SquarePen, X } from "lucide-react"
+import { Search, Settings, SquarePen, X } from "lucide-react"
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import { usePathname, useRouter } from 'next/navigation'
-import AppStatus from "./app-status"
 import { Store } from "@tauri-apps/plugin-store"
 import { PinToggle } from "./pin-toggle"
 import { useTranslations } from 'next-intl'
-import { useEffect, useState } from "react"
-import useImageStore from "@/stores/imageHosting"
- 
+
 interface AppSidebarProps {
   onSearchClick?: () => void
 }
@@ -27,8 +23,7 @@ export function AppSidebar({ onSearchClick }: AppSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const t = useTranslations()
-  const { imageRepoUserInfo } = useImageStore()
-  const [items, setItems] = useState([
+  const items = [
     {
       title: t('navigation.write'),
       url: "/core/main",
@@ -40,20 +35,7 @@ export function AppSidebar({ onSearchClick }: AppSidebarProps) {
       url: "/core/search",
       icon: Search,
     },
-  ])
-
-  async function initGithubImageHosting() {
-    const store = await Store.load('store.json')
-    const githubImageUsername = await store.get<string>('githubImageUsername')
-    const githubImageAccessToken = await store.get<string>('githubImageAccessToken')
-    if (githubImageUsername && githubImageAccessToken && !items.find(item => item.url === '/core/image')) {
-      setItems([...items, {
-        title: t('navigation.githubImageHosting'),
-        url: "/core/image",
-        icon: ImageUp,
-      }])
-    }
-  }
+  ]
 
   async function menuHandler(item: typeof items[0]) {
     // 如果是搜索按钮，打开搜索对话框
@@ -68,22 +50,11 @@ export function AppSidebar({ onSearchClick }: AppSidebarProps) {
     store.set('currentPage', item.url)
   }
 
-  useEffect(() => {
-    initGithubImageHosting()
-  }, [imageRepoUserInfo])
-
   return (
     <Sidebar 
       collapsible="none"
       className="!w-[calc(var(--sidebar-width-icon)_+_1px)] border-r h-[calc(100vh-36px)] mt-9"
     >
-      <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <AppStatus />
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupContent>

@@ -6,8 +6,6 @@ import {
   UserRoundCog,
   Drama,
   FolderOpen,
-  DatabaseBackup,
-  ImageUp,
   FileCog,
   Book,
   KeyboardIcon,
@@ -67,7 +65,6 @@ const settingNavGroups: SettingNavGroup[] = [
   {
     id: 'system',
     items: [
-      { icon: <DatabaseBackup className="size-4 md:size-6" />, anchor: 'sync' },
       { icon: <KeyboardIcon className="size-4 md:size-6" />, anchor: 'shortcuts' },
       { icon: <Store className="size-4 md:size-6" />, anchor: 'about' },
     ],
@@ -79,7 +76,6 @@ const settingNavGroups: SettingNavGroup[] = [
       { icon: <Puzzle className="size-4 md:size-6" />, anchor: 'mcp' },
       { icon: <Drama className="size-4 md:size-6" />, anchor: 'prompt' },
       { icon: <Brain className="size-4 md:size-6" />, anchor: 'memories' },
-      { icon: <ImageUp className="size-4 md:size-6" />, anchor: 'imageHosting' },
       { icon: <ScanText className="size-4 md:size-6" />, anchor: 'imageMethod' },
       { icon: <UserRoundCog className="size-4 md:size-6" />, anchor: 'dev' },
     ],
@@ -101,8 +97,6 @@ export const settingSearchAliases: Record<string, string[]> = {
   general: ['常规', '通用', '主题', '语言', '外观', 'general', 'theme', 'language', 'dark', '暗黑'],
   chat: ['对话', '聊天', '主模型', '工具栏', 'chat', 'primary model', 'toolbar'],
   editor: ['编辑器', '补全', '提交信息', 'editor', 'completion', 'commit'],
-  sync: ['同步', '备份', '仓库', 'sync', 'backup', 'github', 'gitee', 'gitea', 'gitlab', 'webdav', 's3'],
-  imageHosting: ['图床', '图片上传', 'image hosting', 'picgo', 'smms'],
   ai: ['模型', '大模型', '密钥', 'key', 'apikey', 'api key', 'api', 'model', 'llm', 'provider', '供应商', 'openai', 'deepseek', 'qwen', 'gemini', 'claude', 'ollama', '硅基流动', 'siliconflow'],
   websearch: ['联网', '搜索', '联网搜索', 'web', 'search', 'tavily', 'bocha', '博查', 'fetch'],
   rag: ['知识库', '知识库检索', '向量', '嵌入', 'rag', 'knowledge', 'vector', 'embedding', 'rerank', '重排', '检索'],

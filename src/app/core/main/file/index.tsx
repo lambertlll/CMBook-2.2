@@ -246,13 +246,12 @@ function useFileManagerShortcuts() {
 }
 
 export function FileSidebar() {
-  const { initCollapsibleList, initSortSettings, initShowCloudFiles } = useArticleStore()
+  const { initCollapsibleList, initSortSettings } = useArticleStore()
   const { sidebarRef, focusSidebar } = useFileManagerShortcuts()
 
   useEffect(() => {
     initCollapsibleList()
     initSortSettings()
-    initShowCloudFiles()
   }, [])
 
   return (

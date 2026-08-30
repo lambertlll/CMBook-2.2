@@ -62,10 +62,6 @@ import { ArrowLeft, ArrowRight, Check, ChevronDown, FileText, FolderOpen, Home, 
 import type { Mark } from "@/db/marks"
 import { MarkItem } from "./mark-item"
 
-function shouldAutoSyncOnInitialRead(options?: { isNewFile?: boolean }) {
-  return options?.isNewFile !== true
-}
-
 interface OrganizeNotesProps {
   inputValue?: string;
 }
@@ -122,7 +118,7 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
   const { primaryModel } = useSettingStore()
   const { marks, fetchAllMarks, allMarks } = useMarkStore()
   const { currentTagId, tags, fetchTags } = useTagStore()
-  const { activeFilePath, fileTree, setActiveFilePath, loadFileTree, readArticle, setCurrentArticle, setSkipSyncOnSave, setAiGeneratingFilePath, setAiTerminateFn } = useArticleStore()
+  const { activeFilePath, fileTree, setActiveFilePath, loadFileTree, readArticle, setCurrentArticle, setAiGeneratingFilePath, setAiTerminateFn } = useArticleStore()
   const { setLeftSidebarTab } = useSidebarStore()
   const router = useRouter()
   const isMobile = useIsMobile()
@@ -594,9 +590,6 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
       })
 
       // 5. Stream generation to editor
-
-      // Skip sync for AI-generated content
-      setSkipSyncOnSave(true)
       setAiGeneratingFilePath(filePath)
       setAiTerminateFn(() => {
         if (abortControllerRef.current) {
@@ -632,8 +625,6 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
       }, signal)
       streamFinished = true
 
-      // Re-enable sync after AI generation
-      setSkipSyncOnSave(false)
       setAiGeneratingFilePath(null)
       setAiTerminateFn(null)
 
@@ -682,7 +673,7 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
         // Update file tree and active file
         await loadFileTree()
         setActiveFilePath(newFilePath)
-        await readArticle(newFilePath, '', shouldAutoSyncOnInitialRead({ isNewFile: true }))
+        await readArticle(newFilePath)
         if (shouldEmitOrganizeOnboardingComplete({ streamFinished, aborted: signal.aborted })) {
           emitter.emit('onboarding-step-complete', { step: 'organize-note', filePath: newFilePath })
         }
@@ -697,7 +688,7 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
         } else {
           await writeTextFile(pathOptions.path, cleanedContent, { baseDir: pathOptions.baseDir })
         }
-        await readArticle(filePath, '', shouldAutoSyncOnInitialRead())
+        await readArticle(filePath)
         if (shouldEmitOrganizeOnboardingComplete({ streamFinished, aborted: signal.aborted })) {
           emitter.emit('onboarding-step-complete', { step: 'organize-note', filePath })
         }
@@ -719,8 +710,6 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
       organizingRef.current = false
       abortControllerRef.current = null
       setLoading(false)
-      // Re-enable sync in case of termination
-      setSkipSyncOnSave(false)
       setAiGeneratingFilePath(null)
       setAiTerminateFn(null)
       // Emit AI streaming end event
@@ -750,7 +739,6 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
     setAiTerminateFn,
     setCurrentArticle,
     setLeftSidebarTab,
-    setSkipSyncOnSave,
     isMobile,
     tMark,
     router,

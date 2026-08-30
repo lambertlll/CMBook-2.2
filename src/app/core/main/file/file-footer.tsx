@@ -1,7 +1,7 @@
 'use client'
 
 import { Button } from "@/components/ui/button"
-import { FolderOpen, FolderSync, SortAsc, SortDesc, ChevronsDownUp, ChevronsUpDown, ArrowDownAZ, Calendar, Clock, ChevronDown, FolderPlus, Cloud } from "lucide-react"
+import { FolderOpen, FolderSync, SortAsc, SortDesc, ChevronsDownUp, ChevronsUpDown, ArrowDownAZ, Calendar, Clock, ChevronDown, FolderPlus } from "lucide-react"
 import useSettingStore from "@/stores/setting"
 import useArticleStore from "@/stores/article"
 import { useSkillsStore } from "@/stores/skills"
@@ -35,8 +35,6 @@ export function FileFooter() {
     setSortDirection,
     toggleAllFolders,
     collapsibleList,
-    showCloudFiles,
-    setShowCloudFiles
   } = useArticleStore()
   const tFile = useTranslations('settings.file')
   const tToolbar = useTranslations('article.file.toolbar')
@@ -152,16 +150,8 @@ export function FileFooter() {
 
       <Separator orientation="vertical" />
 
-      {/* 右侧：排序、云端开关、展开、刷新 */}
+      {/* 右侧：排序、展开、刷新 */}
       <div className="flex items-center gap-1">
-        {/* 云端文件开关 */}
-        <BottomBarIconButton
-          icon={<Cloud className={`size-3 ${showCloudFiles ? 'text-primary' : 'opacity-40'}`} />}
-          label={showCloudFiles ? tToolbar('hideCloudFiles') : tToolbar('showCloudFiles')}
-          onClick={() => setShowCloudFiles(!showCloudFiles)}
-          active={showCloudFiles}
-        />
-
         {/* 排序 */}
         <TooltipProvider>
           <DropdownMenu>

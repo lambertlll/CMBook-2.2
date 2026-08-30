@@ -2,15 +2,10 @@ import { Store } from '@tauri-apps/plugin-store'
 import { create } from 'zustand'
 import { getVersion } from '@tauri-apps/api/app'
 import { AiConfig } from '@/app/core/setting/config'
-import { GitlabInstanceType } from '@/lib/sync/gitlab.types'
-import { GiteaInstanceType } from '@/lib/sync/gitea.types'
 import { CustomThemeColors } from '@/types/theme'
 import { applyThemeColors, removeThemeColors } from '@/lib/theme-utils'
-import { getNormalizedImageHosting } from '@/lib/image-hosting-config'
 import { normalizeSpeechMode } from '@/lib/speech/preferences'
 import type { SpeechMode } from '@/lib/speech/types'
-import { enqueueAutoDataSync, isAutoDataSyncApplyingRemote } from '@/lib/sync/auto-data-sync-queue'
-import { shouldExcludeFromSync } from '@/config/sync-exclusions'
 import { DEFAULT_SYSTEM_PROMPT } from '@/lib/ai/system-prompt'
 import { APP_FONT_SYSTEM_VALUE, applyAppFontFamily } from '@/lib/font-settings'
 import { encryptSecret, decryptSecret } from './credential-crypto'
@@ -125,8 +120,7 @@ interface SettingState {
 
   // 联网搜索（web_search / web_fetch 工具）：
   // API Key 不落本 store 的持久化字段——在 store.json 中以 webSearchApiKey.<provider> 单独加密存储，
-  // 内存态 webSearchApiKeys 保存解密值（与 aliyunAsrApiKey 同一模式）；
-  // webSearchApiKeys 已在 sync-exclusions 中无条件排除，任何情况下都不会写回 store.json 或上传同步
+  // 内存态 webSearchApiKeys 保存解密值（与 aliyunAsrApiKey 同一模式）
   webSearchEnabled: boolean
   setWebSearchEnabled: (enabled: boolean) => Promise<void>
   webSearchProvider: 'tavily' | 'bocha'
@@ -200,64 +194,8 @@ interface SettingState {
   useImageRepo: boolean
   setUseImageRepo: (useImageRepo: boolean) => Promise<void>
 
-  autoSync: string
-  setAutoSync: (autoSync: string) => Promise<void>
-
-  autoDataSyncEnabled: boolean
-  setAutoDataSyncEnabled: (enabled: boolean) => Promise<void>
-
   excludeSensitiveConfig: boolean
   setExcludeSensitiveConfig: (enabled: boolean) => Promise<void>
-
-  // 自动拉取相关设置
-  autoPullOnOpen: boolean
-  setAutoPullOnOpen: (autoPullOnOpen: boolean) => Promise<void>
-
-  autoPullOnSwitch: boolean
-  setAutoPullOnSwitch: (autoPullOnSwitch: boolean) => Promise<void>
-
-  // Gitee 相关设置
-  giteeAccessToken: string
-  setGiteeAccessToken: (giteeAccessToken: string) => void
-
-  giteeAutoSync: string
-  setGiteeAutoSync: (giteeAutoSync: string) => Promise<void>
-
-  // Gitlab 相关设置
-  gitlabInstanceType: GitlabInstanceType
-  setGitlabInstanceType: (instanceType: GitlabInstanceType) => Promise<void>
-
-  gitlabCustomUrl: string
-  setGitlabCustomUrl: (customUrl: string) => Promise<void>
-
-  gitlabAccessToken: string
-  setGitlabAccessToken: (gitlabAccessToken: string) => void
-
-  gitlabAutoSync: string
-  setGitlabAutoSync: (gitlabAutoSync: string) => Promise<void>
-
-  gitlabUsername: string
-  setGitlabUsername: (gitlabUsername: string) => Promise<void>
-
-  // Gitea 相关设置
-  giteaInstanceType: GiteaInstanceType
-  setGiteaInstanceType: (instanceType: GiteaInstanceType) => Promise<void>
-
-  giteaCustomUrl: string
-  setGiteaCustomUrl: (customUrl: string) => Promise<void>
-
-  giteaAccessToken: string
-  setGiteaAccessToken: (giteaAccessToken: string) => void
-
-  giteaAutoSync: string
-  setGiteaAutoSync: (giteaAutoSync: string) => Promise<void>
-
-  giteaUsername: string
-  setGiteaUsername: (giteaUsername: string) => Promise<void>
-
-  // 主要备份方式设置
-  primaryBackupMethod: 'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav'
-  setPrimaryBackupMethod: (method: 'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav') => Promise<void>
 
   lastSettingPage: string
   setLastSettingPage: (page: string) => Promise<void>
@@ -281,19 +219,6 @@ interface SettingState {
   // 图床设置
   githubImageAccessToken: string
   setGithubImageAccessToken: (githubImageAccessToken: string) => Promise<void>
-
-  // 自定义仓库名称设置
-  githubCustomSyncRepo: string
-  setGithubCustomSyncRepo: (repo: string) => Promise<void>
-
-  giteeCustomSyncRepo: string
-  setGiteeCustomSyncRepo: (repo: string) => Promise<void>
-
-  gitlabCustomSyncRepo: string
-  setGitlabCustomSyncRepo: (repo: string) => Promise<void>
-
-  giteaCustomSyncRepo: string
-  setGiteaCustomSyncRepo: (repo: string) => Promise<void>
 
   githubCustomImageRepo: string
   setGithubCustomImageRepo: (repo: string) => Promise<void>
@@ -358,65 +283,6 @@ export interface RecordToolbarItem {
   id: string
   enabled: boolean
   order: number
-}
-
-let settingAutoSyncReady = false
-let settingAutoSyncSubscriptionInitialized = false
-
-function getChangedSyncableSettingKeys(current: SettingState, previous: SettingState): string[] {
-  const currentRecord = current as unknown as Record<string, unknown>
-  const previousRecord = previous as unknown as Record<string, unknown>
-  const excludeSensitiveConfig = current.excludeSensitiveConfig !== false
-
-  return Object.keys(currentRecord).filter((key) => {
-    if (typeof currentRecord[key] === 'function') {
-      return false
-    }
-
-    if (shouldExcludeFromSync(key, { excludeSensitiveConfig })) {
-      return false
-    }
-
-    return currentRecord[key] !== previousRecord[key]
-  })
-}
-
-function initSettingAutoSyncSubscription() {
-  if (settingAutoSyncSubscriptionInitialized) {
-    return
-  }
-
-  settingAutoSyncSubscriptionInitialized = true
-
-  useSettingStore.subscribe((current, previous) => {
-    if (!settingAutoSyncReady || isAutoDataSyncApplyingRemote()) {
-      return
-    }
-
-    const changedKeys = getChangedSyncableSettingKeys(current, previous)
-    if (changedKeys.length === 0) {
-      return
-    }
-
-    void persistChangedSyncableSettings(current, changedKeys)
-  })
-}
-
-async function persistChangedSyncableSettings(state: SettingState, changedKeys: string[]) {
-  const store = await Store.load('store.json')
-  const stateRecord = state as unknown as Record<string, unknown>
-
-  // 双保险：webSearchApiKeys 是内存态明文密钥，任何情况下都不得落盘/同步
-  // （正常路径已在 getChangedSyncableSettingKeys 经 sync-exclusions 无条件排除）
-  const persistKeys = changedKeys.filter((key) => key !== 'webSearchApiKeys')
-  if (persistKeys.length === 0) return
-
-  for (const key of persistKeys) {
-    await store.set(key, stateRecord[key])
-  }
-
-  await store.save()
-  enqueueAutoDataSync('settings', `settings:${persistKeys.join(',')}`)
 }
 
 const useSettingStore = create<SettingState>((set, get) => ({
@@ -656,17 +522,10 @@ const useSettingStore = create<SettingState>((set, get) => ({
           set({ [key]: res })
         }
       } else {
-        // store 缺键：用内存默认值回写。敏感键跳过回写（默认值多为占位空值，
-        // 落盘也无意义且可能引入明文路径）；真正有值的敏感配置由用户显式设置后经
-        // credential-crypto 加密落盘
-        if (!shouldExcludeFromSync(key)) {
-          await store.set(key, value)
-        }
+        // store 缺键：用内存默认值回写
+        await store.set(key, value)
       }
     }))
-
-    initSettingAutoSyncSubscription()
-    settingAutoSyncReady = true
   },
 
   version: '',
@@ -1032,27 +891,6 @@ const useSettingStore = create<SettingState>((set, get) => ({
     set({ useImageRepo })
     const store = await Store.load('store.json');
     await store.set('useImageRepo', useImageRepo)
-    if (useImageRepo) {
-      const normalizedImageHosting = getNormalizedImageHosting(await store.get<string>('mainImageHosting'))
-      if (normalizedImageHosting.shouldPersist) {
-        await store.set('mainImageHosting', normalizedImageHosting.value)
-      }
-    }
-    await store.save()
-  },
-
-  autoSync: '5',
-  setAutoSync: async (autoSync: string) => {
-    set({ autoSync })
-    const store = await Store.load('store.json');
-    await store.set('autoSync', autoSync)
-  },
-
-  autoDataSyncEnabled: true,
-  setAutoDataSyncEnabled: async (autoDataSyncEnabled: boolean) => {
-    set({ autoDataSyncEnabled })
-    const store = await Store.load('store.json')
-    await store.set('autoDataSyncEnabled', autoDataSyncEnabled)
     await store.save()
   },
 
@@ -1062,43 +900,6 @@ const useSettingStore = create<SettingState>((set, get) => ({
     const store = await Store.load('store.json')
     await store.set('excludeSensitiveConfig', excludeSensitiveConfig)
     await store.save()
-
-    if (!isAutoDataSyncApplyingRemote()) {
-      enqueueAutoDataSync('settings', 'settings:exclude-sensitive-config')
-    }
-  },
-
-  // 自动拉取相关设置 - 默认开启
-  autoPullOnOpen: true,
-  setAutoPullOnOpen: async (autoPullOnOpen: boolean) => {
-    set({ autoPullOnOpen })
-    const store = await Store.load('store.json');
-    await store.set('autoPullOnOpen', autoPullOnOpen)
-
-    // 同步更新 sync-manager 的配置
-    try {
-      const { getSyncManager } = await import('@/lib/sync/sync-manager')
-      const manager = getSyncManager()
-      await manager.updateConfig({ autoPullOnOpen })
-    } catch {
-      // 静默处理
-    }
-  },
-
-  autoPullOnSwitch: true,
-  setAutoPullOnSwitch: async (autoPullOnSwitch: boolean) => {
-    set({ autoPullOnSwitch })
-    const store = await Store.load('store.json');
-    await store.set('autoPullOnSwitch', autoPullOnSwitch)
-
-    // 同步更新 sync-manager 的配置
-    try {
-      const { getSyncManager } = await import('@/lib/sync/sync-manager')
-      const manager = getSyncManager()
-      await manager.updateConfig({ autoPullOnSwitch })
-    } catch {
-      // 静默处理
-    }
   },
 
   lastSettingPage: 'about',
@@ -1153,113 +954,6 @@ const useSettingStore = create<SettingState>((set, get) => ({
     await store.save()
   },
 
-  // Gitee 相关设置
-  giteeAccessToken: '',
-  setGiteeAccessToken: async (giteeAccessToken: string) => {
-    set({ giteeAccessToken })
-    const store = await Store.load('store.json');
-    await store.set('giteeAccessToken', giteeAccessToken)
-  },
-
-  giteeAutoSync: 'disabled',
-  setGiteeAutoSync: async (giteeAutoSync: string) => {
-    set({ giteeAutoSync })
-    const store = await Store.load('store.json');
-    await store.set('giteeAutoSync', giteeAutoSync)
-  },
-
-  // Gitlab 相关设置
-  gitlabInstanceType: GitlabInstanceType.OFFICIAL,
-  setGitlabInstanceType: async (instanceType: GitlabInstanceType) => {
-    const store = await Store.load('store.json')
-    await store.set('gitlabInstanceType', instanceType)
-    await store.save()
-    set({ gitlabInstanceType: instanceType })
-  },
-
-  gitlabCustomUrl: '',
-  setGitlabCustomUrl: async (customUrl: string) => {
-    const store = await Store.load('store.json')
-    await store.set('gitlabCustomUrl', customUrl)
-    await store.save()
-    set({ gitlabCustomUrl: customUrl })
-  },
-
-  gitlabAccessToken: '',
-  setGitlabAccessToken: (gitlabAccessToken: string) => {
-    set({ gitlabAccessToken })
-  },
-
-  gitlabAutoSync: 'disabled',
-  setGitlabAutoSync: async (gitlabAutoSync: string) => {
-    const store = await Store.load('store.json')
-    await store.set('gitlabAutoSync', gitlabAutoSync)
-    await store.save()
-    set({ gitlabAutoSync })
-  },
-
-  gitlabUsername: '',
-  setGitlabUsername: async (gitlabUsername: string) => {
-    const store = await Store.load('store.json')
-    await store.set('gitlabUsername', gitlabUsername)
-    await store.save()
-    set({ gitlabUsername })
-  },
-
-  // Gitea 相关实现
-  giteaInstanceType: GiteaInstanceType.OFFICIAL,
-  setGiteaInstanceType: async (instanceType: GiteaInstanceType) => {
-    const store = await Store.load('store.json')
-    await store.set('giteaInstanceType', instanceType)
-    await store.save()
-    set({ giteaInstanceType: instanceType })
-  },
-
-  giteaCustomUrl: '',
-  setGiteaCustomUrl: async (customUrl: string) => {
-    const store = await Store.load('store.json')
-    await store.set('giteaCustomUrl', customUrl)
-    await store.save()
-    set({ giteaCustomUrl: customUrl })
-  },
-
-  giteaAccessToken: '',
-  setGiteaAccessToken: (giteaAccessToken: string) => {
-    set({ giteaAccessToken })
-  },
-
-  giteaAutoSync: 'disabled',
-  setGiteaAutoSync: async (giteaAutoSync: string) => {
-    set({ giteaAutoSync })
-    const store = await Store.load('store.json');
-    await store.set('giteaAutoSync', giteaAutoSync)
-    await store.save()
-  },
-
-  giteaUsername: '',
-  setGiteaUsername: async (giteaUsername: string) => {
-    const store = await Store.load('store.json')
-    await store.set('giteaUsername', giteaUsername)
-    await store.save()
-    set({ giteaUsername })
-  },
-
-  giteaCustomSyncRepo: '',
-  setGiteaCustomSyncRepo: async (repo: string) => {
-    set({ giteaCustomSyncRepo: repo })
-    const store = await Store.load('store.json');
-    await store.set('giteaCustomSyncRepo', repo)
-    await store.save()
-  },
-
-  // 默认使用 GitHub 作为主要备份方式
-  primaryBackupMethod: 'github',
-  setPrimaryBackupMethod: async (method: 'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav') => {
-    const store = await Store.load('store.json')
-    await store.set('primaryBackupMethod', method)
-    await store.save()
-    set({ primaryBackupMethod: method })
-  },
 
   assetsPath: 'assets',
   setAssetsPath: async (path: string) => {
@@ -1420,31 +1114,6 @@ const useSettingStore = create<SettingState>((set, get) => ({
 
     // 清除自定义主题颜色
     removeThemeColors()
-  },
-
-  // 自定义仓库名称设置
-  githubCustomSyncRepo: '',
-  setGithubCustomSyncRepo: async (repo: string) => {
-    set({ githubCustomSyncRepo: repo })
-    const store = await Store.load('store.json');
-    await store.set('githubCustomSyncRepo', repo)
-    await store.save()
-  },
-
-  giteeCustomSyncRepo: '',
-  setGiteeCustomSyncRepo: async (repo: string) => {
-    set({ giteeCustomSyncRepo: repo })
-    const store = await Store.load('store.json');
-    await store.set('giteeCustomSyncRepo', repo)
-    await store.save()
-  },
-
-  gitlabCustomSyncRepo: '',
-  setGitlabCustomSyncRepo: async (repo: string) => {
-    set({ gitlabCustomSyncRepo: repo })
-    const store = await Store.load('store.json');
-    await store.set('gitlabCustomSyncRepo', repo)
-    await store.save()
   },
 
   githubCustomImageRepo: '',

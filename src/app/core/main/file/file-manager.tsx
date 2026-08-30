@@ -24,7 +24,6 @@ import { pasteIntoFolder } from "./folder-item/paste-into-folder"
 import {
   collectFolderMarkdownPaths,
   deleteLocalFolderIfExists,
-  deleteRemoteFolder,
   deleteVectorDocumentsByPaths,
   removeFolderFromTree,
 } from "./folder-item/delete-folder-utils"
@@ -44,18 +43,6 @@ import {
   hasFileManagerDragData,
   moveFileManagerEntry,
 } from "./file-dnd"
-
-// 递归过滤文件树，移除云端文件（如果 showCloudFiles 为 false）
-function filterFileTree(tree: DirTree[], showCloud: boolean): DirTree[] {
-  if (showCloud) return tree
-
-  return tree
-    .filter(item => item.isLocale)
-    .map(item => ({
-      ...item,
-      children: item.children ? filterFileTree(item.children, showCloud) : undefined
-    }))
-}
 
 function Tree({
   item,
@@ -166,7 +153,6 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
     addFile,
     newFolder,
     setFileTree,
-    showCloudFiles,
     moveLocalEntry,
     syncOpenTabsForPathChange,
     selectedFilePaths,
@@ -368,11 +354,7 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
 
   async function deleteFolder(entry: FileSelectionEntry, tree: DirTree[]) {
     const markdownPaths = await collectFolderMarkdownPaths(entry.path, entry.item)
-    const localDeleted = await deleteLocalFolderIfExists(entry.path)
-    const remoteResult = await deleteRemoteFolder(entry.item, localDeleted)
-    if (remoteResult.failedPaths.length > 0) {
-      throw new Error(`Delete remote folder failed: ${remoteResult.failedPaths.join(', ')}`)
-    }
+    await deleteLocalFolderIfExists(entry.path)
 
     await cleanTabsByDeletedFolder(entry.path)
     removeFolderFromTree(tree, entry.path)
@@ -606,19 +588,13 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
     }
   }, [handleDeleteSelectedEntries])
 
-  // 根据开关状态过滤文件树 - 使用 useMemo 缓存结果
-  const filteredFileTree = useMemo(
-    () => filterFileTree(fileTree, showCloudFiles),
-    [fileTree, showCloudFiles]
-  )
-
   useEffect(() => {
-    const availablePaths = new Set(flattenFileTree(filteredFileTree).map(entry => entry.path))
+    const availablePaths = new Set(flattenFileTree(fileTree).map(entry => entry.path))
     const nextSelectedPaths = selectedFilePaths.filter(path => availablePaths.has(path))
     if (nextSelectedPaths.length !== selectedFilePaths.length) {
       setSelectedFilePaths(nextSelectedPaths)
     }
-  }, [filteredFileTree, selectedFilePaths, setSelectedFilePaths])
+  }, [fileTree, selectedFilePaths, setSelectedFilePaths])
 
   return (
     <div
@@ -644,7 +620,7 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
       )}
       <div className="flex h-full min-h-full min-w-0 flex-col p-0">
         <ul className="min-w-0 shrink-0">
-          {filteredFileTree.map((item) => (
+          {fileTree.map((item) => (
             <Tree
               key={`${item.name}-${item.parent?.name || ''}-${item.sha || ''}-${item.isLocale}`}
               item={item}

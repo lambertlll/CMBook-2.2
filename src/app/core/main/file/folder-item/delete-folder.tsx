@@ -10,7 +10,6 @@ import { Kbd } from "@/components/ui/kbd"
 import {
   collectFolderMarkdownPaths,
   deleteLocalFolderIfExists,
-  deleteRemoteFolder,
   deleteVectorDocumentsByPaths,
   removeFolderFromTree,
 } from "./delete-folder-utils";
@@ -43,11 +42,7 @@ export function DeleteFolder({ item, shortcut }: DeleteFolderProps) {
       if (!confirmed) return;
 
       const markdownPaths = await collectFolderMarkdownPaths(path, item);
-      const localDeleted = await deleteLocalFolderIfExists(path);
-      const remoteResult = await deleteRemoteFolder(item, localDeleted);
-      if (remoteResult.failedPaths.length > 0) {
-        throw new Error(`Delete remote folder failed: ${remoteResult.failedPaths.join(', ')}`);
-      }
+      await deleteLocalFolderIfExists(path);
 
       // 清理已被删除的文件夹对应的 tabs（包括自动选择其他 tab）
       await cleanTabsByDeletedFolder(path)

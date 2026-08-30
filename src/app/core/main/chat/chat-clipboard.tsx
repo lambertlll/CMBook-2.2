@@ -14,7 +14,6 @@ import MessageControl from './message-control';
 import useChatStore from '@/stores/chat';
 import { Button } from '@/components/ui/button';
 import { useTranslations } from 'next-intl';
-import { uploadImage } from '@/lib/imageHosting';
 import { getImageRecognitionProgressText } from '@/lib/image-recognition-progress';
 
 export function ChatClipboard({chat}: { chat: Chat }) {
@@ -103,15 +102,6 @@ export function ChatClipboard({chat}: { chat: Chat }) {
       content,
       url: `${queueId}.png`,
       desc,
-    }
-    setQueue(queueId, { progress: t('record.mark.progress.uploadImage') });
-    const fileData = await readFile(toPath, { baseDir: BaseDirectory.AppData  })
-    const blob = new Blob([new Uint8Array(fileData)], { type: 'image/png' })
-    const file = new File([blob], `${queueId}.png`, { type: 'image/png' })
-    // 上传图片
-    const url = await uploadImage(file)
-    if (url) {
-      mark.url = url
     }
     removeQueue(queueId)
     await updateInsert(chat.id)

@@ -5,11 +5,7 @@ import { FileText } from 'lucide-react'
 import { WordCount } from './word-count'
 import { CopyButton } from './copy-button'
 import { ExportButton } from './export-button'
-import { SyncTools } from '../sync/sync-tools'
 import { OutlineToggle } from './outline-toggle'
-import { SyncButton } from '../sync/sync-button'
-import { PullButton } from '../sync/pull-button'
-import { HistorySheet } from '../sync/history-sheet'
 import useArticleStore from '@/stores/article'
 import { isMobileDevice } from '@/lib/check'
 
@@ -64,9 +60,6 @@ export function FooterBar({
         <div className="shrink-0 flex items-center gap-2">
           {/* E3：保存状态（移动端简短显示） */}
           <span className={`shrink-0 ${saveIndicator.cls}`}>{saveIndicator.text}</span>
-          <HistorySheet editor={editor} />
-          <SyncButton />
-          <PullButton editor={editor} />
         </div>
       </div>
     )
@@ -87,9 +80,6 @@ export function FooterBar({
         {/* E3：保存状态（编辑中/保存中/已保存 HH:mm/保存失败） */}
         <span className={`ml-1 shrink-0 ${saveIndicator.cls}`}>{saveIndicator.text}</span>
       </div>
-
-      {/* Right side: Sync tools */}
-      <SyncTools editor={editor} />
     </div>
   )
 }
